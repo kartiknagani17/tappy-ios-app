@@ -130,7 +130,7 @@ npm run import:off
 - Raw source fields are kept in `source_records.raw_json`, so products can be re-merged without re-downloading.
 - When both sources have a barcode, the record **with ingredients** wins, then the **newest update**; ties go to **USDA**. Missing images, sizes and nutrition are filled from the other source; ingredient lists are never mixed.
 
-Measured here on the October 2026 USDA file: food_nutrient.csv (26.2M rows) streamed at ~96k rows/s using ~180 MB of memory with a 512 MB heap cap.
+Measured on the October 2026 USDA file with a 512 MB heap cap (~180 MB actual memory): food_nutrient.csv (26.2M rows) streamed at ~96k rows/s, and the full import took 24 minutes. It read 2,010,212 branded rows (USDA keeps several versions per barcode; the newest wins) and produced **435,325 unique products, 99.5% with ingredient lists**, in a 2.2 GB SQLite file. Barcode lookups take 2–10 ms; a front-photo text search over all products takes ~150 ms. The Open Food Facts US import adds products USDA lacks, plus images.
 
 ```bash
 npm run migrate
