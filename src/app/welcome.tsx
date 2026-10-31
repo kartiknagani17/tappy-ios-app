@@ -33,7 +33,11 @@ export default function Welcome() {
         {AUTH_ENABLED ? (
           <Text style={styles.login}>
             Have an account?{' '}
-            <TextLink title="Log in" onPress={() => router.push({ pathname: '/auth', params: { mode: 'login' } })} style={{ fontSize: 15 }} />
+            <TextLink
+              title="Log in"
+              onPress={() => router.push({ pathname: '/auth', params: { mode: 'login' } })}
+              style={{ fontSize: 15 }}
+            />
           </Text>
         ) : null}
       </Footer>

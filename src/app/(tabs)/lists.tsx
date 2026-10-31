@@ -192,7 +192,7 @@ export default function Lists() {
                 setSettings(false);
               }}
             />
-          ) : (
+          ) : AUTH_ENABLED ? (
             <Row
               icon="user-plus"
               label="Create account / Log in"
@@ -201,7 +201,7 @@ export default function Lists() {
                 router.push({ pathname: '/auth', params: { mode: 'signup' } });
               }}
             />
-          )}
+          ) : null}
           {account ? <Row icon="user-x" label="Delete account" danger onPress={deleteAccount} testID="delete-account" /> : null}
           <Row
             icon="refresh-ccw"
