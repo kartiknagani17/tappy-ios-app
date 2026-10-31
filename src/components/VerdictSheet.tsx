@@ -5,7 +5,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { api, ApiError, type ApiProduct } from '../lib/api';
 import { haptic } from '../lib/haptics';
 import { useStore } from '../lib/store';
-import { computeVerdict, SOURCE_LABEL, VERDICT_COPY, type VerdictState } from '../lib/verdict';
+import { computeVerdict, SOURCE_LABEL, verdictCopy, type VerdictState } from '../lib/verdict';
 import { colors, noOutline, radius } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Button, CloseButton, RatingIcon } from './ui';
@@ -81,9 +81,9 @@ export function VerdictSheet({
                 ) : (
                   <Feather name="help-circle" size={30} color={colors.textMuted} />
                 )}
-                <Text style={styles.verdictTitle}>{VERDICT_COPY[verdict.state].title}</Text>
+                <Text style={styles.verdictTitle}>{verdictCopy(verdict).title}</Text>
               </View>
-              <Text style={styles.verdictBody}>{VERDICT_COPY[verdict.state].body}</Text>
+              <Text style={styles.verdictBody}>{verdictCopy(verdict).body}</Text>
               {verdict.flags.length ? (
                 <View style={{ marginTop: 10, gap: 6 }}>
                   {verdict.flags.map((f) => (
@@ -105,7 +105,7 @@ export function VerdictSheet({
               <Text style={styles.warningText}>Check the package yourself. Recipes change, and our data can be wrong or out of date.</Text>
             </View>
 
-            {verdict.state === 'unknown' && onPhotographLabel ? (
+            {verdict.reason === 'no_ingredients' && onPhotographLabel ? (
               <Button
                 title="Photograph the ingredient list"
                 onPress={() => onPhotographLabel(product.gtin14 || null)}
@@ -167,7 +167,12 @@ export function VerdictSheet({
 
 function highlight(text: string, terms: Set<string>) {
   if (!terms.size) return text;
-  const re = new RegExp(`(${[...terms].map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+  // Whole words only, so "egg" isn't highlighted inside "eggplant".
+  const alts = [...terms]
+    .sort((a, b) => b.length - a.length)
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+  const re = new RegExp(`(?<![A-Za-z0-9])(${alts})(?![A-Za-z0-9])`, 'gi');
   return text.split(re).map((part, i) =>
     terms.has(part.toLowerCase()) ? (
       <Text key={i} style={{ color: colors.danger, fontWeight: '700', textDecorationLine: 'underline' }}>

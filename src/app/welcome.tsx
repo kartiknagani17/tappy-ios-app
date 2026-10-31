@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { PhoneMockup } from '../components/art';
 import { Button, Footer, Logo, Screen, TextLink } from '../components/ui';
+import { AUTH_ENABLED } from '../lib/auth';
 import { useStore } from '../lib/store';
 import { colors } from '../theme';
 
@@ -29,10 +30,12 @@ export default function Welcome() {
             router.push('/onboarding/mindset');
           }}
         />
-        <Text style={styles.login}>
-          Have an account?{' '}
-          <TextLink title="Log in" onPress={() => router.push({ pathname: '/auth', params: { mode: 'login' } })} style={{ fontSize: 15 }} />
-        </Text>
+        {AUTH_ENABLED ? (
+          <Text style={styles.login}>
+            Have an account?{' '}
+            <TextLink title="Log in" onPress={() => router.push({ pathname: '/auth', params: { mode: 'login' } })} style={{ fontSize: 15 }} />
+          </Text>
+        ) : null}
       </Footer>
     </Screen>
   );

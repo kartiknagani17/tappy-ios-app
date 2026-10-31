@@ -13,6 +13,7 @@ import { Button, CloseButton, Logo } from '../../components/ui';
 import { VerdictSheet } from '../../components/VerdictSheet';
 import { api, ApiError, prepareUpload, type ApiProduct, type FrontResult } from '../../lib/api';
 import { haptic } from '../../lib/haptics';
+import { AUTH_ENABLED } from '../../lib/auth';
 import { useStore } from '../../lib/store';
 import { colors, noOutline, radius } from '../../theme';
 
@@ -42,7 +43,7 @@ const nowMs = () => Date.now();
 function markPushAsked() {
   useStore.getState().set({ askedPush: true });
   const st = useStore.getState();
-  if (!st.account && !st.accountPromptDismissed) {
+  if (AUTH_ENABLED && !st.account && !st.accountPromptDismissed) {
     setTimeout(() => router.push({ pathname: '/auth', params: { mode: 'signup', prompt: '1' } }), 350);
   }
 }
@@ -145,6 +146,14 @@ export default function Scan() {
     haptic.warning();
     if (e instanceof ApiError && e.code === 'daily_limit_reached') {
       setPrompt({ title: 'Daily free scans used', body: e.message + ' Start your free trial for unlimited scans.', actions: ['upgrade'] });
+    } else if (e instanceof ApiError && e.code === 'timeout') {
+      setPrompt({ title: 'Taking too long', body: e.message, actions: ['retry'] });
+    } else if (e instanceof ApiError && e.code === 'network') {
+      setPrompt({ title: 'You’re offline', body: e.message, actions: ['retry'] });
+    } else if (e instanceof ApiError && e.code === 'bad_response') {
+      setPrompt({ title: 'Something went wrong', body: e.message, actions: ['retry'] });
+    } else if (e instanceof ApiError && e.code === 'config') {
+      setPrompt({ title: 'Scanning is unavailable', body: e.message, actions: ['retry'] });
     } else if (e instanceof ApiError && e.code === 'rate_limited') {
       setPrompt({ title: 'Slow down a little', body: 'Too many scans in a short time. Try again in a minute.', actions: ['retry'] });
     } else {

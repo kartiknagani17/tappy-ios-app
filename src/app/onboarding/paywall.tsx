@@ -2,12 +2,10 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   Dimensions,
   Linking,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,7 +19,7 @@ import { Button, CloseButton, Screen } from '../../components/ui';
 import { haptic } from '../../lib/haptics';
 import { useStore } from '../../lib/store';
 import { PLANS, PRIVACY_URL, TERMS_URL, TRIAL_DAYS, money, restorePurchases, startTrial } from '../../lib/subscription';
-import { colors, radius } from '../../theme';
+import { colors } from '../../theme';
 
 const { width: W } = Dimensions.get('window');
 

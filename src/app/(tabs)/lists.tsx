@@ -7,6 +7,7 @@ import { DEMO_PRODUCTS, ProductTile, type DemoProduct } from '../../components/a
 import { BottomSheet } from '../../components/BottomSheet';
 import { ProductSheet } from '../../components/ProductSheet';
 import { Button, Screen } from '../../components/ui';
+import { AUTH_ENABLED } from '../../lib/auth';
 import { haptic } from '../../lib/haptics';
 import { rateNames, worst } from '../../lib/ratings';
 import { useStore } from '../../lib/store';
@@ -96,7 +97,7 @@ export default function Lists() {
         </Pressable>
       </View>
 
-      {!account ? (
+      {AUTH_ENABLED && !account ? (
         <Pressable
           testID="account-banner"
           accessibilityRole="button"
