@@ -34,7 +34,10 @@ export default function Commit() {
       if (ticker.current) clearInterval(ticker.current);
       // Don't navigate forward if the user already left this screen.
       if (advance.current) clearTimeout(advance.current);
+      cancelAnimation(pulse);
+      cancelAnimation(fill);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 

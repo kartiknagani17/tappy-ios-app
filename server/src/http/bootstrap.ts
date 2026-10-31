@@ -60,13 +60,18 @@ export function installShutdown({ server, db, timeoutMs, exit = (c) => process.e
         resolve();
         exit(code);
       };
+      // Keep-alive sockets become idle as in-flight requests finish: reap them promptly.
+      const reaper = setInterval(() => server.closeIdleConnections(), 100);
+      reaper.unref();
       const force = setTimeout(() => {
         server.closeAllConnections();
+        clearInterval(reaper);
         finish();
       }, timeoutMs);
       force.unref();
       server.close(() => {
         clearTimeout(force);
+        clearInterval(reaper);
         finish();
       });
       server.closeIdleConnections();
