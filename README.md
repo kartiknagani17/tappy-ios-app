@@ -78,8 +78,6 @@ These are stubbed so the app is fully clickable today:
 | Auth (email, Google, Apple, Facebook) | `src/app/auth.tsx` | Supabase / Firebase / Clerk + Sign in with Apple |
 | Feedback forms | `src/components/FeedbackSheet.tsx` | Your backend or a form endpoint |
 | Terms / Privacy URLs | `src/lib/subscription.ts` | Your real legal pages |
-| Paywall testimonials | `src/app/onboarding/paywall.tsx` → `REVIEWS` | Real App Store reviews |
-| "872 people have joined this plan today!" | `src/lib/subscription.ts` → `JOINED_TODAY` | Your real daily conversion count (e.g. remote config) |
 
 Brand colors live in `src/theme.ts`.
 

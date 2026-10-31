@@ -24,12 +24,6 @@ export function formatReminderDate(from = new Date()) {
   return reminderDate(from).toLocaleDateString('en-US', { month: 'long', day: '2-digit' });
 }
 
-/**
- * Social-proof count on the paywall ("872 people have joined this plan today!").
- * Set this from your real daily conversion data (e.g. a remote config value) so it stays accurate.
- */
-export const JOINED_TODAY = 872;
-
 export const money = (n: number) => `$${n.toFixed(2)}`;
 
 /**
