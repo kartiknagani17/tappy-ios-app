@@ -71,9 +71,7 @@ export default function Reminder() {
           We'll remind you <Text style={{ color: colors.purpleDark }}>{`${REMINDER_DAYS_BEFORE}\u00A0days`}</Text>
           {'\n'}before your trial ends
         </Animated.Text>
-        <Text style={styles.sub}>
-          If you start a free trial, we'll send a reminder on {formatReminderDate()}. Allow notifications on the next prompt to get it.
-        </Text>
+        <Text style={styles.sub}>You'll get a push notification on {formatReminderDate()}</Text>
       </View>
       <Footer border={false}>
         <Button testID="continue" title="Continue" loading={busy} onPress={onContinue} textStyle={{ fontWeight: '700' }} />
@@ -85,5 +83,5 @@ export default function Reminder() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   title: { fontSize: 31, lineHeight: 40, fontWeight: '800', textAlign: 'center', marginTop: 36, color: '#000', letterSpacing: -0.6 },
-  sub: { fontSize: 15, lineHeight: 21, fontWeight: '500', color: '#111', marginTop: 16, textAlign: 'center' },
+  sub: { fontSize: 15, fontWeight: '500', color: '#111', marginTop: 16, textAlign: 'center' },
 });

@@ -17,7 +17,12 @@ export default function ScannerReady() {
   return (
     <Screen>
       <Text style={styles.kicker}>Your personalized scanner is ready!</Text>
-      <Animated.View entering={FadeIn.duration(500)} style={[styles.card, { height: cardH }]} accessible={false} importantForAccessibility="no-hide-descendants">
+      <Animated.View
+        entering={FadeIn.duration(500)}
+        style={[styles.card, { height: cardH }]}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
         <LinearGradient colors={['#F2E9D8', '#D9CCB4', '#9B8F7C']} style={StyleSheet.absoluteFill} />
         {/* stylized grocery aisle */}
         {[0, 1, 2, 3].map((row) => (
@@ -45,9 +50,11 @@ export default function ScannerReady() {
           </View>
         </Animated.View>
       </Animated.View>
-      <Text style={[styles.headline, compact && { fontSize: 22, lineHeight: 28, marginTop: 16 }]}>Scan from 100,000+ products and know if something's safe. Instantly.</Text>
+      <Text style={[styles.headline, compact && { fontSize: 22, lineHeight: 28, marginTop: 16 }]}>
+        Scan from 100,000+ products and know if something's safe. Instantly.
+      </Text>
       <View style={{ flex: 1 }} />
-      <Footer border={false}>
+      <Footer>
         <Button testID="continue" title="Continue" onPress={() => router.replace('/onboarding/pass')} />
       </Footer>
     </Screen>

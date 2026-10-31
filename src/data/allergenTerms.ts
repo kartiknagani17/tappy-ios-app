@@ -9,6 +9,9 @@
  * "anchovies"), and accents are folded ("blé" → "ble"), so list each word once, unaccented.
  * Longer phrases win over shorter ones, so a phrase with no tags (e.g. "cream of tartar")
  * stops a shorter word inside it ("cream") from being flagged.
+ *
+ * Deliberately NOT included: "X-free" / "free from X" negations. Treating them as negations could hide
+ * a real allergen (e.g. OCR dropping a comma in "wheat, free-range eggs"), so they over-flag instead.
  */
 export const EXTRA_TERMS: Record<string, string[]> = {
   // ---- Milk ----

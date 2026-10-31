@@ -88,7 +88,9 @@ export function BottomSheet({
             accessibilityRole="button"
             accessibilityLabel="Dismiss"
             accessible={!locked}
-            style={{ flex: 1 }} onPress={locked ? undefined : onClose} />
+            style={{ flex: 1 }}
+            onPress={locked ? undefined : onClose}
+          />
         </Animated.View>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.anchor} pointerEvents="box-none">
           <GestureDetector gesture={pan}>

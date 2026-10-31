@@ -15,7 +15,7 @@ type Props = {
 };
 
 /**
- * Full-height sheet with Cancel / Send in the header, used for
+ * Full-height sheet with Cancel / Next in the header, used for
  * "Don't see an ingredient?" and "Feedback on this restriction?".
  */
 export function FeedbackSheet(props: Props) {
@@ -53,7 +53,7 @@ function FeedbackBody({ onClose, header, title, body, placeholder = 'Let us know
             setSent(true);
           }}
         >
-          <Text style={[styles.barBtn, (!canSend || sent) && { opacity: 0.35 }]}>Send</Text>
+          <Text style={[styles.barBtn, (!canSend || sent) && { opacity: 0.35 }]}>Next</Text>
         </Pressable>
       </View>
       <View style={styles.body}>

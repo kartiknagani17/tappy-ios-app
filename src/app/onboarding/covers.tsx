@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { BottomSheet } from '../../components/BottomSheet';
 import { Button, Footer, OnboardingHeader, Screen, TextLink } from '../../components/ui';
-import { goNext, progressFor } from '../../lib/flow';
+import { goNext } from '../../lib/flow';
 import { colors } from '../../theme';
 
 export default function Covers() {
@@ -17,7 +17,7 @@ export default function Covers() {
 
   return (
     <Screen>
-      <OnboardingHeader progress={progressFor('covers')} />
+      <OnboardingHeader />
       <View style={styles.content}>
         <Animated.Text entering={FadeInDown.duration(500)} style={styles.title}>
           Tapi covers over 2,900 dietary needs

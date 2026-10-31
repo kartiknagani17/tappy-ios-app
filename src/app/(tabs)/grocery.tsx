@@ -58,6 +58,7 @@ export default function Grocery() {
             accessibilityRole="switch"
             accessibilityLabel="Only show products that likely work for you"
             accessibilityState={{ checked: likelyOnly }}
+            hitSlop={4}
             style={[styles.filter, likelyOnly && styles.filterOn]}
             onPress={() => {
               haptic.select();
@@ -71,7 +72,8 @@ export default function Grocery() {
             testID="category"
             accessibilityRole="button"
             accessibilityLabel={`Category: ${category}`}
-            style={[styles.filter, category !== CATEGORIES[0] && styles.filterOn]}
+            hitSlop={4}
+            style={styles.filter}
             onPress={() => setPicker(true)}
           >
             <Text style={styles.filterText}>{category === CATEGORIES[0] ? 'Category' : category}</Text>
@@ -100,7 +102,7 @@ export default function Grocery() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No matching products</Text>
-            <Text style={styles.emptyBody}>Try turning off “Likely Works”, changing the category, or searching for something else.</Text>
+            <Text style={styles.emptyBody}>Try turning off “Likely Works” or searching for something else.</Text>
           </View>
         }
       />
@@ -155,7 +157,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
-    minHeight: 40,
+    height: 36,
   },
   filterOn: { borderColor: colors.ink, backgroundColor: '#F6FFE0' },
   filterText: { fontSize: 14, color: colors.ink },

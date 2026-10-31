@@ -197,3 +197,23 @@ describe('config', () => {
     assert.equal(c.visionCacheMaxHammingDistance <= 3, true);
   });
 });
+
+describe('allergen statements', () => {
+  it("joins Contains and May contain with '. ' so they stay separable", async () => {
+    const { joinAllergenStatements } = await import('../src/services/scan.ts');
+    assert.equal(joinAllergenStatements('Contains: milk', 'May contain: peanuts'), 'Contains: milk. May contain: peanuts');
+    assert.equal(joinAllergenStatements('Contains: milk.', 'May contain: peanuts.'), 'Contains: milk. May contain: peanuts');
+    assert.equal(joinAllergenStatements(null, 'May contain: nuts'), 'May contain: nuts');
+    assert.equal(joinAllergenStatements('', null), null);
+
+    const db = await seededDb();
+    const provider = new MockVisionProvider([
+      { text: labelJson({ contains_statement: 'Contains: milk, soy', may_contain_statement: 'May contain tree nuts' }) },
+    ]);
+    const { scan } = makeScan(db, provider);
+    const r = await scan.scanLabel(await packagePhoto(81), 'u-12345678', { gtin: '036000291452' });
+    assert.equal(r.status === 'contributed' && r.product.allergens_text, 'Contains: milk, soy. May contain tree nuts');
+    const row = db.prepare('SELECT allergens_text FROM contributions').get() as { allergens_text: string };
+    assert.equal(row.allergens_text, 'Contains: milk, soy. May contain tree nuts');
+  });
+});

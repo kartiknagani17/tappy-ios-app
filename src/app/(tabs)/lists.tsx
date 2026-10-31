@@ -167,12 +167,10 @@ export default function Lists() {
               trackColor={{ true: colors.purple, false: '#D1D1D6' }}
             />
           </View>
-          <Text style={styles.group}>Subscription</Text>
           <Row icon="rotate-ccw" label={restoring ? 'Restoring…' : 'Restore purchases'} onPress={restore} testID="restore" />
           {trialActive && Platform.OS === 'ios' ? (
             <Row icon="credit-card" label="Manage subscription" onPress={() => Linking.openURL(MANAGE_SUBSCRIPTIONS_URL)} external />
           ) : null}
-          <Text style={styles.group}>Support & legal</Text>
           <Row icon="mail" label="Contact support" onPress={contactSupport} testID="contact" external />
           <Row icon="shield" label="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_URL)} testID="privacy" external />
           <Row icon="file-text" label="Terms of Use" onPress={() => Linking.openURL(TERMS_URL)} testID="terms" external />
@@ -184,7 +182,6 @@ export default function Lists() {
               router.push('/credits');
             }}
           />
-          <Text style={styles.group}>Account</Text>
           {account ? (
             <Row
               icon="log-out"
@@ -240,10 +237,16 @@ function Row({
   testID?: string;
 }) {
   return (
-    <Pressable testID={testID} accessibilityRole={external ? 'link' : 'button'} accessibilityLabel={label} style={styles.row} onPress={onPress}>
+    <Pressable
+      testID={testID}
+      accessibilityRole={external ? 'link' : 'button'}
+      accessibilityLabel={label}
+      style={styles.row}
+      onPress={onPress}
+    >
       <Feather name={icon} size={20} color={danger ? colors.danger : colors.ink} />
       <Text style={[styles.rowText, danger && { color: colors.danger }]}>{label}</Text>
-      <Feather name={external ? 'external-link' : 'chevron-right'} size={18} color={colors.textSubtle} />
+      <Feather name="chevron-right" size={20} color={colors.textSubtle} />
     </Pressable>
   );
 }
@@ -268,7 +271,6 @@ const styles = StyleSheet.create({
   emptyBody: { fontSize: 15, color: colors.textMuted, textAlign: 'center', marginTop: 6 },
   sheetTitle: { fontSize: 22, fontWeight: '600', color: colors.ink, marginVertical: 8 },
   account: { fontSize: 14, color: colors.textMuted, marginBottom: 8 },
-  group: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 2 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

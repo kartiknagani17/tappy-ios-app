@@ -1,28 +1,46 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import {
+  Alert,
+  Dimensions,
+  Linking,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
+import Animated, { FadeIn, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { BottomSheet } from '../../components/BottomSheet';
-import { Button, CloseButton, Footer, Screen } from '../../components/ui';
+import { Button, CloseButton, Screen } from '../../components/ui';
 import { haptic } from '../../lib/haptics';
 import { useStore } from '../../lib/store';
 import { PLANS, PRIVACY_URL, TERMS_URL, TRIAL_DAYS, money, restorePurchases, startTrial } from '../../lib/subscription';
-import { colors } from '../../theme';
+import { colors, radius } from '../../theme';
 
-// What the subscription unlocks. Plain feature list: no testimonials or live counters
-// unless they come from real, verifiable data (App Store guidelines 2.3.1 / 5.6).
-const FEATURES: { icon: React.ComponentProps<typeof Feather>['name']; text: string }[] = [
-  { icon: 'maximize', text: 'Unlimited barcode scans' },
-  { icon: 'camera', text: 'Photo scans of packages and ingredient lists' },
-  { icon: 'sliders', text: 'Ratings personalized to every diet and allergy in your profile' },
-  { icon: 'bookmark', text: 'Save products to lists' },
+const { width: W } = Dimensions.get('window');
+
+// What the plan includes. (Testimonials and a "people joined today" count were removed: they were
+// placeholders, and unverifiable reviews/counters are a rejection risk under App Store guidelines 2.3.1 / 5.6.
+// Only add them back with real, verifiable data.)
+const SLIDES = [
+  { emoji: '🔎', title: 'Unlimited scans', text: 'Scan any barcode and instantly see if it fits your diet, allergies, and avoidances.' },
+  { emoji: '📸', title: 'Photo scanning', text: 'No barcode handy? Snap the package or the ingredient list and Tapi reads it for you.' },
+  {
+    emoji: '🥗',
+    title: 'Personalized ratings',
+    text: 'Every ingredient is rated against your dietary profile: can eat, limit this, or avoid.',
+  },
+  { emoji: '🔖', title: 'Lists', text: 'Save the products that work for you so your next grocery run is faster.' },
 ];
 
-const renewalCopy = (price: number) =>
-  `Payment is charged to your Apple ID when the free trial ends. The subscription renews automatically at ${money(price)}/year unless canceled at least 24 hours before the end of the trial or current period. Cancel anytime in Settings > Apple ID > Subscriptions.`;
-
 export default function Paywall() {
+  const [trial, setTrial] = useState(true);
   const [loading, setLoading] = useState(false);
   const [offer, setOffer] = useState(false);
   const [offerLoading, setOfferLoading] = useState(false);
@@ -40,28 +58,26 @@ export default function Paywall() {
   );
 
   // During onboarding the paywall leads to the safety screen. When opened later
-  // (e.g. from "See plans" on the scanner), it returns to where the user came from.
+  // (e.g. "See plans" on the scanner), it returns to where the user came from.
   const leave = () => {
     if (!useStore.getState().onboarded) router.replace('/onboarding/safety');
     else if (router.canGoBack()) router.back();
     else router.replace('/(tabs)/scan');
   };
 
-  const purchase = async (productId: string, setBusy: (b: boolean) => void) => {
+  const purchase = async (productId: string, withTrial: boolean, setBusy: (b: boolean) => void) => {
     if (loading || offerLoading) return;
     setBusy(true);
     setMessage(null);
     try {
-      const ok = await startTrial(productId, true);
+      const ok = await startTrial(productId, withTrial);
       if (!mounted.current) return;
       if (ok) {
         haptic.success();
         set({ trialActive: true });
         setOffer(false);
         leave();
-      } else {
-        setMessage('The purchase was not completed. You have not been charged.');
-      }
+      } else setMessage('The purchase was not completed. You have not been charged.');
     } catch {
       if (mounted.current) setMessage('Something went wrong with the App Store. Please try again.');
     } finally {
@@ -80,9 +96,7 @@ export default function Paywall() {
         haptic.success();
         set({ trialActive: true });
         leave();
-      } else {
-        setMessage('No active Tapi subscription was found for this Apple ID.');
-      }
+      } else setMessage('No active Tapi subscription was found for this Apple ID.');
     } catch {
       if (mounted.current) setMessage('Could not reach the App Store. Please try again.');
     } finally {
@@ -94,70 +108,75 @@ export default function Paywall() {
     <Screen>
       <View style={styles.top}>
         <CloseButton testID="paywall-close" onPress={() => setOffer(true)} size={30} color="#4A4A5A" />
-        <Pressable testID="restore" accessibilityRole="button" accessibilityLabel="Restore purchases" hitSlop={12} onPress={restore}>
-          <Text style={styles.restoreTop}>{restoring ? 'Restoring…' : 'Restore'}</Text>
-        </Pressable>
       </View>
-
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      {/* Scrolls only when the screen is too short (iPhone SE) so the legal links stay reachable. */}
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <Text style={styles.title} accessibilityRole="header">
           Choose your plan
         </Text>
-        <Text style={styles.subtitle}>Try Tapi Unlimited free for {TRIAL_DAYS} days.</Text>
 
-        <View style={styles.features}>
-          {FEATURES.map((f) => (
-            <View key={f.text} style={styles.feature}>
-              <View style={styles.featureIcon}>
-                <Feather name={f.icon} size={18} color={colors.purpleDark} />
-              </View>
-              <Text style={styles.featureText}>{f.text}</Text>
+        <Carousel />
+
+        <View style={{ flex: 1 }} />
+
+        <View style={styles.bottom}>
+          <View style={styles.trialRow}>
+            <Text style={styles.trialText}>{trial ? `${TRIAL_DAYS} Day Free Trial Activated` : 'Enable free trial'}</Text>
+            <Switch
+              testID="trial-toggle"
+              accessibilityLabel="Free trial"
+              value={trial}
+              onValueChange={(v) => {
+                haptic.select();
+                setTrial(v);
+              }}
+              trackColor={{ true: colors.purpleDark, false: '#D1D1D6' }}
+              ios_backgroundColor="#D1D1D6"
+            />
+          </View>
+
+          <View
+            style={styles.planCard}
+            accessible
+            accessibilityRole="radio"
+            accessibilityState={{ selected: true }}
+            accessibilityLabel={`1 year plan, ${money(plan.price)} per year`}
+          >
+            <View style={styles.planCheck}>
+              <Feather name="check" size={16} color={colors.ink} />
             </View>
-          ))}
-        </View>
-
-        <View
-          style={styles.planCard}
-          accessible
-          accessibilityRole="radio"
-          accessibilityState={{ selected: true }}
-          accessibilityLabel={`Annual plan, ${TRIAL_DAYS} days free, then ${money(plan.price)} per year`}
-        >
-          <View style={styles.planCheck}>
-            <Feather name="check" size={16} color={colors.ink} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.planName}>{plan.label}</Text>
+              <Text style={styles.planSub}>{money(monthly)}/month, billed yearly</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.planPrice}>{money(plan.price)}</Text>
+              <Text style={styles.planSub}>/ year</Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.planName}>Annual</Text>
-            <Text style={styles.planSub}>{TRIAL_DAYS}-day free trial</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.planPrice}>{money(plan.price)}/year</Text>
-            <Text style={styles.planSub}>about {money(monthly)}/month</Text>
-          </View>
-        </View>
+          <View style={{ height: 18 }} />
+          {message ? (
+            <Text style={styles.message} accessibilityLiveRegion="polite">
+              {message}
+            </Text>
+          ) : null}
 
-        <Text style={styles.terms}>{renewalCopy(plan.price)}</Text>
-      </ScrollView>
-
-      <Footer>
-        {message ? (
-          <Text style={styles.message} accessibilityLiveRegion="polite">
-            {message}
+          <Button
+            testID="start-trial"
+            title={trial ? 'Start FREE trial' : 'Continue'}
+            loading={loading}
+            onPress={() => purchase(plan.id, trial, setLoading)}
+            style={{ borderRadius: 16, height: 60 }}
+            textStyle={{ fontWeight: '800', fontSize: 19 }}
+          />
+          <Text style={styles.fine}>
+            {trial
+              ? `${TRIAL_DAYS} days free, then ${money(plan.price)}/year. Renews automatically unless canceled at least 24 hours before the trial ends. Cancel anytime in Settings.`
+              : `${money(plan.price)}/year. Renews automatically each year unless canceled at least 24 hours before renewal. Cancel anytime in Settings.`}
           </Text>
-        ) : null}
-        <Button
-          testID="start-trial"
-          title="Start free trial"
-          loading={loading}
-          onPress={() => purchase(plan.id, setLoading)}
-          style={{ borderRadius: 16, minHeight: 60 }}
-          textStyle={{ fontWeight: '800', fontSize: 19 }}
-        />
-        <Text style={styles.fine}>
-          {TRIAL_DAYS} days free, then {money(plan.price)}/year. Auto-renews. Cancel anytime.
-        </Text>
-        <LegalRow onRestore={restore} restoring={restoring} />
-      </Footer>
+          <LegalRow onRestore={restore} restoring={restoring} />
+        </View>
+      </ScrollView>
 
       <BottomSheet
         visible={offer}
@@ -175,29 +194,31 @@ export default function Paywall() {
         <Animated.View entering={FadeIn} style={styles.offer}>
           <Text style={styles.offerTitle}>Before you go...</Text>
           <Text style={styles.offerSub}>
-            {TRIAL_DAYS} days free, then {money(PLANS.annualOffer.price)}/year
+            {TRIAL_DAYS} days free, then only {money(PLANS.annualOffer.price)} / year
           </Text>
           <Text style={styles.offerNoPay}>No payment now · Cancel anytime</Text>
           <Button
             testID="offer-accept"
             title="Start my free week"
             loading={offerLoading}
-            onPress={() => purchase(PLANS.annualOffer.id, setOfferLoading)}
-            style={{ marginTop: 28 }}
+            onPress={() => purchase(PLANS.annualOffer.id, true, setOfferLoading)}
+            style={{ marginTop: 40 }}
             textStyle={{ fontWeight: '800', fontSize: 19 }}
           />
-          <Text style={styles.offerTerms}>{renewalCopy(PLANS.annualOffer.price)}</Text>
+          <Text style={[styles.fine, { marginTop: 10 }]}>
+            Renews at {money(PLANS.annualOffer.price)}/year unless canceled at least 24 hours before the trial ends.
+          </Text>
           <LegalRow />
           <Pressable
             testID="offer-decline"
             accessibilityRole="button"
-            style={{ paddingVertical: 14, minHeight: 44 }}
+            style={{ paddingVertical: 16 }}
             onPress={() => {
               setOffer(false);
               leave();
             }}
           >
-            <Text style={styles.decline}>No thanks, continue without a trial →</Text>
+            <Text style={styles.decline}>Decline one-time offer →</Text>
           </Pressable>
         </Animated.View>
       </BottomSheet>
@@ -210,67 +231,111 @@ function LegalRow({ onRestore, restoring }: { onRestore?: () => void; restoring?
     <View style={styles.legal}>
       {onRestore ? (
         <>
-          <Text accessibilityRole="button" style={styles.legalLink} onPress={onRestore}>
-            {restoring ? 'Restoring…' : 'Restore purchases'}
+          <Text testID="restore" accessibilityRole="button" style={styles.legalLink} onPress={onRestore}>
+            {restoring ? 'Restoring…' : 'Restore'}
           </Text>
           <Text style={styles.legalDot}>·</Text>
         </>
       ) : null}
       <Text accessibilityRole="link" style={styles.legalLink} onPress={() => Linking.openURL(TERMS_URL)}>
-        Terms of Use
+        Terms
       </Text>
       <Text style={styles.legalDot}>·</Text>
       <Text accessibilityRole="link" style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
-        Privacy Policy
+        Privacy
       </Text>
     </View>
   );
 }
 
+function Carousel() {
+  const ref = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const [index, setIndex] = useState(0);
+  const dragging = useRef(false);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (dragging.current) return;
+      setIndex((i) => {
+        const next = (i + 1) % SLIDES.length;
+        ref.current?.scrollTo({ x: next * W, animated: true });
+        return next;
+      });
+    }, 4200);
+    return () => clearInterval(id);
+  }, []);
+
+  const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    dragging.current = false;
+    setIndex(Math.round(e.nativeEvent.contentOffset.x / W));
+  };
+
+  return (
+    <View style={{ marginTop: 28 }}>
+      <ScrollView
+        ref={ref}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScrollBeginDrag={() => (dragging.current = true)}
+        onMomentumScrollEnd={onEnd}
+        scrollEventThrottle={16}
+      >
+        {SLIDES.map((r) => (
+          <View key={r.title} style={{ width: W, alignItems: 'center', paddingHorizontal: 40 }}>
+            <Text style={styles.stars}>{r.emoji}</Text>
+            <Text style={styles.authorName}>{r.title}</Text>
+            <Text style={styles.review}>{r.text}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      <View style={styles.dots}>
+        {SLIDES.map((_, i) => (
+          <Dot key={i} active={i === index} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function Dot({ active }: { active: boolean }) {
+  const s = useAnimatedStyle(() => ({
+    width: withTiming(active ? 24 : 8, { duration: 220 }),
+    backgroundColor: active ? colors.purpleDark : '#D9D9DE',
+  }));
+  return <Animated.View style={[styles.dot, s]} />;
+}
+
 const styles = StyleSheet.create({
-  top: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  restoreTop: { fontSize: 15, fontWeight: '600', color: colors.textMuted },
-  scroll: { paddingHorizontal: 20, paddingBottom: 16 },
-  title: { fontSize: 30, fontWeight: '800', textAlign: 'center', color: '#000', marginTop: 4, letterSpacing: -0.6 },
-  subtitle: { fontSize: 16, lineHeight: 22, color: colors.text, textAlign: 'center', marginTop: 8 },
-  features: { gap: 14, marginTop: 24, marginBottom: 24 },
-  feature: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  featureIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.purpleSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureText: { flex: 1, fontSize: 16, lineHeight: 22, color: colors.ink },
+  top: { paddingHorizontal: 20, paddingTop: 12, height: 52, justifyContent: 'center' },
+  title: { fontSize: 30, fontWeight: '800', textAlign: 'center', color: '#000', marginTop: 12, letterSpacing: -0.6 },
+  stars: { fontSize: 26, letterSpacing: 4 },
+  review: { fontSize: 16, lineHeight: 23, color: '#6E6E73', textAlign: 'center', marginTop: 10 },
+  authorName: { fontSize: 17, fontWeight: '700', color: '#1B1B2A', marginTop: 16 },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 24 },
+  dot: { height: 8, borderRadius: 4 },
+  bottom: { paddingHorizontal: 20, paddingBottom: 8 },
+  trialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, marginBottom: 16 },
+  trialText: { fontSize: 17, fontWeight: '700', color: '#000' },
   planCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     borderWidth: 2.5,
-    borderColor: colors.purpleDark,
-    borderRadius: 24,
+    borderColor: colors.lime,
+    borderRadius: 40,
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
   planCheck: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.lime, alignItems: 'center', justifyContent: 'center' },
   planName: { fontSize: 19, fontWeight: '800', color: '#000' },
-  planSub: { fontSize: 14, color: colors.textMuted, marginTop: 2 },
-  planPrice: { fontSize: 20, fontWeight: '700', color: '#000' },
-  terms: { fontSize: 12, lineHeight: 17, color: colors.textMuted, marginTop: 14 },
-  message: { fontSize: 14, lineHeight: 20, color: colors.danger, textAlign: 'center' },
-  fine: { fontSize: 13, color: '#222', textAlign: 'center' },
-  legal: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 8 },
-  legalLink: { fontSize: 13, color: colors.textMuted, textDecorationLine: 'underline', paddingVertical: 4 },
-  legalDot: { fontSize: 13, color: colors.textMuted, paddingVertical: 4 },
+  planSub: { fontSize: 14, color: '#222', marginTop: 2 },
+  planPrice: { fontSize: 22, color: '#000' },
+  fine: { fontSize: 13, color: '#222', textAlign: 'center', marginTop: 12 },
+  message: { fontSize: 13, color: colors.danger, textAlign: 'center', marginBottom: 12 },
+  legal: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 8 },
+  legalLink: { fontSize: 12, color: colors.textMuted, textDecorationLine: 'underline' },
+  legalDot: { fontSize: 12, color: colors.textMuted },
   ribbon: { width: 300, height: 110, alignItems: 'center', justifyContent: 'center' },
   ribbonBack: {
     position: 'absolute',
@@ -294,8 +359,7 @@ const styles = StyleSheet.create({
   ribbonText: { fontSize: 32, fontWeight: '900', fontStyle: 'italic', color: '#000', letterSpacing: 0.5 },
   offer: { paddingHorizontal: 24, paddingTop: 76, alignItems: 'stretch' },
   offerTitle: { fontSize: 34, fontWeight: '900', textAlign: 'center', color: '#000', letterSpacing: -0.6 },
-  offerSub: { fontSize: 17, color: '#55555F', textAlign: 'center', marginTop: 14 },
-  offerNoPay: { fontSize: 16, fontWeight: '800', color: '#55555F', textAlign: 'center', marginTop: 6 },
-  offerTerms: { fontSize: 11, lineHeight: 15, color: colors.textMuted, textAlign: 'center', marginTop: 12, marginBottom: 6 },
-  decline: { fontSize: 16, color: '#55555F', textAlign: 'center' },
+  offerSub: { fontSize: 17, color: '#7A7A85', textAlign: 'center', marginTop: 14 },
+  offerNoPay: { fontSize: 16, fontWeight: '800', color: '#7A7A85', textAlign: 'center', marginTop: 6 },
+  decline: { fontSize: 16, color: '#7A7A85', textAlign: 'center' },
 });

@@ -147,7 +147,7 @@ export function VerdictSheet({
             </View>
 
             {product.id !== null && !demo ? (
-              <Pressable accessibilityRole="button" testID="report" onPress={() => setReporting(true)} style={styles.report}>
+              <Pressable accessibilityRole="button" testID="report" hitSlop={8} onPress={() => setReporting(true)} style={styles.report}>
                 <Feather name="flag" size={16} color={colors.danger} />
                 <Text style={styles.reportText}>Report wrong info</Text>
               </Pressable>
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   link: { textDecorationLine: 'underline' },
   badge: { alignSelf: 'flex-start', backgroundColor: '#FFE8CC', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: 12, fontWeight: '700', color: '#8A4B00' },
-  report: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, minHeight: 44 },
+  report: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 14, paddingVertical: 6 },
   reportText: { color: colors.danger, fontWeight: '600', fontSize: 14 },
   sheetTitle: { fontSize: 20, fontWeight: '600', color: colors.ink, marginTop: 6 },
   reason: {

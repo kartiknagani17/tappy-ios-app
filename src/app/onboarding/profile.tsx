@@ -348,6 +348,7 @@ function LookupTab() {
         </View>
         <Pressable
           testID="filter"
+          hitSlop={4}
           accessibilityRole="button"
           accessibilityLabel={`Filter: ${FILTER_LABEL[filter]}`}
           style={[styles.filterBtn, filter !== 'all' && styles.filterBtnActive]}
@@ -555,7 +556,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    minHeight: 44,
+    height: 42,
     paddingHorizontal: 16,
     borderRadius: radius.pill,
     backgroundColor: '#fff',

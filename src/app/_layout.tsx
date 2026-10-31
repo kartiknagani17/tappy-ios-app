@@ -1,10 +1,43 @@
-import { Stack } from 'expo-router';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Button, Logo } from '../components/ui';
+import { useRouteGuard, useStoreReady } from '../lib/boot';
 import { colors } from '../theme';
 
+// Keep the native splash up until the saved profile has loaded (or the fail-safe timeout passes).
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/** Last-resort screen if rendering throws anywhere in the app. Never shows a verdict. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    SplashScreen.hide();
+    if (__DEV__) console.error(error);
+  }, [error]);
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
+      <Logo size={40} />
+      <Text style={{ fontSize: 22, fontWeight: '600', color: colors.ink, textAlign: 'center' }}>Something went wrong</Text>
+      <Text style={{ fontSize: 16, lineHeight: 23, color: colors.textMuted, textAlign: 'center' }}>
+        Tapi hit an unexpected problem. Your profile is still saved on this device.
+      </Text>
+      <Button title="Try again" onPress={retry} style={{ alignSelf: 'stretch', marginTop: 12 }} />
+    </View>
+  );
+}
+
 export default function RootLayout() {
+  const ready = useStoreReady();
+  useRouteGuard(ready);
+  useEffect(() => {
+    if (ready) SplashScreen.hide();
+  }, [ready]);
+  if (!ready) return null;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

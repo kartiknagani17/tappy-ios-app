@@ -1,19 +1,16 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Logo } from '../components/ui';
+import { useStoreReady } from '../lib/boot';
 import { useStore } from '../lib/store';
 import { colors } from '../theme';
 
 export default function Splash() {
-  const [hydrated, setHydrated] = useState(useStore.persist.hasHydrated());
-
-  useEffect(() => {
-    const unsub = useStore.persist.onFinishHydration(() => setHydrated(true));
-    return unsub;
-  }, []);
+  // Same fail-safe as the root layout: never wait forever on storage.
+  const hydrated = useStoreReady();
 
   useEffect(() => {
     if (!hydrated) return;

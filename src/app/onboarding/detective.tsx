@@ -48,11 +48,7 @@ export default function Detective() {
             <View style={styles.notifyRow}>
               <Feather name="bell" size={13} />
               <Text style={styles.notifyText}>Get notified of ingredient changes</Text>
-              <Switch
-                value
-                trackColor={{ true: colors.purple, false: '#ddd' }}
-                style={{ transform: [{ scale: 0.7 }] }}
-              />
+              <Switch value trackColor={{ true: colors.purple, false: '#ddd' }} style={{ transform: [{ scale: 0.7 }] }} />
             </View>
             <Text style={styles.overview}>Diet Overview</Text>
           </View>

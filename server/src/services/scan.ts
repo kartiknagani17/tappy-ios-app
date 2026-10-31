@@ -69,6 +69,16 @@ type Deps = { db: DB; config: Config; vision: VisionService; offLive: OffLiveCli
 export type ConfirmResult = { ok: true; product: PublicProduct; shared_choice: boolean } | { ok: false; reason: 'not_found' | 'not_offered' };
 
 const HEX16 = /^[0-9a-f]{16}$/;
+
+/**
+ * "Contains" + "May contain" as one string, separated by '. ' so the client can split them
+ * (a may-contain clause must never read as part of the contains list). Trailing periods are
+ * trimmed first so the result never has "..".
+ */
+export function joinAllergenStatements(contains: string | null | undefined, mayContain: string | null | undefined): string | null {
+  const parts = [contains, mayContain].map((p) => (p ?? '').trim().replace(/\.+$/, '').trim()).filter(Boolean);
+  return parts.length ? parts.join('. ') : null;
+}
 const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
 export class ScanService {
@@ -336,7 +346,7 @@ export class ScanService {
     let imagePath: string | null = null;
     if (opts.contribute) imagePath = this.saveLabelImage(hash, jpeg);
 
-    const allergens = [extracted.contains_statement, extracted.may_contain_statement].filter(Boolean).join(' ') || null;
+    const allergens = joinAllergenStatements(extracted.contains_statement, extracted.may_contain_statement);
     const res = db
       .prepare(
         `INSERT INTO contributions (gtin14, front_photo_hash, user_id, ingredients_text, allergens_text, may_contain_text,
@@ -387,7 +397,7 @@ export class ScanService {
       variant_or_flavor: existing?.variant_or_flavor ?? null,
       size_text: existing?.size_text ?? null,
       ingredients_text: x.ingredients_text,
-      allergens_text: [x.contains_statement, x.may_contain_statement].filter(Boolean).join(' ') || null,
+      allergens_text: joinAllergenStatements(x.contains_statement, x.may_contain_statement),
       nutrition: x.nutrition,
       category: existing?.category ?? null,
       image_url: existing?.image_url ?? null,

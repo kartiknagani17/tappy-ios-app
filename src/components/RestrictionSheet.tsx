@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     minHeight: 64,
   },
-  remove: { backgroundColor: colors.danger, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 9, minHeight: 40, justifyContent: 'center' },
+  remove: { backgroundColor: colors.danger, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 9 },
   removeText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   body: { paddingHorizontal: 16, paddingBottom: 24 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 8 },

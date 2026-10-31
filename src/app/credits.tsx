@@ -3,7 +3,7 @@ import { BackButton, Screen } from '../components/ui';
 import { colors, radius } from '../theme';
 
 const link = (url: string, label = url) => (
-  <Text style={styles.link} onPress={() => Linking.openURL(url)}>
+  <Text style={styles.link} accessibilityRole="link" onPress={() => Linking.openURL(url).catch(() => {})}>
     {label}
   </Text>
 );
@@ -24,10 +24,14 @@ export default function Credits() {
         <View style={styles.card}>
           <Text style={styles.title}>Open Food Facts</Text>
           <Text style={styles.text}>
-            Product data from Open Food Facts, a free, collaborative database of food products. Made available under the{' '}
-            {link('https://opendatacommons.org/licenses/odbl/1-0/', 'Open Database License (ODbL)')}. Individual contents are under the{' '}
-            {link('https://opendatacommons.org/licenses/dbcl/1-0/', 'Database Contents License')}, and product images under{' '}
-            {link('https://creativecommons.org/licenses/by-sa/3.0/deed.en', 'CC BY-SA')}.
+            Contains information from Open Food Facts, a free, collaborative database of food products, which is made available here
+            under the {link('https://opendatacommons.org/licenses/odbl/1-0/', 'Open Database License (ODbL) v1.0')}. Individual contents
+            of the database are under the {link('https://opendatacommons.org/licenses/dbcl/1-0/', 'Database Contents License')}, and
+            product images under {link('https://creativecommons.org/licenses/by-sa/3.0/deed.en', 'CC BY-SA 3.0')}.
+          </Text>
+          <Text style={styles.text}>
+            Tapi’s product database includes data derived from Open Food Facts; that derived database is also available under the ODbL.
+            Open Food Facts does not endorse Tapi.
           </Text>
           <Text style={styles.text}>{link('https://world.openfoodfacts.org', 'openfoodfacts.org')}</Text>
         </View>
@@ -35,8 +39,8 @@ export default function Credits() {
         <View style={styles.card}>
           <Text style={styles.title}>USDA FoodData Central</Text>
           <Text style={styles.text}>
-            Branded Foods data from the U.S. Department of Agriculture, Agricultural Research Service. FoodData Central is in the public
-            domain (CC0 1.0).
+            Branded Foods data from U.S. Department of Agriculture, Agricultural Research Service. FoodData Central. FoodData Central is in
+            the public domain ({link('https://creativecommons.org/publicdomain/zero/1.0/', 'CC0 1.0')}). The USDA does not endorse Tapi.
           </Text>
           <Text style={styles.text}>{link('https://fdc.nal.usda.gov', 'fdc.nal.usda.gov')}</Text>
         </View>

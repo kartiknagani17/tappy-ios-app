@@ -352,6 +352,8 @@ export default function Scan() {
                   testID={`mode-${m}`}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: mode === m }}
+                  accessibilityLabel={m === 'barcode' ? 'Barcode' : 'Photo'}
+                  hitSlop={{ top: 4, bottom: 4 }}
                   onPress={() => {
                     haptic.select();
                     setMode(m);
@@ -380,22 +382,16 @@ export default function Scan() {
       ) : null}
 
       {permission && !permission.granted ? (
-        <View style={[styles.permission, { bottom: 24 }]}>
+        <View style={[styles.permission, { bottom: 32 }]}>
           <Text style={styles.permText}>
-            {Platform.OS === 'web'
-              ? 'Camera scanning works in the iOS app. You can still type a barcode number.'
-              : permission.canAskAgain
-                ? 'Allow camera access to scan barcodes, or type the barcode number.'
-                : 'Camera access is off. Turn it on in Settings, or type the barcode number.'}
+            {Platform.OS === 'web' ? 'Camera scanning works in the iOS app.' : 'Allow camera access to scan barcodes.'}
           </Text>
-          {Platform.OS !== 'web' ? (
-            <Button
-              title={!permission.canAskAgain ? 'Open Settings' : 'Allow camera'}
-              variant="primary"
-              onPress={() => (!permission.canAskAgain ? Linking.openSettings() : requestPermission())}
-              style={{ alignSelf: 'stretch' }}
-            />
-          ) : null}
+          <Button
+            title={!permission.canAskAgain ? 'Open Settings' : 'Allow camera'}
+            variant="primary"
+            onPress={() => (!permission.canAskAgain ? Linking.openSettings() : requestPermission())}
+            style={{ alignSelf: 'stretch' }}
+          />
           <ManualEntryButton onPress={() => setManual(true)} />
         </View>
       ) : null}
@@ -474,26 +470,25 @@ export default function Scan() {
         <View style={styles.modalBackdrop}>
           <Animated.View entering={ZoomIn.springify().damping(16)} style={styles.modal}>
             <View style={styles.modalClose}>
-              <CloseButton onPress={afterPush} size={28} />
+              <CloseButton testID="push-no" onPress={afterPush} size={28} />
             </View>
             <Text style={styles.modalTitle} accessibilityRole="header">
-              Turn on notifications?
+              Don't miss out! Enable push notifications.
             </Text>
-            <Text style={styles.modalBody}>
-              We'll remind you before a free trial ends and tell you when products you saved change their ingredients.
-            </Text>
-            <Text style={styles.modalBody}>You can change this anytime in Settings.</Text>
+            <Text style={styles.modalBody}>We like giving away free stuff and adding new features 😀</Text>
+            <Text style={styles.modalBody}>Do you want to hear about them?</Text>
             <Button
               testID="push-yes"
-              title="Turn on notifications"
+              title="Yes, I'm in!"
               variant="purple"
               style={{ borderRadius: 6, marginTop: 24, backgroundColor: '#7452F5' }}
-              textStyle={{ fontWeight: '600', fontSize: 18 }}
+              textStyle={{ fontWeight: '500', fontSize: 22 }}
               onPress={async () => {
                 if (Platform.OS !== 'web') {
                   try {
                     const p = await Notifications.getPermissionsAsync();
                     if (p.status === 'undetermined') await Notifications.requestPermissionsAsync();
+                    else if (p.status === 'denied') Linking.openSettings();
                   } catch {
                     // ignore
                   }
@@ -501,9 +496,6 @@ export default function Scan() {
                 afterPush();
               }}
             />
-            <Pressable testID="push-no" accessibilityRole="button" onPress={afterPush} style={styles.notNow}>
-              <Text style={styles.notNowText}>Not now</Text>
-            </Pressable>
           </Animated.View>
         </View>
       </Modal>
@@ -560,7 +552,7 @@ const styles = StyleSheet.create({
   hint: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: 16, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 },
   controls: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 16 },
   segment: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: radius.pill, padding: 4 },
-  segBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, minHeight: 44, borderRadius: radius.pill },
+  segBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, height: 38, borderRadius: radius.pill },
   segBtnOn: { backgroundColor: colors.lime },
   segText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   shutter: { width: 76, height: 76, borderRadius: 38, borderWidth: 5, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
@@ -572,7 +564,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: radius.pill,
     paddingHorizontal: 16,
-    minHeight: 44,
+    height: 38,
   },
   labelBannerText: { color: '#fff', fontWeight: '600' },
   busy: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 14 },
@@ -584,10 +576,8 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 24 },
   modal: { backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 24, paddingTop: 40, paddingBottom: 36 },
   modalClose: { position: 'absolute', right: 14, top: 14 },
-  modalTitle: { fontSize: 24, lineHeight: 31, fontWeight: '600', textAlign: 'center', color: '#111' },
-  modalBody: { fontSize: 16, lineHeight: 23, textAlign: 'center', color: '#333', marginTop: 12 },
-  notNow: { alignItems: 'center', justifyContent: 'center', minHeight: 44, marginTop: 8 },
-  notNowText: { fontSize: 16, fontWeight: '500', color: colors.textMuted },
+  modalTitle: { fontSize: 25, lineHeight: 33, textAlign: 'center', color: '#111' },
+  modalBody: { fontSize: 18, lineHeight: 27, textAlign: 'center', color: '#111', marginTop: 16 },
   manualBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -595,7 +585,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: radius.pill,
     paddingHorizontal: 16,
-    minHeight: 44,
+    height: 38,
   },
   manualText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   manualSheet: { paddingHorizontal: 16, gap: 12 },
@@ -618,6 +608,7 @@ function ManualEntryButton({ onPress }: { onPress: () => void }) {
       testID="manual-entry"
       accessibilityRole="button"
       accessibilityLabel="Type a barcode number"
+      hitSlop={{ top: 4, bottom: 4 }}
       onPress={() => {
         haptic.select();
         onPress();

@@ -282,6 +282,7 @@ export function Chip({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: !!selected }}
+      hitSlop={{ top: 4, bottom: 4 }}
       onPress={() => {
         haptic.select();
         onPress?.();
@@ -398,8 +399,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.sm,
     paddingHorizontal: 12,
-    minHeight: 44,
-    paddingVertical: 6,
+    height: 40,
     backgroundColor: '#fff',
   },
   chipSelected: { borderColor: colors.ink, borderWidth: 2, paddingHorizontal: 11 },
