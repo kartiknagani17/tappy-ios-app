@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * Safety-logic tests (not bundled into the app; Metro only bundles imported files).
  * Run: node --import ./src/lib/__tests__/register.mjs --test src/lib/__tests__/*.test.ts

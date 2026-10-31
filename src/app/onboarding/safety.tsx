@@ -17,7 +17,7 @@ export default function Safety() {
         <Feather name="shield" size={56} color={colors.ink} />
         <Text style={styles.title}>Your safety is our priority</Text>
         <Text style={styles.body}>
-          <Text style={{ fontWeight: '700' }}>Always double-check ingredients</Text>, especially if you live with life threatening
+          <Text style={{ fontWeight: '700' }}>Always double-check ingredients</Text>, especially if you live with life-threatening
           allergies.
         </Text>
       </View>
@@ -25,6 +25,7 @@ export default function Safety() {
         <Pressable
           testID="agree"
           accessibilityRole="checkbox"
+          accessibilityLabel="I agree to Tapi's Terms of Service and Privacy Policy, and I'll always double-check ingredient and allergen info."
           accessibilityState={{ checked: agreed }}
           onPress={() => {
             haptic.select();
@@ -35,11 +36,11 @@ export default function Safety() {
           <Checkbox checked={agreed} size={24} />
           <Text style={styles.agreeText}>
             I agree to Tapi's{' '}
-            <Text style={styles.link} onPress={() => Linking.openURL(TERMS_URL)}>
+            <Text accessibilityRole="link" style={styles.link} onPress={() => Linking.openURL(TERMS_URL)}>
               Terms of Service
             </Text>{' '}
             and{' '}
-            <Text style={styles.link} onPress={() => Linking.openURL(PRIVACY_URL)}>
+            <Text accessibilityRole="link" style={styles.link} onPress={() => Linking.openURL(PRIVACY_URL)}>
               Privacy Policy
             </Text>
             , and I'll always double-check ingredient and allergen info.

@@ -44,6 +44,8 @@ function SheetBody({ r, current, onClose, onSave }: { r: Restriction } & Omit<Pr
           {isSelected ? (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={`Remove ${r.name}`}
+              hitSlop={6}
               onPress={() => {
                 haptic.warning();
                 onSave(r.id, null);
@@ -81,6 +83,7 @@ function SheetBody({ r, current, onClose, onSave }: { r: Restriction } & Omit<Pr
                   <Pressable
                     key={o.level}
                     accessibilityRole="radio"
+                    accessibilityLabel={`${o.title}. ${o.body}${o.linkCrossContact ? (o.linkCrossContact === 'notOk' ? 'cross-contact is not ok.' : 'cross-contact is ok.') : ''}`}
                     accessibilityState={{ selected: level === o.level }}
                     onPress={() => {
                       haptic.select();
@@ -191,6 +194,7 @@ function PickStep({
             <View style={styles.itemRow}>
               <Pressable
                 accessibilityRole={r.kind === 'radio' ? 'radio' : 'checkbox'}
+                accessibilityLabel={it.label}
                 accessibilityState={{ checked: items.includes(it.id) }}
                 onPress={() => toggle(it.id)}
                 style={styles.itemMain}
@@ -218,7 +222,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     minHeight: 64,
   },
-  remove: { backgroundColor: colors.danger, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 9 },
+  remove: { backgroundColor: colors.danger, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 9, minHeight: 40, justifyContent: 'center' },
   removeText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   body: { paddingHorizontal: 16, paddingBottom: 24 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 8 },

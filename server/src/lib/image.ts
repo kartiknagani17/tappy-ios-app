@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
 
 export const MAX_EDGE = 1024;
 
@@ -14,6 +14,23 @@ export class ImageError extends Error {
 export const DEFAULT_MAX_INPUT_PIXELS = 40_000_000;
 /** Raster formats a phone camera/upload pipeline produces. SVG, TIFF, PDF, GIF etc. are refused. */
 const ALLOWED_FORMATS = new Set(['jpeg', 'png', 'webp', 'heif']);
+
+/**
+ * Cheap header-only check (no pixel decode) that the upload is an allowed raster format within the
+ * pixel ceiling. Used before charging the user's photo quota.
+ */
+export async function probeImage(input: Buffer, maxInputPixels = DEFAULT_MAX_INPUT_PIXELS): Promise<{ format: string; width: number; height: number }> {
+  if (!input.length) throw new ImageError('Could not read image: empty');
+  let meta: Metadata;
+  try {
+    meta = await sharp(input, { limitInputPixels: maxInputPixels, pages: 1 }).metadata();
+  } catch (e) {
+    throw new ImageError(`Could not read image: ${(e as Error).message}`);
+  }
+  if (!meta.format || !ALLOWED_FORMATS.has(meta.format)) throw new ImageError(`Could not read image: unsupported format ${meta.format ?? 'unknown'}`);
+  if (!meta.width || !meta.height || meta.width * meta.height > maxInputPixels) throw new ImageError('Could not read image: dimensions too large');
+  return { format: meta.format, width: meta.width, height: meta.height };
+}
 
 export async function prepareImage(
   input: Buffer,

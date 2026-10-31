@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { DEMO_PRODUCTS, Package } from '../../components/art';
 import { Button, Footer, RatingIcon, Screen } from '../../components/ui';
@@ -10,10 +10,14 @@ const SHELF = ['🥫', '🧃', '🥣', '🍪', '🧂', '🫙', '🥫', '🍫', '
 
 export default function ScannerReady() {
   const bread = DEMO_PRODUCTS[2];
+  // Shrink the illustration on short screens (iPhone SE) so the Continue button stays on screen.
+  const { height } = useWindowDimensions();
+  const compact = height < 760;
+  const cardH = compact ? Math.max(260, Math.min(400, height - 300)) : 400;
   return (
     <Screen>
       <Text style={styles.kicker}>Your personalized scanner is ready!</Text>
-      <Animated.View entering={FadeIn.duration(500)} style={styles.card}>
+      <Animated.View entering={FadeIn.duration(500)} style={[styles.card, { height: cardH }]} accessible={false} importantForAccessibility="no-hide-descendants">
         <LinearGradient colors={['#F2E9D8', '#D9CCB4', '#9B8F7C']} style={StyleSheet.absoluteFill} />
         {/* stylized grocery aisle */}
         {[0, 1, 2, 3].map((row) => (
@@ -34,16 +38,16 @@ export default function ScannerReady() {
             <Text style={styles.bad}>WHEAT GLUTEN</Text>, …
           </Text>
         </Animated.View>
-        <Animated.View entering={FadeInUp.delay(200).duration(500)} style={styles.product}>
+        <Animated.View entering={FadeInUp.delay(200).duration(500)} style={[styles.product, { top: cardH - 240 }]}>
           <Package p={bread} size={170} />
           <View style={{ position: 'absolute', left: 16, bottom: 16 }}>
             <RatingIcon rating="red" size={40} />
           </View>
         </Animated.View>
       </Animated.View>
-      <Text style={styles.headline}>Scan from 100,000+ products and know if something's safe. Instantly.</Text>
+      <Text style={[styles.headline, compact && { fontSize: 22, lineHeight: 28, marginTop: 16 }]}>Scan from 100,000+ products and know if something's safe. Instantly.</Text>
       <View style={{ flex: 1 }} />
-      <Footer>
+      <Footer border={false}>
         <Button testID="continue" title="Continue" onPress={() => router.replace('/onboarding/pass')} />
       </Footer>
     </Screen>

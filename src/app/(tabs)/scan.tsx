@@ -3,7 +3,7 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DEMO_PRODUCTS } from '../../components/art';
@@ -14,7 +14,7 @@ import { VerdictSheet } from '../../components/VerdictSheet';
 import { api, ApiError, prepareUpload, type ApiProduct, type FrontResult } from '../../lib/api';
 import { haptic } from '../../lib/haptics';
 import { useStore } from '../../lib/store';
-import { colors, radius } from '../../theme';
+import { colors, noOutline, radius } from '../../theme';
 
 type Mode = 'barcode' | 'front' | 'label';
 type Match = Extract<FrontResult, { status: 'match' }>;
@@ -32,6 +32,20 @@ const MODE_HINT: Record<Mode, string> = {
   front: 'Snap the front of the package',
   label: 'Fit the whole ingredient list in the frame',
 };
+
+/** Same barcode seen again within this window is ignored (camera fires many callbacks per second). */
+const SAME_CODE_COOLDOWN_MS = 2500;
+const VALID_LENGTHS = [8, 12, 13, 14];
+const nowMs = () => Date.now();
+
+/** Push pre-prompt is done (or not needed): continue to the one-time account prompt. */
+function markPushAsked() {
+  useStore.getState().set({ askedPush: true });
+  const st = useStore.getState();
+  if (!st.account && !st.accountPromptDismissed) {
+    setTimeout(() => router.push({ pathname: '/auth', params: { mode: 'signup', prompt: '1' } }), 350);
+  }
+}
 
 const demoProduct = (): ApiProduct => {
   const p = DEMO_PRODUCTS[4];
@@ -72,6 +86,9 @@ export default function Scan() {
   const [verdict, setVerdict] = useState<{ product: ApiProduct; demo?: boolean } | null>(null);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const lastFrontHash = useRef<string | null>(null);
+  const lastCode = useRef<{ code: string; at: number } | null>(null);
+  const shooting = useRef(false);
+  const [manual, setManual] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -83,8 +100,23 @@ export default function Scan() {
   // First visit: our own push pre-prompt, then the account prompt.
   useEffect(() => {
     if (askedPush) return;
-    const t = setTimeout(() => setPushPrompt(true), 700);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      if (Platform.OS !== 'web') {
+        // Only pre-prompt when the system prompt can actually still be shown.
+        const p = await Notifications.getPermissionsAsync().catch(() => null);
+        if (cancelled) return;
+        if (p && p.status !== 'undetermined') {
+          markPushAsked();
+          return;
+        }
+      }
+      if (!cancelled) setPushPrompt(true);
+    }, 700);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [askedPush]);
 
   // Ask for camera once the app is reached (system prompt), unless the push prompt is showing.
@@ -96,15 +128,12 @@ export default function Scan() {
 
   const afterPush = () => {
     setPushPrompt(false);
-    useStore.getState().set({ askedPush: true });
-    const st = useStore.getState();
-    if (!st.account && !st.accountPromptDismissed) {
-      setTimeout(() => router.push({ pathname: '/auth', params: { mode: 'signup', prompt: '1' } }), 350);
-    }
+    markPushAsked();
   };
 
   const unlock = () => setTimeout(() => (locked.current = false), 700);
   const reset = () => {
+    if (lastCode.current) lastCode.current.at = nowMs();
     setVerdict(null);
     setMatch(null);
     setPrompt(null);
@@ -137,14 +166,27 @@ export default function Scan() {
   };
 
   // ---- barcode (no vision call ever happens on this path) ----
-  const onScanned = async (r: BarcodeScanningResult) => {
+  const onScanned = (r: BarcodeScanningResult) => {
     if (locked.current || mode !== 'barcode') return;
+    const now = nowMs();
+    const prev = lastCode.current;
+    if (prev && prev.code === r.data && now - prev.at < SAME_CODE_COOLDOWN_MS) {
+      // Still pointing at the product we just showed: keep suppressing until it leaves the frame.
+      prev.at = now;
+      return;
+    }
+    lastCode.current = { code: r.data, at: now };
+    lookupBarcode(r.data);
+  };
+
+  const lookupBarcode = async (code: string) => {
+    if (locked.current) return;
     locked.current = true;
     haptic.success();
     lastFrontHash.current = null;
     setBusy('Looking up product…');
     try {
-      const res = await api.scanBarcode(r.data);
+      const res = await api.scanBarcode(code);
       if (res.status === 'found') setVerdict({ product: res.product });
       else if (res.status === 'needs_label_photo') {
         setLabelCtx({ gtin: res.gtin14, frontHash: null });
@@ -163,12 +205,15 @@ export default function Scan() {
       fail(e);
     } finally {
       setBusy(null);
+      // Restart the same-code cooldown from when the result was shown.
+      if (lastCode.current) lastCode.current.at = nowMs();
     }
   };
 
   // ---- photos (front of package / ingredient panel) ----
   const takePhoto = async () => {
-    if (!camera.current || busy) return;
+    if (!camera.current || busy || shooting.current) return;
+    shooting.current = true;
     haptic.medium();
     try {
       setBusy(mode === 'front' ? 'Reading the package…' : 'Reading the ingredients…');
@@ -200,6 +245,7 @@ export default function Scan() {
     } catch (e) {
       fail(e);
     } finally {
+      shooting.current = false;
       setBusy(null);
     }
   };
@@ -237,17 +283,28 @@ export default function Scan() {
         <Animated.View entering={FadeIn} style={[styles.tip, { top: insets.top + 64 }]}>
           <View style={styles.tipHead}>
             <Text style={styles.tipTitle}>{TIPS[tip].title}</Text>
-            <Pressable accessibilityLabel="Hide tips" hitSlop={10} onPress={() => setTipHidden(true)}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Hide tips" hitSlop={14} onPress={() => setTipHidden(true)}>
               <Text style={styles.tipClose}>✕</Text>
             </Pressable>
           </View>
-          <Pressable onPress={() => setTip((t) => (t + 1) % TIPS.length)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${TIPS[tip].body} Next tip`}
+            onPress={() => setTip((t) => (t + 1) % TIPS.length)}
+          >
             <Text style={styles.tipBody}>{TIPS[tip].body}</Text>
           </Pressable>
           <View style={styles.tipFoot}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {TIPS.map((_, i) => (
-                <Pressable key={i} hitSlop={6} onPress={() => setTip(i)}>
+                <Pressable
+                  key={i}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tip ${i + 1} of ${TIPS.length}`}
+                  accessibilityState={{ selected: i === tip }}
+                  hitSlop={10}
+                  onPress={() => setTip(i)}
+                >
                   <View style={[styles.tipDot, i === tip && { backgroundColor: '#fff' }]} />
                 </Pressable>
               ))}
@@ -255,7 +312,8 @@ export default function Scan() {
             <Pressable
               testID="try-demo"
               accessibilityRole="button"
-              hitSlop={10}
+              accessibilityLabel="Try a demo scan"
+              hitSlop={12}
               onPress={() => {
                 haptic.light();
                 locked.current = true;
@@ -277,7 +335,12 @@ export default function Scan() {
       {permission?.granted ? (
         <View style={[styles.controls, { bottom: 18 }]}>
           {mode === 'label' ? (
-            <Pressable style={styles.labelBanner} onPress={() => setMode('barcode')}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel ingredient photo"
+              style={styles.labelBanner}
+              onPress={() => setMode('barcode')}
+            >
               <Feather name="file-text" size={16} color="#fff" />
               <Text style={styles.labelBannerText}>Ingredient photo · tap to cancel</Text>
             </Pressable>
@@ -301,6 +364,7 @@ export default function Scan() {
               ))}
             </View>
           )}
+          {mode === 'barcode' ? <ManualEntryButton onPress={() => setManual(true)} /> : null}
           {photoMode ? (
             <Pressable
               testID="shutter"
@@ -315,17 +379,24 @@ export default function Scan() {
         </View>
       ) : null}
 
-      {!permission?.granted ? (
-        <View style={[styles.permission, { bottom: 32 }]}>
+      {permission && !permission.granted ? (
+        <View style={[styles.permission, { bottom: 24 }]}>
           <Text style={styles.permText}>
-            {Platform.OS === 'web' ? 'Camera scanning works in the iOS app.' : 'Allow camera access to scan barcodes.'}
+            {Platform.OS === 'web'
+              ? 'Camera scanning works in the iOS app. You can still type a barcode number.'
+              : permission.canAskAgain
+                ? 'Allow camera access to scan barcodes, or type the barcode number.'
+                : 'Camera access is off. Turn it on in Settings, or type the barcode number.'}
           </Text>
-          <Button
-            title={permission && !permission.canAskAgain ? 'Open Settings' : 'Allow camera'}
-            variant="primary"
-            onPress={() => (permission && !permission.canAskAgain ? Linking.openSettings() : requestPermission())}
-            style={{ alignSelf: 'stretch' }}
-          />
+          {Platform.OS !== 'web' ? (
+            <Button
+              title={!permission.canAskAgain ? 'Open Settings' : 'Allow camera'}
+              variant="primary"
+              onPress={() => (!permission.canAskAgain ? Linking.openSettings() : requestPermission())}
+              style={{ alignSelf: 'stretch' }}
+            />
+          ) : null}
+          <ManualEntryButton onPress={() => setManual(true)} />
         </View>
       ) : null}
 
@@ -335,6 +406,18 @@ export default function Scan() {
           <Text style={styles.busyText}>{busy}</Text>
         </View>
       ) : null}
+
+      <ManualBarcodeSheet
+        visible={manual}
+        onClose={() => setManual(false)}
+        onSubmit={(code) => {
+          setManual(false);
+          setMode('barcode');
+          lastCode.current = { code, at: nowMs() };
+          // Let the sheet close before the result sheet opens.
+          setTimeout(() => lookupBarcode(code), 300);
+        }}
+      />
 
       <MatchSheet
         match={match}
@@ -393,21 +476,24 @@ export default function Scan() {
             <View style={styles.modalClose}>
               <CloseButton onPress={afterPush} size={28} />
             </View>
-            <Text style={styles.modalTitle}>Don't miss out! Enable push notifications.</Text>
-            <Text style={styles.modalBody}>We like giving away free stuff and adding new features 😀</Text>
-            <Text style={styles.modalBody}>Do you want to hear about them?</Text>
+            <Text style={styles.modalTitle} accessibilityRole="header">
+              Turn on notifications?
+            </Text>
+            <Text style={styles.modalBody}>
+              We'll remind you before a free trial ends and tell you when products you saved change their ingredients.
+            </Text>
+            <Text style={styles.modalBody}>You can change this anytime in Settings.</Text>
             <Button
               testID="push-yes"
-              title="Yes, I'm in!"
+              title="Turn on notifications"
               variant="purple"
               style={{ borderRadius: 6, marginTop: 24, backgroundColor: '#7452F5' }}
-              textStyle={{ fontWeight: '500', fontSize: 22 }}
+              textStyle={{ fontWeight: '600', fontSize: 18 }}
               onPress={async () => {
                 if (Platform.OS !== 'web') {
                   try {
                     const p = await Notifications.getPermissionsAsync();
                     if (p.status === 'undetermined') await Notifications.requestPermissionsAsync();
-                    else if (p.status === 'denied') Linking.openSettings();
                   } catch {
                     // ignore
                   }
@@ -415,6 +501,9 @@ export default function Scan() {
                 afterPush();
               }}
             />
+            <Pressable testID="push-no" accessibilityRole="button" onPress={afterPush} style={styles.notNow}>
+              <Text style={styles.notNowText}>Not now</Text>
+            </Pressable>
           </Animated.View>
         </View>
       </Modal>
@@ -471,7 +560,7 @@ const styles = StyleSheet.create({
   hint: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: 16, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 },
   controls: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 16 },
   segment: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: radius.pill, padding: 4 },
-  segBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, height: 38, borderRadius: radius.pill },
+  segBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, minHeight: 44, borderRadius: radius.pill },
   segBtnOn: { backgroundColor: colors.lime },
   segText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   shutter: { width: 76, height: 76, borderRadius: 38, borderWidth: 5, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
@@ -483,7 +572,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: radius.pill,
     paddingHorizontal: 16,
-    height: 38,
+    minHeight: 44,
   },
   labelBannerText: { color: '#fff', fontWeight: '600' },
   busy: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 14 },
@@ -495,6 +584,105 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 24 },
   modal: { backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 24, paddingTop: 40, paddingBottom: 36 },
   modalClose: { position: 'absolute', right: 14, top: 14 },
-  modalTitle: { fontSize: 25, lineHeight: 33, textAlign: 'center', color: '#111' },
-  modalBody: { fontSize: 18, lineHeight: 27, textAlign: 'center', color: '#111', marginTop: 16 },
+  modalTitle: { fontSize: 24, lineHeight: 31, fontWeight: '600', textAlign: 'center', color: '#111' },
+  modalBody: { fontSize: 16, lineHeight: 23, textAlign: 'center', color: '#333', marginTop: 12 },
+  notNow: { alignItems: 'center', justifyContent: 'center', minHeight: 44, marginTop: 8 },
+  notNowText: { fontSize: 16, fontWeight: '500', color: colors.textMuted },
+  manualBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    minHeight: 44,
+  },
+  manualText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  manualSheet: { paddingHorizontal: 16, gap: 12 },
+  manualInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    height: 56,
+    paddingHorizontal: 16,
+    fontSize: 20,
+    letterSpacing: 1.5,
+    color: colors.ink,
+  },
+  manualError: { fontSize: 14, color: colors.danger },
 });
+
+function ManualEntryButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      testID="manual-entry"
+      accessibilityRole="button"
+      accessibilityLabel="Type a barcode number"
+      onPress={() => {
+        haptic.select();
+        onPress();
+      }}
+      style={styles.manualBtn}
+    >
+      <Feather name="hash" size={16} color="#fff" />
+      <Text style={styles.manualText}>Type barcode number</Text>
+    </Pressable>
+  );
+}
+
+/** Fallback when the camera is unavailable, denied, or can't read a damaged barcode. */
+function ManualBarcodeSheet({ visible, onClose, onSubmit }: { visible: boolean; onClose: () => void; onSubmit: (code: string) => void }) {
+  return (
+    <BottomSheet visible={visible} onClose={onClose} handle>
+      {/* Remount on open so the field starts empty. */}
+      {visible ? <ManualBarcodeBody onClose={onClose} onSubmit={onSubmit} /> : null}
+    </BottomSheet>
+  );
+}
+
+function ManualBarcodeBody({ onClose, onSubmit }: { onClose: () => void; onSubmit: (code: string) => void }) {
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const digits = code.replace(/\D/g, '');
+  const submit = () => {
+    if (!VALID_LENGTHS.includes(digits.length)) {
+      setError('Barcodes are 8, 12, 13 or 14 digits. Check the numbers under the bars.');
+      return;
+    }
+    onSubmit(digits);
+  };
+  return (
+    <View style={styles.manualSheet}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={styles.promptTitle} accessibilityRole="header">
+          Type the barcode
+        </Text>
+        <CloseButton onPress={onClose} />
+      </View>
+      <Text style={styles.promptBody}>Enter the numbers printed under the barcode on the package.</Text>
+      <TextInput
+        testID="manual-barcode-input"
+        accessibilityLabel="Barcode number"
+        value={code}
+        onChangeText={(t) => {
+          setCode(t.replace(/[^\d ]/g, ''));
+          setError(null);
+        }}
+        placeholder="e.g. 012345678905"
+        placeholderTextColor={colors.textSubtle}
+        keyboardType="number-pad"
+        returnKeyType="search"
+        maxLength={18}
+        autoFocus
+        onSubmitEditing={submit}
+        style={[styles.manualInput, noOutline]}
+      />
+      {error ? (
+        <Text style={styles.manualError} accessibilityLiveRegion="polite">
+          {error}
+        </Text>
+      ) : null}
+      <Button testID="manual-barcode-submit" title="Look up product" disabled={digits.length < 8} onPress={submit} />
+    </View>
+  );
+}

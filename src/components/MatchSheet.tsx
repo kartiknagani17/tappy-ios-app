@@ -66,6 +66,7 @@ function MatchBody({
           <Pressable
             key={product.id}
             accessibilityRole="radio"
+            accessibilityLabel={[product.name, product.brand, product.size_text].filter(Boolean).join(', ')}
             accessibilityState={{ selected: selected === product.id }}
             onPress={() => {
               haptic.select();
@@ -100,11 +101,11 @@ function MatchBody({
       />
       <Text style={styles.alt}>Not right?</Text>
       <View style={styles.altRow}>
-        <Pressable style={styles.altBtn} onPress={onScanBarcode}>
+        <Pressable accessibilityRole="button" style={styles.altBtn} onPress={onScanBarcode}>
           <Feather name="maximize" size={16} color={colors.ink} />
           <Text style={styles.altText}>Scan barcode</Text>
         </Pressable>
-        <Pressable style={styles.altBtn} onPress={onPhotographLabel}>
+        <Pressable accessibilityRole="button" style={styles.altBtn} onPress={onPhotographLabel}>
           <Feather name="file-text" size={16} color={colors.ink} />
           <Text style={styles.altText}>Photo of ingredients</Text>
         </Pressable>

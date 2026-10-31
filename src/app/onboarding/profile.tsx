@@ -135,6 +135,7 @@ function Tabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
             key={t}
             testID={`tab-${t}`}
             accessibilityRole="tab"
+            accessibilityLabel={t === 'profile' ? 'Dietary Profile' : 'Ingredient Lookup'}
             accessibilityState={{ selected: tab === t }}
             style={styles.tab}
             onPress={() => onChange(t)}
@@ -169,7 +170,13 @@ function ProfileTab({ onReview, editing }: { onReview: () => void; editing: bool
   return (
     <>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-        <Pressable testID="review-banner" accessibilityRole="button" onPress={onReview} style={styles.banner}>
+        <Pressable
+          testID="review-banner"
+          accessibilityRole="button"
+          accessibilityLabel="Review individual ingredient ratings"
+          onPress={onReview}
+          style={styles.banner}
+        >
           <Text style={styles.bannerText}>Review individual ingredient ratings</Text>
           <Feather name="arrow-right" size={22} color={colors.purple} />
         </Pressable>
@@ -197,6 +204,7 @@ function ProfileTab({ onReview, editing }: { onReview: () => void; editing: bool
                       <View style={styles.cardRow}>
                         <Pressable
                           accessibilityRole="button"
+                          accessibilityLabel={r.name}
                           accessibilityHint="Edit this restriction"
                           style={styles.cardMain}
                           onPress={() => (r.kind === 'toggle' ? setAbout(r) : setEditId(r.id))}
@@ -205,8 +213,9 @@ function ProfileTab({ onReview, editing }: { onReview: () => void; editing: bool
                         </Pressable>
                         {subs.length ? (
                           <Pressable
-                            accessibilityLabel={open ? 'Collapse' : 'Expand'}
-                            hitSlop={10}
+                            accessibilityRole="button"
+                            accessibilityLabel={open ? `Hide ${r.name} details` : `Show ${r.name} details`}
+                            hitSlop={12}
                             onPress={() => setExpanded((e) => ({ ...e, [r.id]: !open }))}
                           >
                             <Feather name={open ? 'chevron-up' : 'chevron-down'} size={20} color={colors.ink} />
@@ -234,6 +243,7 @@ function ProfileTab({ onReview, editing }: { onReview: () => void; editing: bool
         <Pressable
           testID="add-restrictions"
           accessibilityRole="button"
+          accessibilityLabel={selected.length ? 'Add or edit restrictions' : 'Add restrictions'}
           style={styles.addBtn}
           onPress={() => router.push({ pathname: '/onboarding/restrictions', params: { edit: '1' } })}
         >
@@ -326,6 +336,7 @@ function LookupTab() {
           <Feather name="search" size={20} color={colors.ink} />
           <TextInput
             testID="ingredient-search"
+            accessibilityLabel="Search ingredients"
             value={query}
             onChangeText={setQuery}
             placeholder="Search ingredients"
@@ -338,6 +349,7 @@ function LookupTab() {
         <Pressable
           testID="filter"
           accessibilityRole="button"
+          accessibilityLabel={`Filter: ${FILTER_LABEL[filter]}`}
           style={[styles.filterBtn, filter !== 'all' && styles.filterBtnActive]}
           onPress={() => setFilterOpen(true)}
         >
@@ -383,7 +395,12 @@ function LookupTab() {
             >
               <RatingIcon rating={item.rating} />
             </Pressable>
-            <Pressable style={{ flex: 1 }} onPress={() => setDetailId(item.id)}>
+            <Pressable
+              style={{ flex: 1, alignSelf: 'stretch', justifyContent: 'center' }}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.name} details`}
+              onPress={() => setDetailId(item.id)}
+            >
               <Text style={styles.ingName}>{item.name}</Text>
               {overrides[item.id] ? <Text style={styles.ingChanged}>Changed by you</Text> : null}
             </Pressable>
@@ -399,6 +416,7 @@ function LookupTab() {
             <Pressable
               key={f}
               accessibilityRole="radio"
+              accessibilityLabel={f === 'all' ? 'All ingredients' : f === 'manual' ? 'Changed by me' : ratingLabel[f]}
               accessibilityState={{ selected: filter === f }}
               style={styles.filterRow}
               onPress={() => {
@@ -446,6 +464,7 @@ function LookupTab() {
                 <Pressable
                   key={r}
                   accessibilityRole="radio"
+                  accessibilityLabel={ratingLabel[r]}
                   accessibilityState={{ selected: detail.rating === r }}
                   style={[styles.segBtn, detail.rating === r && styles.segBtnActive]}
                   onPress={() => {
@@ -536,7 +555,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: 42,
+    minHeight: 44,
     paddingHorizontal: 16,
     borderRadius: radius.pill,
     backgroundColor: '#fff',

@@ -52,6 +52,7 @@ export default function Restrictions() {
             <Feather name="search" size={20} color={colors.ink} />
             <TextInput
               testID="restriction-search"
+              accessibilityLabel="Search for a diet, allergy, or condition"
               value={query}
               onChangeText={setQuery}
               placeholder="Search for a diet, allergy, or condition"
@@ -62,7 +63,7 @@ export default function Restrictions() {
               clearButtonMode="while-editing"
             />
             {query ? (
-              <Pressable accessibilityLabel="Clear search" hitSlop={10} onPress={() => setQuery('')}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={14} onPress={() => setQuery('')}>
                 <Feather name="x-circle" size={18} color={colors.textSubtle} />
               </Pressable>
             ) : null}

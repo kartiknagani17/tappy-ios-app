@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { haptic } from '../lib/haptics';
 import { rateNames, worst } from '../lib/ratings';
 import { useStore } from '../lib/store';
 import { colors, radius } from '../theme';
@@ -38,8 +39,12 @@ export function ProductSheet({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={isSaved ? 'Remove from list' : 'Save to list'}
-              hitSlop={10}
-              onPress={() => toggleSaved(product.id)}
+              testID="bookmark"
+              hitSlop={12}
+              onPress={() => {
+                haptic.select();
+                toggleSaved(product.id);
+              }}
             >
               <Feather name="bookmark" size={24} color={isSaved ? colors.purple : colors.ink} />
             </Pressable>

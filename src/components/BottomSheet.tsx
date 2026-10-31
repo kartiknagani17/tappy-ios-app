@@ -84,7 +84,11 @@ export function BottomSheet({
     <Modal transparent visible={mounted} animationType="none" onRequestClose={locked ? undefined : onClose} statusBarTranslucent>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.backdrop }, backdropStyle]}>
-          <Pressable accessibilityLabel="Dismiss" style={{ flex: 1 }} onPress={locked ? undefined : onClose} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+            accessible={!locked}
+            style={{ flex: 1 }} onPress={locked ? undefined : onClose} />
         </Animated.View>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.anchor} pointerEvents="box-none">
           <GestureDetector gesture={pan}>

@@ -16,6 +16,7 @@ export type DemoProduct = {
   emoji: string;
   color: string;
   accent: string;
+  category: 'Snacks' | 'Bakery' | 'Dairy & alternatives' | 'Frozen' | 'Pantry';
   ingredients: string[];
 };
 
@@ -27,6 +28,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     emoji: '🍌',
     color: '#FDE2EC',
     accent: '#E8447A',
+    category: 'Snacks',
     ingredients: ['Banana', 'Coconut oil', 'Sea salt'],
   },
   {
@@ -36,6 +38,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     emoji: '🍫',
     color: '#FFD84D',
     accent: '#B4122B',
+    category: 'Snacks',
     ingredients: ['Oats', 'Banana', 'Chocolate', 'Honey', 'Sunflower oil', 'Sea salt'],
   },
   {
@@ -45,6 +48,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     emoji: '🍞',
     color: '#E9DDF7',
     accent: '#5B3A8E',
+    category: 'Bakery',
     ingredients: ['Whole wheat flour', 'Water', 'Cane sugar', 'Wheat gluten', 'Yeast', 'Sea salt', 'Vinegar'],
   },
   {
@@ -54,6 +58,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     emoji: '🥨',
     color: '#CFF3F1',
     accent: '#138C8A',
+    category: 'Snacks',
     ingredients: ['Sugar', 'Palm oil', 'Corn starch', 'Potato starch', 'Yogurt', 'Soy lecithin', 'Natural flavor', 'Salt'],
   },
   {
@@ -63,6 +68,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     emoji: '🍓',
     color: '#FFE3E3',
     accent: '#D7263D',
+    category: 'Frozen',
     ingredients: [
       'Milk',
       'Cream',
@@ -84,6 +90,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     emoji: '🥛',
     color: '#E4EEFB',
     accent: '#1F4E9C',
+    category: 'Dairy & alternatives',
     ingredients: ['Oats', 'Water', 'Rapeseed oil', 'Calcium carbonate', 'Sea salt'],
   },
   {
@@ -93,6 +100,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     emoji: '🍅',
     color: '#FFE8D6',
     accent: '#C2410C',
+    category: 'Pantry',
     ingredients: ['Tomato', 'Onion', 'Bell pepper', 'Cayenne pepper', 'Vinegar', 'Garlic', 'Salt'],
   },
   {
@@ -102,6 +110,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     emoji: '🥜',
     color: '#F6E7C8',
     accent: '#7C4A12',
+    category: 'Pantry',
     ingredients: ['Peanut', 'Sea salt'],
   },
   {
@@ -111,6 +120,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     emoji: '🍘',
     color: '#FFF4D6',
     accent: '#2D7A3E',
+    category: 'Snacks',
     ingredients: ['Almond flour', 'Sunflower seeds', 'Flaxseed', 'Tapioca', 'Sea salt'],
   },
 ];

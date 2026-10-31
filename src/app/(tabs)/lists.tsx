@@ -1,14 +1,21 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, FlatList, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import Constants from 'expo-constants';
+import { Alert, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { DEMO_PRODUCTS, ProductTile, type DemoProduct } from '../../components/art';
 import { BottomSheet } from '../../components/BottomSheet';
 import { ProductSheet } from '../../components/ProductSheet';
 import { Button, Screen } from '../../components/ui';
+import { haptic } from '../../lib/haptics';
 import { rateNames, worst } from '../../lib/ratings';
 import { useStore } from '../../lib/store';
+import { PRIVACY_URL, restorePurchases, TERMS_URL } from '../../lib/subscription';
 import { colors, radius } from '../../theme';
+
+// TODO: move to src/lib/subscription.ts next to TERMS_URL / PRIVACY_URL and point at a monitored inbox.
+const SUPPORT_EMAIL = 'support@tapi.app';
+const MANAGE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
 export default function Lists() {
   const saved = useStore((s) => s.saved);
@@ -17,19 +24,62 @@ export default function Lists() {
   const restrictions = useStore((s) => s.restrictions);
   const overrides = useStore((s) => s.ingredientOverrides);
   const [product, setProduct] = useState<DemoProduct | null>(null);
+  const trialActive = useStore((s) => s.trialActive);
   const [settings, setSettings] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const items = DEMO_PRODUCTS.filter((p) => saved.includes(p.id));
 
-  const confirm = (title: string, msg: string, onOk: () => void) => {
+  const confirm = (title: string, msg: string, onOk: () => void, okText = 'Continue') => {
     if (Platform.OS === 'web') {
       if (window.confirm(`${title}\n\n${msg}`)) onOk();
       return;
     }
     Alert.alert(title, msg, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Continue', style: 'destructive', onPress: onOk },
+      { text: okText, style: 'destructive', onPress: onOk },
     ]);
   };
+  const notify = (title: string, msg: string) => {
+    if (Platform.OS === 'web') window.alert(`${title}\n\n${msg}`);
+    else Alert.alert(title, msg);
+  };
+
+  const restore = async () => {
+    if (restoring) return;
+    setRestoring(true);
+    try {
+      const ok = await restorePurchases();
+      if (ok) {
+        haptic.success();
+        useStore.getState().set({ trialActive: true });
+        notify('Purchases restored', 'Your Tapi subscription is active on this device.');
+      } else notify('No purchases found', 'We couldn’t find an active Tapi subscription for this Apple ID.');
+    } catch {
+      notify('Couldn’t restore', 'Could not reach the App Store. Please try again.');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const contactSupport = () => {
+    const version = Constants.expoConfig?.version ?? '';
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Tapi support (v${version} ${Platform.OS})`)}`;
+    Linking.openURL(url).catch(() => notify('Contact support', `Email us at ${SUPPORT_EMAIL}`));
+  };
+
+  const deleteAccount = () =>
+    confirm(
+      'Delete your account?',
+      'This permanently deletes your Tapi account, dietary profile and saved lists. This can’t be undone. An App Store subscription is not canceled automatically; manage it in Settings > Apple ID > Subscriptions.',
+      () => {
+        // TODO: call the backend account-deletion endpoint here once auth is wired up (Guideline 5.1.1(v)).
+        haptic.warning();
+        setSettings(false);
+        useStore.getState().resetAll();
+        router.replace('/welcome');
+      },
+      'Delete account',
+    );
 
   return (
     <Screen>
@@ -47,7 +97,13 @@ export default function Lists() {
       </View>
 
       {!account ? (
-        <Pressable style={styles.banner} onPress={() => router.push({ pathname: '/auth', params: { mode: 'signup' } })}>
+        <Pressable
+          testID="account-banner"
+          accessibilityRole="button"
+          accessibilityLabel="Save your lists. Create a free account so your profile and lists sync across devices."
+          style={styles.banner}
+          onPress={() => router.push({ pathname: '/auth', params: { mode: 'signup' } })}
+        >
           <View style={{ flex: 1 }}>
             <Text style={styles.bannerTitle}>Save your lists</Text>
             <Text style={styles.bannerBody}>Create a free account so your profile and lists sync across devices.</Text>
@@ -63,7 +119,7 @@ export default function Lists() {
         columnWrapperStyle={{ gap: 14 }}
         contentContainerStyle={{ padding: 16, gap: 18, flexGrow: 1 }}
         renderItem={({ item }) => (
-          <Pressable style={{ flex: 1 }} onPress={() => setProduct(item)}>
+          <Pressable style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel={item.name} onPress={() => setProduct(item)}>
             <ProductTile p={item} saved rating={worst(rateNames(item.ingredients, restrictions, overrides).map((r) => r.rating))} />
           </Pressable>
         )}
@@ -84,8 +140,10 @@ export default function Lists() {
       <ProductSheet product={product} onClose={() => setProduct(null)} />
 
       <BottomSheet visible={settings} onClose={() => setSettings(false)} handle>
-        <View style={{ paddingHorizontal: 16 }}>
-          <Text style={styles.sheetTitle}>Settings</Text>
+        <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: 16 }}>
+          <Text style={styles.sheetTitle} accessibilityRole="header">
+            Settings
+          </Text>
           {account ? <Text style={styles.account}>Signed in as {account.email}</Text> : null}
           <Row
             icon="sliders"
@@ -102,11 +160,22 @@ export default function Lists() {
               <Text style={styles.rowSub}>Keep package photos to improve Tapi’s database. Off: photos are deleted after scanning.</Text>
             </View>
             <Switch
+              testID="share-photos"
+              accessibilityLabel="Share product photos"
               value={contributePhotos}
               onValueChange={(v) => useStore.getState().set({ contributePhotos: v })}
               trackColor={{ true: colors.purple, false: '#D1D1D6' }}
             />
           </View>
+          <Text style={styles.group}>Subscription</Text>
+          <Row icon="rotate-ccw" label={restoring ? 'Restoring…' : 'Restore purchases'} onPress={restore} testID="restore" />
+          {trialActive && Platform.OS === 'ios' ? (
+            <Row icon="credit-card" label="Manage subscription" onPress={() => Linking.openURL(MANAGE_SUBSCRIPTIONS_URL)} external />
+          ) : null}
+          <Text style={styles.group}>Support & legal</Text>
+          <Row icon="mail" label="Contact support" onPress={contactSupport} testID="contact" external />
+          <Row icon="shield" label="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_URL)} testID="privacy" external />
+          <Row icon="file-text" label="Terms of Use" onPress={() => Linking.openURL(TERMS_URL)} testID="terms" external />
           <Row
             icon="info"
             label="Data sources & credits"
@@ -115,6 +184,7 @@ export default function Lists() {
               router.push('/credits');
             }}
           />
+          <Text style={styles.group}>Account</Text>
           {account ? (
             <Row
               icon="log-out"
@@ -134,9 +204,11 @@ export default function Lists() {
               }}
             />
           )}
+          {account ? <Row icon="user-x" label="Delete account" danger onPress={deleteAccount} testID="delete-account" /> : null}
           <Row
             icon="refresh-ccw"
             label="Reset app & restart onboarding"
+            testID="reset"
             danger
             onPress={() =>
               confirm('Reset Tapi?', 'This clears your profile and restarts onboarding on this device.', () => {
@@ -146,7 +218,7 @@ export default function Lists() {
               })
             }
           />
-        </View>
+        </ScrollView>
       </BottomSheet>
     </Screen>
   );
@@ -157,17 +229,21 @@ function Row({
   label,
   onPress,
   danger,
+  external,
+  testID,
 }: {
   icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   onPress: () => void;
   danger?: boolean;
+  external?: boolean;
+  testID?: string;
 }) {
   return (
-    <Pressable accessibilityRole="button" style={styles.row} onPress={onPress}>
+    <Pressable testID={testID} accessibilityRole={external ? 'link' : 'button'} accessibilityLabel={label} style={styles.row} onPress={onPress}>
       <Feather name={icon} size={20} color={danger ? colors.danger : colors.ink} />
       <Text style={[styles.rowText, danger && { color: colors.danger }]}>{label}</Text>
-      <Feather name="chevron-right" size={20} color={colors.textSubtle} />
+      <Feather name={external ? 'external-link' : 'chevron-right'} size={18} color={colors.textSubtle} />
     </Pressable>
   );
 }
@@ -192,6 +268,7 @@ const styles = StyleSheet.create({
   emptyBody: { fontSize: 15, color: colors.textMuted, textAlign: 'center', marginTop: 6 },
   sheetTitle: { fontSize: 22, fontWeight: '600', color: colors.ink, marginVertical: 8 },
   account: { fontSize: 14, color: colors.textMuted, marginBottom: 8 },
+  group: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 2 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

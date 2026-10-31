@@ -140,14 +140,14 @@ export function VerdictSheet({
               ) : null}
               {product.gtin14 ? <Text style={styles.provText}>Barcode {product.gtin14.replace(/^0+(?=\d{12})/, '')}</Text> : null}
               {!demo ? (
-                <Text style={[styles.provText, styles.link]} onPress={() => router.push('/credits')}>
+                <Text accessibilityRole="link" style={[styles.provText, styles.link]} onPress={() => router.push('/credits')}>
                   Data sources & credits
                 </Text>
               ) : null}
             </View>
 
             {product.id !== null && !demo ? (
-              <Pressable accessibilityRole="button" onPress={() => setReporting(true)} style={styles.report}>
+              <Pressable accessibilityRole="button" testID="report" onPress={() => setReporting(true)} style={styles.report}>
                 <Feather name="flag" size={16} color={colors.danger} />
                 <Text style={styles.reportText}>Report wrong info</Text>
               </Pressable>
@@ -209,7 +209,16 @@ function ReportSheet({ productId, onClose }: { productId: number | null; onClose
           <>
             <Text style={styles.sheetTitle}>What’s wrong?</Text>
             {REASONS.map((r) => (
-              <Pressable key={r} style={[styles.reason, reason === r && styles.reasonOn]} onPress={() => setReason(r)}>
+              <Pressable
+                key={r}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: reason === r }}
+                style={[styles.reason, reason === r && styles.reasonOn]}
+                onPress={() => {
+                  haptic.select();
+                  setReason(r);
+                }}
+              >
                 <Text style={styles.reasonText}>{r}</Text>
                 {reason === r ? <Feather name="check" size={18} color={colors.purple} /> : null}
               </Pressable>
@@ -218,6 +227,7 @@ function ReportSheet({ productId, onClose }: { productId: number | null; onClose
               value={note}
               onChangeText={setNote}
               placeholder="Details (optional)"
+              accessibilityLabel="Details (optional)"
               placeholderTextColor={colors.textSubtle}
               style={[styles.input, noOutline]}
               multiline
@@ -279,7 +289,7 @@ const styles = StyleSheet.create({
   link: { textDecorationLine: 'underline' },
   badge: { alignSelf: 'flex-start', backgroundColor: '#FFE8CC', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: 12, fontWeight: '700', color: '#8A4B00' },
-  report: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 14, paddingVertical: 6 },
+  report: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, minHeight: 44 },
   reportText: { color: colors.danger, fontWeight: '600', fontSize: 14 },
   sheetTitle: { fontSize: 20, fontWeight: '600', color: colors.ink, marginTop: 6 },
   reason: {

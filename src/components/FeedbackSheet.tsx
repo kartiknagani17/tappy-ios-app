@@ -15,7 +15,7 @@ type Props = {
 };
 
 /**
- * Full-height sheet with Cancel / Next in the header, used for
+ * Full-height sheet with Cancel / Send in the header, used for
  * "Don't see an ingredient?" and "Feedback on this restriction?".
  */
 export function FeedbackSheet(props: Props) {
@@ -35,7 +35,7 @@ function FeedbackBody({ onClose, header, title, body, placeholder = 'Let us know
   return (
     <>
       <View style={styles.bar}>
-        <Pressable accessibilityRole="button" hitSlop={10} onPress={onClose}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Cancel" hitSlop={12} onPress={onClose}>
           <Text style={styles.barBtn}>Cancel</Text>
         </Pressable>
         <Text style={styles.barTitle} numberOfLines={1}>
@@ -43,15 +43,17 @@ function FeedbackBody({ onClose, header, title, body, placeholder = 'Let us know
         </Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Send feedback"
           accessibilityState={{ disabled: !canSend || sent }}
-          hitSlop={10}
+          testID="feedback-send"
+          hitSlop={12}
           disabled={!canSend || sent}
           onPress={() => {
             haptic.success();
             setSent(true);
           }}
         >
-          <Text style={[styles.barBtn, (!canSend || sent) && { opacity: 0.35 }]}>Next</Text>
+          <Text style={[styles.barBtn, (!canSend || sent) && { opacity: 0.35 }]}>Send</Text>
         </Pressable>
       </View>
       <View style={styles.body}>

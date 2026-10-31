@@ -69,6 +69,7 @@ export default function Avoid() {
           <View key={it.id} style={[styles.row, i < ITEMS.length - 1 && styles.divider]}>
             <Pressable
               accessibilityRole="checkbox"
+              accessibilityLabel={it.label}
               accessibilityState={{ checked: avoidList.includes(it.id) }}
               onPress={() => toggle(it.id)}
               style={styles.rowMain}

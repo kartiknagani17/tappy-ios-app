@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Selection } from '../data/restrictions';
+import { STORE_VERSION, migratePersisted, safeStorage, sanitizePersisted } from './persist';
 
 export type Rating = 'green' | 'yellow' | 'red';
 
@@ -122,7 +123,21 @@ export const useStore = create<State & Actions>()(
     }),
     {
       name: 'tapi-store-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      // Corrupted JSON or a storage error resets to defaults instead of hanging hydration.
+      storage: createJSONStorage(() =>
+        safeStorage(AsyncStorage, (where, e) => {
+          if (__DEV__) console.warn(`[store] ${where} failed`, e);
+        }),
+      ),
+      version: STORE_VERSION,
+      migrate: (persisted, fromVersion) => migratePersisted(persisted, fromVersion) as unknown as State & Actions,
+      // Only well-typed fields from disk are applied over the defaults (never actions, never bad shapes).
+      merge: (persisted, current) => ({ ...current, ...(sanitizePersisted(persisted) as Partial<State>) }),
+      // Persist data only, not the action functions.
+      partialize: (st) => {
+        const { set: _s, setRestriction: _r, setOverride: _o, resetOverrides: _ro, applyAvoidList: _a, resetAll: _ra, toggleSaved: _t, ...data } = st;
+        return data;
+      },
     },
   ),
 );

@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { isIP } from 'node:net';
 import { photoScanningEnabled, type Config } from '../config.ts';
 import type { DB } from '../db/index.ts';
-import { ImageError } from '../lib/image.ts';
+import { ImageError, probeImage } from '../lib/image.ts';
 import { logError } from '../lib/log.ts';
 import { consumeDailyQuota, ipKey, LimitError, RateLimiter, type QuotaSubject } from '../services/limits.ts';
 import { getProductById, reportProduct, sanitizeReason, toPublicProduct } from '../services/products.ts';
@@ -151,6 +151,7 @@ export function createApp({
       }
       case 'front': {
         const image = decodeImage(body.image_base64, config.visionMaxImageBytes);
+        await probeImage(image, config.imageMaxInputPixels); // invalid uploads don't cost quota
         quota('photo');
         return send(res, 200, await scan.scanFront(image, userId, { contribute: body.contribute === true }));
       }
@@ -176,6 +177,7 @@ export function createApp({
       }
       case 'label': {
         const image = decodeImage(body.image_base64, config.visionMaxImageBytes);
+        await probeImage(image, config.imageMaxInputPixels);
         const gtin = typeof body.gtin === 'string' || typeof body.gtin === 'number' ? String(body.gtin).slice(0, MAX_BARCODE_CHARS) : null;
         quota('photo');
         return send(

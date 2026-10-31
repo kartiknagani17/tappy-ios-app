@@ -10,7 +10,6 @@ import { rateNames, worst } from '../../lib/ratings';
 import { useStore } from '../../lib/store';
 import { colors, radius, noOutline } from '../../theme';
 
-const STORES = ['All stores', 'Whole Foods', 'Trader Joe’s', 'Target', 'Walmart', 'Kroger'];
 const CATEGORIES = ['All categories', 'Snacks', 'Bakery', 'Dairy & alternatives', 'Frozen', 'Pantry'];
 
 export default function Grocery() {
@@ -19,9 +18,8 @@ export default function Grocery() {
   const saved = useStore((s) => s.saved);
   const [query, setQuery] = useState('');
   const [likelyOnly, setLikelyOnly] = useState(true);
-  const [store, setStore] = useState(STORES[0]);
   const [category, setCategory] = useState(CATEGORIES[0]);
-  const [picker, setPicker] = useState<null | 'store' | 'category'>(null);
+  const [picker, setPicker] = useState(false);
   const [product, setProduct] = useState<DemoProduct | null>(null);
 
   const rated = useMemo(
@@ -29,7 +27,12 @@ export default function Grocery() {
     [restrictions, overrides],
   );
   const q = query.trim().toLowerCase();
-  const list = rated.filter((r) => (!likelyOnly || r.rating === 'green') && (!q || r.p.name.toLowerCase().includes(q)));
+  const list = rated.filter(
+    (r) =>
+      (!likelyOnly || r.rating === 'green') &&
+      (category === CATEGORIES[0] || r.p.category === category) &&
+      (!q || r.p.name.toLowerCase().includes(q) || r.p.brand.toLowerCase().includes(q)),
+  );
 
   return (
     <Screen>
@@ -37,6 +40,8 @@ export default function Grocery() {
         <View style={styles.search}>
           <Feather name="search" size={18} color="#666" />
           <TextInput
+            testID="grocery-search"
+            accessibilityLabel="Search for a product"
             value={query}
             onChangeText={setQuery}
             placeholder="Search for a product"
@@ -45,12 +50,13 @@ export default function Grocery() {
             clearButtonMode="while-editing"
           />
         </View>
-        <Feather name="bell" size={24} color={colors.ink} />
       </View>
       <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
           <Pressable
+            testID="likely-works"
             accessibilityRole="switch"
+            accessibilityLabel="Only show products that likely work for you"
             accessibilityState={{ checked: likelyOnly }}
             style={[styles.filter, likelyOnly && styles.filterOn]}
             onPress={() => {
@@ -61,11 +67,13 @@ export default function Grocery() {
             <RatingIcon rating="green" size={18} />
             <Text style={styles.filterText}>Likely Works</Text>
           </Pressable>
-          <Pressable style={styles.filter} onPress={() => setPicker('store')}>
-            <Text style={styles.filterText}>{store === STORES[0] ? 'Store' : store}</Text>
-            <Feather name="chevron-down" size={14} />
-          </Pressable>
-          <Pressable style={styles.filter} onPress={() => setPicker('category')}>
+          <Pressable
+            testID="category"
+            accessibilityRole="button"
+            accessibilityLabel={`Category: ${category}`}
+            style={[styles.filter, category !== CATEGORIES[0] && styles.filterOn]}
+            onPress={() => setPicker(true)}
+          >
             <Text style={styles.filterText}>{category === CATEGORIES[0] ? 'Category' : category}</Text>
             <Feather name="chevron-down" size={14} />
           </Pressable>
@@ -77,33 +85,41 @@ export default function Grocery() {
         numColumns={2}
         columnWrapperStyle={{ gap: 14 }}
         contentContainerStyle={{ padding: 16, gap: 18 }}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
-          <Pressable style={{ flex: 1 }} onPress={() => setProduct(item.p)}>
+          <Pressable
+            style={{ flex: 1 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.p.name}. ${item.rating === 'green' ? 'Likely works' : item.rating === 'yellow' ? 'Contains something you limit' : 'Contains something you avoid'}`}
+            onPress={() => setProduct(item.p)}
+          >
             <ProductTile p={item.p} rating={item.rating} saved={saved.includes(item.p.id)} />
           </Pressable>
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No matching products</Text>
-            <Text style={styles.emptyBody}>Try turning off “Likely Works” or searching for something else.</Text>
+            <Text style={styles.emptyBody}>Try turning off “Likely Works”, changing the category, or searching for something else.</Text>
           </View>
         }
       />
       <ProductSheet product={product} onClose={() => setProduct(null)} />
-      <BottomSheet visible={!!picker} onClose={() => setPicker(null)} handle>
+      <BottomSheet visible={picker} onClose={() => setPicker(false)} handle>
         <View style={{ paddingHorizontal: 16 }}>
-          <Text style={styles.sheetTitle}>{picker === 'store' ? 'Store' : 'Category'}</Text>
-          {(picker === 'store' ? STORES : CATEGORIES).map((o) => {
-            const active = (picker === 'store' ? store : category) === o;
+          <Text style={styles.sheetTitle}>Category</Text>
+          {CATEGORIES.map((o) => {
+            const active = category === o;
             return (
               <Pressable
                 key={o}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
                 style={styles.option}
                 onPress={() => {
                   haptic.select();
-                  if (picker === 'store') setStore(o);
-                  else setCategory(o);
-                  setPicker(null);
+                  setCategory(o);
+                  setPicker(false);
                 }}
               >
                 <Text style={styles.optionText}>{o}</Text>
@@ -139,7 +155,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
-    height: 36,
+    minHeight: 40,
   },
   filterOn: { borderColor: colors.ink, backgroundColor: '#F6FFE0' },
   filterText: { fontSize: 14, color: colors.ink },

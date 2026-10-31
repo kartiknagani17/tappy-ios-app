@@ -3,7 +3,22 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useStore } from './store';
 
 /** Backend base URL. On a physical iPhone, point this at your computer's LAN IP. */
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787').replace(/\/$/, '');
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787').trim().replace(/\/+$/, '');
+
+/**
+ * Release builds must talk to the API over HTTPS (photos, device id and the user's scans travel
+ * in the request). Plain http:// is only accepted in development. When this is non-null every
+ * request fails with a clear error instead of silently sending data in the clear.
+ */
+export const API_CONFIG_ERROR: string | null = (() => {
+  if (!/^https?:\/\/[^/\s]+/i.test(API_URL)) return `Invalid EXPO_PUBLIC_API_URL: "${API_URL}"`;
+  if (!__DEV__ && !/^https:\/\//i.test(API_URL)) return 'EXPO_PUBLIC_API_URL must use https:// in release builds.';
+  return null;
+})();
+if (API_CONFIG_ERROR) console.error(`[api] ${API_CONFIG_ERROR}`);
+
+/** Per-request timeouts. Photo uploads + vision calls are slower than barcode lookups. */
+const TIMEOUT_MS = { default: 15_000, upload: 45_000 };
 
 export type ProductSource = 'usda' | 'off' | 'user' | 'ocr';
 
@@ -77,20 +92,124 @@ function deviceId(): string {
   return id;
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+type PostOptions = { timeoutMs?: number; retries?: number; validate: (json: unknown) => boolean };
+
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function postOnce<T>(path: string, body: string, opts: PostOptions): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? TIMEOUT_MS.default);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Tapi-User': deviceId() },
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Tapi-User': deviceId() },
+      body,
+      signal: controller.signal,
     });
-  } catch {
+  } catch (e) {
+    clearTimeout(timer);
+    if (controller.signal.aborted) throw new ApiError(0, 'timeout', 'Tapi is taking too long to respond. Please try again.');
+    if (__DEV__) console.warn(`[api] ${path} network error`, e);
     throw new ApiError(0, 'network', 'Can’t reach Tapi right now. Check your connection and try again.');
   }
-  const json = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-  if (!res.ok) throw new ApiError(res.status, json.error ?? 'error', json.message ?? 'Something went wrong.');
+  let json: unknown = null;
+  try {
+    json = await res.json();
+  } catch {
+    json = null;
+  } finally {
+    clearTimeout(timer);
+  }
+  const obj = (json && typeof json === 'object' ? json : {}) as { error?: unknown; message?: unknown };
+  if (!res.ok) {
+    const code = typeof obj.error === 'string' ? obj.error.slice(0, 64) : 'error';
+    // Server messages are shown to the user, so only accept short plain strings.
+    const message =
+      typeof obj.message === 'string' && obj.message.length <= 300
+        ? obj.message
+        : res.status === 429
+          ? 'You’ve hit the scan limit for now. Please try again later.'
+          : res.status >= 500
+            ? 'Tapi is having trouble right now. Please try again in a moment.'
+            : 'Something went wrong.';
+    throw new ApiError(res.status, code, message);
+  }
+  if (!opts.validate(json)) {
+    if (__DEV__) console.warn(`[api] ${path} unexpected response`, json);
+    throw new ApiError(res.status, 'bad_response', 'We got an unexpected answer from Tapi. Please try again.');
+  }
   return json as T;
+}
+
+async function post<T>(path: string, payload: unknown, opts: PostOptions): Promise<T> {
+  if (API_CONFIG_ERROR) throw new ApiError(0, 'config', 'Tapi isn’t configured correctly. Please update the app.');
+  const body = JSON.stringify(payload);
+  const retries = opts.retries ?? 0;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await postOnce<T>(path, body, opts);
+    } catch (e) {
+      const retryable = e instanceof ApiError && (e.code === 'network' || RETRYABLE_STATUS.has(e.status));
+      if (!retryable || attempt >= retries) throw e;
+      await sleep(600 * (attempt + 1));
+    }
+  }
+}
+
+// ---------- Response validation (never trust the shape of what comes back) ----------
+
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const strOrNull = (v: unknown) => v === null || v === undefined || typeof v === 'string';
+const numOrNull = (v: unknown) => v === null || v === undefined || (typeof v === 'number' && Number.isFinite(v));
+
+/** A product must have text (or null) where the verdict reads text; anything else is rejected. */
+export function isApiProduct(v: unknown): v is ApiProduct {
+  return (
+    isObj(v) &&
+    numOrNull(v.id) &&
+    typeof v.gtin14 === 'string' &&
+    typeof v.name === 'string' &&
+    strOrNull(v.brand) &&
+    strOrNull(v.variant_or_flavor) &&
+    strOrNull(v.size_text) &&
+    strOrNull(v.ingredients_text) &&
+    strOrNull(v.allergens_text) &&
+    strOrNull(v.category) &&
+    strOrNull(v.image_url) &&
+    typeof v.source === 'string' &&
+    strOrNull(v.source_updated_at)
+  );
+}
+
+const isExtracted = (v: unknown) => v === null || (isObj(v) && strOrNull(v.brand) && strOrNull(v.product_name));
+
+function isBarcodeResult(v: unknown): boolean {
+  if (!isObj(v)) return false;
+  if (v.status === 'found') return isApiProduct(v.product);
+  if (v.status === 'needs_label_photo') return typeof v.gtin14 === 'string';
+  if (v.status === 'invalid_barcode') return true;
+  return false;
+}
+
+function isFrontResult(v: unknown): boolean {
+  if (!isObj(v)) return false;
+  if (v.status === 'match') {
+    return (
+      Array.isArray(v.candidates) &&
+      v.candidates.every((c) => isObj(c) && isApiProduct(c.product)) &&
+      numOrNull(v.vision_cache_id) &&
+      isExtracted(v.extracted)
+    );
+  }
+  return v.status === 'needs_barcode_or_label' || v.status === 'not_food_package' || v.status === 'vision_unavailable';
+}
+
+function isLabelResult(v: unknown): boolean {
+  if (!isObj(v)) return false;
+  if (v.status === 'existing_product' || v.status === 'contributed') return isApiProduct(v.product);
+  return v.status === 'unreadable';
 }
 
 /**
@@ -109,17 +228,33 @@ export async function prepareUpload(uri: string, width: number, height: number):
 }
 
 export const api = {
-  scanBarcode: (barcode: string) => post<BarcodeResult>('/api/scan/barcode', { barcode }),
+  scanBarcode: (barcode: string) =>
+    post<BarcodeResult>('/api/scan/barcode', { barcode }, { validate: isBarcodeResult, retries: 1 }),
   scanFront: (imageBase64: string) =>
-    post<FrontResult>('/api/scan/front', { image_base64: imageBase64, contribute: useStore.getState().contributePhotos }),
+    post<FrontResult>(
+      '/api/scan/front',
+      { image_base64: imageBase64, contribute: useStore.getState().contributePhotos },
+      { validate: isFrontResult, timeoutMs: TIMEOUT_MS.upload },
+    ),
   confirmFront: (visionCacheId: number | null, productId: number) =>
-    post<{ product: ApiProduct }>('/api/scan/front/confirm', { vision_cache_id: visionCacheId, product_id: productId }),
+    post<{ product: ApiProduct }>(
+      '/api/scan/front/confirm',
+      { vision_cache_id: visionCacheId, product_id: productId },
+      { validate: (v) => isObj(v) && isApiProduct(v.product), retries: 1 },
+    ),
   scanLabel: (imageBase64: string, ctx: { gtin?: string | null; frontHash?: string | null }) =>
-    post<LabelResult>('/api/scan/label', {
-      image_base64: imageBase64,
-      gtin: ctx.gtin ?? null,
-      front_hash: ctx.frontHash ?? null,
-      contribute: useStore.getState().contributePhotos,
-    }),
-  report: (productId: number, reason: string) => post<{ ok: true }>(`/api/products/${productId}/report`, { reason }),
+    post<LabelResult>(
+      '/api/scan/label',
+      {
+        image_base64: imageBase64,
+        gtin: ctx.gtin ?? null,
+        front_hash: ctx.frontHash ?? null,
+        contribute: useStore.getState().contributePhotos,
+      },
+      { validate: isLabelResult, timeoutMs: TIMEOUT_MS.upload },
+    ),
+  report: (productId: number, reason: string) => {
+    if (!Number.isSafeInteger(productId) || productId <= 0) return Promise.reject(new ApiError(0, 'invalid', 'Can’t report this product.'));
+    return post<{ ok: true }>(`/api/products/${productId}/report`, { reason: reason.slice(0, 1000) }, { validate: isObj });
+  },
 };
