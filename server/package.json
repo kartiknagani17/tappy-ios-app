@@ -1,0 +1,32 @@
+{
+  "name": "tapi-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tapi product database, barcode/photo scan API, and data import CLI",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/http/server.ts",
+    "start": "node --disable-warning=ExperimentalWarning src/http/server.ts",
+    "migrate": "node --disable-warning=ExperimentalWarning src/cli.ts migrate",
+    "data:download": "node --disable-warning=ExperimentalWarning src/cli.ts download",
+    "import:usda": "node --disable-warning=ExperimentalWarning src/cli.ts import-usda",
+    "import:off": "node --disable-warning=ExperimentalWarning src/cli.ts import-off",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-reporter=spec \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "csv-parse": "^7.0.3",
+    "sharp": "^0.35.5",
+    "yauzl": "^3.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/yauzl": "^3.4.0",
+    "typescript": "^7.0.2"
+  }
+}

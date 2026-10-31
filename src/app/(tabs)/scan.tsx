@@ -1,22 +1,58 @@
+import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DEMO_PRODUCTS, type DemoProduct } from '../../components/art';
-import { ProductSheet } from '../../components/ProductSheet';
+import { DEMO_PRODUCTS } from '../../components/art';
+import { BottomSheet } from '../../components/BottomSheet';
+import { MatchSheet } from '../../components/MatchSheet';
 import { Button, CloseButton, Logo } from '../../components/ui';
+import { VerdictSheet } from '../../components/VerdictSheet';
+import { api, ApiError, prepareUpload, type ApiProduct, type FrontResult } from '../../lib/api';
 import { haptic } from '../../lib/haptics';
 import { useStore } from '../../lib/store';
+import { colors, radius } from '../../theme';
+
+type Mode = 'barcode' | 'front' | 'label';
+type Match = Extract<FrontResult, { status: 'match' }>;
+type Prompt = { title: string; body: string; actions: ('barcode' | 'front' | 'label' | 'retry' | 'upgrade')[] };
 
 const TIPS = [
   { title: 'Barcode scanner', body: 'Scan barcodes to instantly check the ingredients/allergens for your Tapi profile(s).' },
-  { title: 'Hold steady', body: 'Center the barcode inside the frame. Tapi scans automatically. No button needed.' },
-  { title: 'Color ratings', body: 'Green means it likely fits, yellow means limit it, red means avoid. Tap any product for details.' },
-  { title: 'Save favorites', body: 'Bookmark products you love to find them later in Lists.' },
+  { title: 'No barcode handy?', body: 'Switch to Photo and snap the front of the package. You’ll confirm the match before we check it.' },
+  { title: 'Color ratings', body: 'Red means it has something you avoid, yellow means something you limit. Always check the package too.' },
+  { title: 'Missing product?', body: 'Photograph the ingredient list and Tapi will read it for you right away.' },
 ];
+
+const MODE_HINT: Record<Mode, string> = {
+  barcode: 'Center the barcode in the frame',
+  front: 'Snap the front of the package',
+  label: 'Fit the whole ingredient list in the frame',
+};
+
+const demoProduct = (): ApiProduct => {
+  const p = DEMO_PRODUCTS[4];
+  return {
+    id: null,
+    gtin14: '',
+    name: p.name,
+    brand: 'Market',
+    variant_or_flavor: null,
+    size_text: '1.5 qt',
+    ingredients_text: p.ingredients.join(', '),
+    allergens_text: 'Contains: milk.',
+    nutrition: null,
+    category: 'Ice cream',
+    image_url: null,
+    source: 'off',
+    source_updated_at: null,
+    verified: true,
+    under_review: false,
+  };
+};
 
 export default function Scan() {
   const insets = useSafeAreaInsets();
@@ -24,10 +60,18 @@ export default function Scan() {
   const [focused, setFocused] = useState(true);
   const [tip, setTip] = useState(0);
   const [tipHidden, setTipHidden] = useState(false);
-  const [product, setProduct] = useState<DemoProduct | null>(null);
   const [pushPrompt, setPushPrompt] = useState(false);
-  const locked = useRef(false);
   const askedPush = useStore((s) => s.askedPush);
+
+  const camera = useRef<CameraView>(null);
+  const locked = useRef(false);
+  const [mode, setMode] = useState<Mode>('barcode');
+  const [labelCtx, setLabelCtx] = useState<{ gtin: string | null; frontHash: string | null }>({ gtin: null, frontHash: null });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [match, setMatch] = useState<Match | null>(null);
+  const [verdict, setVerdict] = useState<{ product: ApiProduct; demo?: boolean } | null>(null);
+  const [prompt, setPrompt] = useState<Prompt | null>(null);
+  const lastFrontHash = useRef<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -59,25 +103,127 @@ export default function Scan() {
     }
   };
 
-  const onScanned = (r: BarcodeScanningResult) => {
-    if (locked.current || product) return;
+  const unlock = () => setTimeout(() => (locked.current = false), 700);
+  const reset = () => {
+    setVerdict(null);
+    setMatch(null);
+    setPrompt(null);
+    setMode('barcode');
+    unlock();
+  };
+
+  const fail = (e: unknown) => {
+    haptic.warning();
+    if (e instanceof ApiError && e.code === 'daily_limit_reached') {
+      setPrompt({ title: 'Daily free scans used', body: e.message + ' Start your free trial for unlimited scans.', actions: ['upgrade'] });
+    } else if (e instanceof ApiError && e.code === 'rate_limited') {
+      setPrompt({ title: 'Slow down a little', body: 'Too many scans in a short time. Try again in a minute.', actions: ['retry'] });
+    } else {
+      setPrompt({
+        title: 'Something went wrong',
+        body: e instanceof Error ? e.message : 'Please try again.',
+        actions: ['retry'],
+      });
+    }
+  };
+
+  const goLabel = (gtin: string | null, frontHash: string | null) => {
+    setVerdict(null);
+    setMatch(null);
+    setPrompt(null);
+    setLabelCtx({ gtin, frontHash });
+    setMode('label');
+    unlock();
+  };
+
+  // ---- barcode (no vision call ever happens on this path) ----
+  const onScanned = async (r: BarcodeScanningResult) => {
+    if (locked.current || mode !== 'barcode') return;
     locked.current = true;
     haptic.success();
-    // Demo lookup: map any barcode to a sample product. Replace with your product API.
-    const idx = Math.abs([...r.data].reduce((a, c) => a + c.charCodeAt(0), 0)) % DEMO_PRODUCTS.length;
-    setProduct(DEMO_PRODUCTS[idx]);
+    lastFrontHash.current = null;
+    setBusy('Looking up product…');
+    try {
+      const res = await api.scanBarcode(r.data);
+      if (res.status === 'found') setVerdict({ product: res.product });
+      else if (res.status === 'needs_label_photo') {
+        setLabelCtx({ gtin: res.gtin14, frontHash: null });
+        setPrompt({
+          title: 'We don’t know this one yet',
+          body: 'Take a photo of the ingredient list and we’ll read it for you right now.',
+          actions: ['label', 'retry'],
+        });
+      } else
+        setPrompt({
+          title: 'Couldn’t read that barcode',
+          body: 'Hold steady and make sure the whole barcode is in the frame.',
+          actions: ['retry', 'front'],
+        });
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // ---- photos (front of package / ingredient panel) ----
+  const takePhoto = async () => {
+    if (!camera.current || busy) return;
+    haptic.medium();
+    try {
+      setBusy(mode === 'front' ? 'Reading the package…' : 'Reading the ingredients…');
+      const pic = await camera.current.takePictureAsync({ quality: 0.8, skipProcessing: false });
+      const base64 = await prepareUpload(pic.uri, pic.width, pic.height);
+      if (mode === 'front') {
+        const res = await api.scanFront(base64);
+        lastFrontHash.current = res.front_hash;
+        // A label photo taken next belongs to this front photo, not to any earlier barcode.
+        setLabelCtx({ gtin: null, frontHash: res.front_hash });
+        if (res.status === 'match') setMatch(res);
+        else if (res.status === 'needs_barcode_or_label')
+          setPrompt({ title: 'Not sure which product this is', body: res.message, actions: ['barcode', 'label'] });
+        else
+          setPrompt({
+            title: res.status === 'not_food_package' ? 'That doesn’t look like food' : 'Couldn’t read the photo',
+            body: res.message,
+            actions: ['front', 'barcode'],
+          });
+      } else {
+        const res = await api.scanLabel(base64, labelCtx);
+        if (res.status === 'unreadable') setPrompt({ title: 'Couldn’t read the ingredients', body: res.message, actions: ['label'] });
+        else {
+          haptic.success();
+          setMode('barcode');
+          setVerdict({ product: res.product });
+        }
+      }
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onPromptAction = (a: Prompt['actions'][number]) => {
+    setPrompt(null);
+    if (a === 'label') return goLabel(labelCtx.gtin, labelCtx.frontHash);
+    if (a === 'upgrade') return router.push('/onboarding/paywall');
+    if (a === 'front' || a === 'barcode') setMode(a);
+    unlock();
   };
 
   const cameraReady = permission?.granted && focused;
+  const photoMode = mode !== 'barcode';
 
   return (
     <View style={styles.root}>
       {cameraReady ? (
         <CameraView
+          ref={camera}
           style={StyleSheet.absoluteFill}
           facing="back"
-          barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'] }}
-          onBarcodeScanned={product ? undefined : onScanned}
+          barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
+          onBarcodeScanned={mode === 'barcode' && !verdict && !match && !prompt && !busy ? onScanned : undefined}
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.noCam]} />
@@ -87,7 +233,7 @@ export default function Scan() {
         <Logo size={34} color="#fff" />
       </View>
 
-      {!tipHidden ? (
+      {!tipHidden && mode === 'barcode' ? (
         <Animated.View entering={FadeIn} style={[styles.tip, { top: insets.top + 64 }]}>
           <View style={styles.tipHead}>
             <Text style={styles.tipTitle}>{TIPS[tip].title}</Text>
@@ -112,7 +258,8 @@ export default function Scan() {
               hitSlop={10}
               onPress={() => {
                 haptic.light();
-                setProduct(DEMO_PRODUCTS[4]);
+                locked.current = true;
+                setVerdict({ product: demoProduct(), demo: true });
               }}
             >
               <Text style={styles.tipCta}>TRY A DEMO</Text>
@@ -123,8 +270,50 @@ export default function Scan() {
       ) : null}
 
       <View style={styles.frameWrap} pointerEvents="none">
-        <View style={styles.frame} />
+        <View style={[styles.frame, photoMode && styles.framePhoto]} />
+        <Text style={styles.hint}>{MODE_HINT[mode]}</Text>
       </View>
+
+      {permission?.granted ? (
+        <View style={[styles.controls, { bottom: 18 }]}>
+          {mode === 'label' ? (
+            <Pressable style={styles.labelBanner} onPress={() => setMode('barcode')}>
+              <Feather name="file-text" size={16} color="#fff" />
+              <Text style={styles.labelBannerText}>Ingredient photo · tap to cancel</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.segment}>
+              {(['barcode', 'front'] as const).map((m) => (
+                <Pressable
+                  key={m}
+                  testID={`mode-${m}`}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: mode === m }}
+                  onPress={() => {
+                    haptic.select();
+                    setMode(m);
+                  }}
+                  style={[styles.segBtn, mode === m && styles.segBtnOn]}
+                >
+                  <Feather name={m === 'barcode' ? 'maximize' : 'camera'} size={15} color={mode === m ? colors.ink : '#fff'} />
+                  <Text style={[styles.segText, mode === m && { color: colors.ink }]}>{m === 'barcode' ? 'Barcode' : 'Photo'}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          {photoMode ? (
+            <Pressable
+              testID="shutter"
+              accessibilityRole="button"
+              accessibilityLabel="Take photo"
+              onPress={takePhoto}
+              style={styles.shutter}
+            >
+              <View style={styles.shutterInner} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       {!permission?.granted ? (
         <View style={[styles.permission, { bottom: 32 }]}>
@@ -140,17 +329,63 @@ export default function Scan() {
         </View>
       ) : null}
 
-      <ProductSheet
-        product={product}
-        onClose={() => {
-          setProduct(null);
-          setTimeout(() => (locked.current = false), 600);
+      {busy ? (
+        <View style={styles.busy} pointerEvents="auto">
+          <ActivityIndicator color="#fff" size="large" />
+          <Text style={styles.busyText}>{busy}</Text>
+        </View>
+      ) : null}
+
+      <MatchSheet
+        match={match}
+        onClose={reset}
+        onScanBarcode={() => {
+          setMatch(null);
+          setMode('barcode');
+          unlock();
         }}
-        onScanAgain={() => {
-          setProduct(null);
-          setTimeout(() => (locked.current = false), 600);
+        onPhotographLabel={() => goLabel(null, match?.front_hash ?? null)}
+        onConfirm={async (product) => {
+          const m = match;
+          setMatch(null);
+          setVerdict({ product });
+          // Remember the choice so a repeat photo of this package pre-selects it.
+          if (m && product.id !== null) api.confirmFront(m.vision_cache_id, product.id).catch(() => {});
         }}
       />
+
+      <VerdictSheet
+        product={verdict?.product ?? null}
+        demo={verdict?.demo}
+        onClose={reset}
+        onScanAgain={reset}
+        onPhotographLabel={(gtin) => goLabel(gtin, gtin ? null : lastFrontHash.current)}
+      />
+
+      <BottomSheet visible={!!prompt} onClose={reset} handle>
+        {prompt ? (
+          <View style={{ paddingHorizontal: 16, gap: 10 }}>
+            <Text style={styles.promptTitle}>{prompt.title}</Text>
+            <Text style={styles.promptBody}>{prompt.body}</Text>
+            {prompt.actions.map((a, i) => (
+              <Button
+                key={a}
+                variant={i === 0 ? 'primary' : 'outline'}
+                title={
+                  {
+                    label: 'Photograph ingredient list',
+                    barcode: 'Scan the barcode',
+                    front: 'Photograph the front',
+                    retry: 'Try again',
+                    upgrade: 'See plans',
+                  }[a]
+                }
+                onPress={() => onPromptAction(a)}
+              />
+            ))}
+          </View>
+        ) : null}
+      </BottomSheet>
 
       <Modal transparent visible={pushPrompt} animationType="fade" onRequestClose={afterPush}>
         <View style={styles.modalBackdrop}>
@@ -232,6 +467,29 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 4,
     borderBottomLeftRadius: 4,
   },
+  framePhoto: { width: 290, height: 360, borderRadius: 24, borderTopLeftRadius: 24, borderBottomRightRadius: 24 },
+  hint: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: 16, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 },
+  controls: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 16 },
+  segment: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: radius.pill, padding: 4 },
+  segBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, height: 38, borderRadius: radius.pill },
+  segBtnOn: { backgroundColor: colors.lime },
+  segText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  shutter: { width: 76, height: 76, borderRadius: 38, borderWidth: 5, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  shutterInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff' },
+  labelBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    height: 38,
+  },
+  labelBannerText: { color: '#fff', fontWeight: '600' },
+  busy: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 14 },
+  busyText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  promptTitle: { fontSize: 22, fontWeight: '600', color: colors.ink, marginTop: 6 },
+  promptBody: { fontSize: 15, lineHeight: 22, color: colors.text, marginBottom: 8 },
   permission: { position: 'absolute', left: 16, right: 16, alignItems: 'center', gap: 12 },
   permText: { color: '#fff', fontSize: 15, textAlign: 'center' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 24 },

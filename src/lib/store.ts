@@ -31,6 +31,9 @@ type State = {
   account?: { email: string; provider: 'email' | 'google' | 'apple' | 'facebook' };
   accountPromptDismissed: boolean;
   saved: string[];
+  deviceId?: string;
+  /** User opted in to share scanned product photos to improve the database. */
+  contributePhotos: boolean;
 };
 
 type Actions = {
@@ -54,6 +57,7 @@ const initial: State = {
   askedPush: false,
   accountPromptDismissed: false,
   saved: [],
+  contributePhotos: false,
 };
 
 export const useStore = create<State & Actions>()(
@@ -112,7 +116,8 @@ export const useStore = create<State & Actions>()(
         toggle('emulsifier-free', list.has('emulsifiers'), { level: 'preference', items: ['emul-gut'] });
         set({ restrictions: r });
       },
-      resetAll: () => set({ ...initial }),
+      // Keep the anonymous device id across resets so daily limits can't be bypassed by resetting.
+      resetAll: () => set((st) => ({ ...initial, deviceId: st.deviceId })),
       toggleSaved: (id) => set((st) => ({ saved: st.saved.includes(id) ? st.saved.filter((x) => x !== id) : [...st.saved, id] })),
     }),
     {

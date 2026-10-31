@@ -39,3 +39,13 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Server: local database, bulk data downloads, user uploads, secrets
+server/node_modules/
+server/data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example

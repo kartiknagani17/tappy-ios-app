@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { DEMO_PRODUCTS, ProductTile, type DemoProduct } from '../../components/art';
 import { BottomSheet } from '../../components/BottomSheet';
 import { ProductSheet } from '../../components/ProductSheet';
@@ -13,6 +13,7 @@ import { colors, radius } from '../../theme';
 export default function Lists() {
   const saved = useStore((s) => s.saved);
   const account = useStore((s) => s.account);
+  const contributePhotos = useStore((s) => s.contributePhotos);
   const restrictions = useStore((s) => s.restrictions);
   const overrides = useStore((s) => s.ingredientOverrides);
   const [product, setProduct] = useState<DemoProduct | null>(null);
@@ -92,6 +93,26 @@ export default function Lists() {
             onPress={() => {
               setSettings(false);
               router.push({ pathname: '/onboarding/profile', params: { edit: '1' } });
+            }}
+          />
+          <View style={styles.row}>
+            <Feather name="image" size={20} color={colors.ink} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowText}>Share product photos</Text>
+              <Text style={styles.rowSub}>Keep package photos to improve Tapi’s database. Off: photos are deleted after scanning.</Text>
+            </View>
+            <Switch
+              value={contributePhotos}
+              onValueChange={(v) => useStore.getState().set({ contributePhotos: v })}
+              trackColor={{ true: colors.purple, false: '#D1D1D6' }}
+            />
+          </View>
+          <Row
+            icon="info"
+            label="Data sources & credits"
+            onPress={() => {
+              setSettings(false);
+              router.push('/credits');
             }}
           />
           {account ? (
@@ -180,4 +201,5 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   rowText: { flex: 1, fontSize: 17, color: colors.ink },
+  rowSub: { fontSize: 13, color: colors.textMuted, marginTop: 2, lineHeight: 18 },
 });

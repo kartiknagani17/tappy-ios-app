@@ -1,0 +1,45 @@
+{
+  "candidates": [
+    { "id": 1, "brand": "Dave's Killer Bread", "name": "21 Whole Grains and Seeds Organic Bread", "variant_or_flavor": null, "size_text": "27 oz/765 g" },
+    { "id": 2, "brand": "Dave's Killer Bread", "name": "Good Seed Organic Bread", "variant_or_flavor": null, "size_text": "27 oz" },
+    { "id": 3, "brand": "Nature's Own", "name": "Double Fiber Wheat Bread", "variant_or_flavor": null, "size_text": "20 oz" },
+    { "id": 4, "brand": "Dave's Killer Bread", "name": "21 Whole Grains and Seeds Thin-Sliced Organic Bread", "variant_or_flavor": null, "size_text": "20.5 oz" },
+    { "id": 10, "brand": "Sunny Snacks", "name": "Kettle Cooked Potato Chips", "variant_or_flavor": "Sea Salt", "size_text": "8 oz" },
+    { "id": 11, "brand": "Sunny Snacks", "name": "Kettle Cooked Potato Chips", "variant_or_flavor": "Barbecue", "size_text": "8 oz" },
+    { "id": 12, "brand": "Sunny Snacks", "name": "Kettle Cooked Potato Chips", "variant_or_flavor": "Salt & Vinegar", "size_text": "8 oz" },
+    { "id": 20, "brand": "Nutty Farms", "name": "Creamy Peanut Butter", "variant_or_flavor": null, "size_text": "16 oz" },
+    { "id": 21, "brand": "Nutty Farms", "name": "Crunchy Peanut Butter", "variant_or_flavor": null, "size_text": "16 oz" }
+  ],
+  "cases": [
+    {
+      "name": "exact brand, name and size -> one-tap confirm",
+      "query": { "brand": "DAVE'S KILLER BREAD", "product_name": "21 Whole Grains and Seeds", "variant_or_flavor": null, "size_text": "NET WT 27 OZ (1 LB 11 OZ) 765g" },
+      "expect": { "decision": "confirm_top", "top": 1 }
+    },
+    {
+      "name": "size on the package picks the thin-sliced 20.5 oz version",
+      "query": { "brand": "Dave's Killer Bread", "product_name": "21 Whole Grains and Seeds Thin-Sliced", "variant_or_flavor": null, "size_text": "NET WT 20.5 OZ (581g)" },
+      "expect": { "decision": "confirm_top", "top": 4 }
+    },
+    {
+      "name": "flavor read from the photo selects the right variant",
+      "query": { "brand": "Sunny Snacks", "product_name": "Kettle Cooked Potato Chips", "variant_or_flavor": "Sea Salt", "size_text": "8 OZ" },
+      "expect": { "decision": "confirm_top", "top": 10 }
+    },
+    {
+      "name": "flavor not visible -> several near-identical matches -> choose from top 3",
+      "query": { "brand": "Sunny Snacks", "product_name": "Kettle Cooked Potato Chips", "variant_or_flavor": null, "size_text": null },
+      "expect": { "decision": "choose_top3" }
+    },
+    {
+      "name": "brand only -> capped below auto-confirm -> choose from top 3",
+      "query": { "brand": "Nutty Farms", "product_name": null, "variant_or_flavor": null, "size_text": null },
+      "expect": { "decision": "choose_top3" }
+    },
+    {
+      "name": "unknown product -> ask for barcode or ingredient photo",
+      "query": { "brand": "Zephyr Organics", "product_name": "Mango Habanero Jerky Bites", "variant_or_flavor": null, "size_text": "3 oz" },
+      "expect": { "decision": "needs_barcode_or_label" }
+    }
+  ]
+}

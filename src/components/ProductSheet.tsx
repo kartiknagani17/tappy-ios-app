@@ -8,7 +8,7 @@ import { BottomSheet } from './BottomSheet';
 import { Button, CloseButton, RatingIcon, ratingLabel } from './ui';
 
 const VERDICT = {
-  green: 'Likely fits your Tapi',
+  green: 'No conflicts found',
   yellow: 'Contains ingredients you limit',
   red: 'Does not fit your Tapi',
 };
@@ -86,7 +86,7 @@ export function ProductSheet({
                 ) : null;
               })}
             </View>
-            <Text style={styles.disclaimer}>Always double-check the package label. Formulas can change.</Text>
+            <Text style={styles.disclaimer}>Check the package yourself. Sample product for illustration; formulas change.</Text>
           </ScrollView>
           {onScanAgain ? (
             <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
