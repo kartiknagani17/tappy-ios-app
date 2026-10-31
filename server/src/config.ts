@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 export const SERVER_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// Load server/.env (then repo-root .env) if present. Real env vars always win.
-for (const file of [path.join(SERVER_ROOT, '.env'), path.join(SERVER_ROOT, '..', '.env')]) {
+// Load TAPI_ENV_FILE (used on the server, e.g. /etc/tapi/tapi.env), then server/.env, then repo-root .env.
+// Real env vars always win; earlier files win over later ones.
+for (const file of [process.env.TAPI_ENV_FILE, path.join(SERVER_ROOT, '.env'), path.join(SERVER_ROOT, '..', '.env')]) {
+  if (!file) continue;
   if (existsSync(file)) process.loadEnvFile(file);
 }
 
@@ -42,6 +44,8 @@ export type Config = ReturnType<typeof loadConfig>;
 export function loadConfig() {
   return {
     port: num('PORT', 8787),
+    // 127.0.0.1 when running behind Cloudflare Tunnel (nothing else can reach the port).
+    host: str('HOST', '0.0.0.0'),
     dbPath: path.resolve(SERVER_ROOT, str('DATABASE_PATH', 'data/tapi.db')),
     rawDataDir: path.resolve(SERVER_ROOT, str('RAW_DATA_DIR', 'data/raw')),
     uploadsDir: path.resolve(SERVER_ROOT, str('UPLOADS_DIR', 'data/uploads')),
@@ -132,7 +136,8 @@ export function validateConfig(c: Config): string[] {
   intIn('visionConfirmConsensus', 1, 1000);
   intIn('matchCandidateLimit', 1, 200);
   if (!(c.visionDailyBudgetUsd >= 0)) errors.push('visionDailyBudgetUsd must be >= 0');
-  if (!['auto', 'on', 'off'].includes(c.photoScanningMode)) errors.push(`PHOTO_SCANNING must be auto, on or off (got "${c.photoScanningMode}")`);
+  if (!['auto', 'on', 'off'].includes(c.photoScanningMode))
+    errors.push(`PHOTO_SCANNING must be auto, on or off (got "${c.photoScanningMode}")`);
   if (c.photoScanningMode === 'on' && c.visionProvider === 'anthropic' && !c.anthropicApiKey) {
     errors.push('PHOTO_SCANNING=on but ANTHROPIC_API_KEY is not set');
   }
@@ -145,7 +150,8 @@ export function validateConfig(c: Config): string[] {
         : 'ANTHROPIC_API_KEY is not set: photo scanning is disabled (photo endpoints return 503). Barcode scans still work.',
     );
   }
-  if (c.visionDailyBudgetUsd === 0 && photoScanningEnabled(c)) warnings.push('VISION_DAILY_BUDGET_USD=0: no daily ceiling on vision spend.');
+  if (c.visionDailyBudgetUsd === 0 && photoScanningEnabled(c))
+    warnings.push('VISION_DAILY_BUDGET_USD=0: no daily ceiling on vision spend.');
   if (c.corsOrigins.includes('*')) warnings.push('CORS_ORIGINS=* allows any website to call this API from a browser.');
   if (c.offUserAgent.includes('example.com')) warnings.push('OFF_USER_AGENT still uses the example contact address.');
   return warnings;

@@ -146,6 +146,8 @@ node src/cli.ts stats
 npm start
 ```
 
+To run it in production for free (Oracle Cloud Always Free + Cloudflare Tunnel for HTTPS), follow [`deploy/README.md`](deploy/README.md).
+
 | Endpoint | Body | Result |
 |---|---|---|
 | `POST /api/scan/barcode` | `{ barcode }` | `found` (product + source + date), `needs_label_photo`, or `invalid_barcode` |

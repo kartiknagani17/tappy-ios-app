@@ -33,11 +33,11 @@ const scan = new ScanService({ db, config, vision, offLive });
 const server = createHttpServer(createApp({ db, config, scan }), config);
 installShutdown({ server, db, timeoutMs: config.shutdownTimeoutMs });
 
-server.listen(config.port, () => {
+server.listen(config.port, config.host, () => {
   const count = (db.prepare('SELECT count(*) AS n FROM products').get() as { n: number }).n;
   const { port } = server.address() as AddressInfo;
   console.log(
-    `Tapi API listening on http://localhost:${port} (${count.toLocaleString()} products, ` +
+    `Tapi API listening on http://localhost:${port} (bound to ${config.host}; ${count.toLocaleString()} products, ` +
       `photo scanning ${photoScanningEnabled(config) ? `on, vision model ${config.visionModel}` : 'off'})`,
   );
 });

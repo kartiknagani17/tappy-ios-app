@@ -91,12 +91,25 @@ describe('HTTP API', () => {
       fetch(url, {
         method: 'POST',
         headers: { 'X-Tapi-User': 'device-burst-1', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ barcode: '013764027503' }) });
+        body: JSON.stringify({ barcode: '013764027503' }),
+      });
     assert.equal((await hit()).status, 200);
     assert.equal((await hit()).status, 200);
     const third = await hit();
     assert.equal(third.status, 429);
     assert.equal(((await third.json()) as { error: string }).error, 'rate_limited');
     s.close();
+  });
+});
+
+describe('clientIp() behind Cloudflare Tunnel', async () => {
+  const { clientIp } = await import('../src/http/app.ts');
+  const req = (headers: Record<string, string>) =>
+    ({ headers, socket: { remoteAddress: '127.0.0.1' } }) as unknown as import('node:http').IncomingMessage;
+
+  it('TRUST_PROXY=1 takes the address cloudflared appended, even if the client spoofed X-Forwarded-For', () => {
+    assert.equal(clientIp(req({ 'x-forwarded-for': '203.0.113.7' }), 1), '203.0.113.7');
+    assert.equal(clientIp(req({ 'x-forwarded-for': '6.6.6.6, 203.0.113.7' }), 1), '203.0.113.7');
+    assert.equal(clientIp(req({ 'x-forwarded-for': '203.0.113.7' }), 0), '127.0.0.1'); // not trusted by default
   });
 });

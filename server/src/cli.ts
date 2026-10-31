@@ -1,4 +1,4 @@
-import { createWriteStream, existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -14,6 +14,7 @@ const HELP = `Tapi data CLI
   node src/cli.ts import-usda [path]      Import USDA Branded Foods (.zip or extracted folder)
   node src/cli.ts import-off [path]       Import Open Food Facts US products (.csv or .csv.gz)
   node src/cli.ts stats                   Row counts and vision spend
+  node src/cli.ts backup [dir] [keep]     Consistent snapshot of the live database (default: keep 2)
 
 Imports are idempotent: re-running with the same file changes nothing.`;
 
@@ -79,6 +80,24 @@ async function main() {
       if (!existsSync(file)) throw new Error(`${file} not found. Run "npm run data:download -- off" first.`);
       log(`Importing Open Food Facts (US only) from ${file}`);
       await importOff(db, file, log);
+      return;
+    }
+    case 'backup': {
+      // VACUUM INTO writes a consistent, compacted copy even while the API is serving traffic.
+      const dir = path.resolve(arg ?? path.join(path.dirname(config.dbPath), 'backups'));
+      const keep = Math.max(1, Number(process.argv[4] ?? 2));
+      mkdirSync(dir, { recursive: true });
+      const target = path.join(dir, `tapi-${new Date().toISOString().replace(/[:.]/g, '-')}.db`);
+      const db = openDb(config.dbPath, { migrate: false });
+      log(`Backing up ${config.dbPath} -> ${target}`);
+      db.prepare('VACUUM INTO ?').run(target);
+      db.close();
+      const old = readdirSync(dir)
+        .filter((f) => /^tapi-.*\.db$/.test(f))
+        .sort()
+        .slice(0, -keep);
+      for (const f of old) rmSync(path.join(dir, f));
+      log(`Done (${(statSync(target).size / 1e6).toFixed(0)} MB). Removed ${old.length} old backup(s).`);
       return;
     }
     case 'stats': {
