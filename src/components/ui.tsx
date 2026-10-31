@@ -100,7 +100,9 @@ export function Button({
       ) : (
         <View style={styles.row}>
           {icon}
-          <Text style={[styles.btnText, { color: fg }, textStyle]}>{title}</Text>
+          <Text style={[styles.btnText, { color: fg }, textStyle]} maxFontSizeMultiplier={1.6}>
+            {title}
+          </Text>
         </View>
       )}
     </Tappable>
@@ -111,6 +113,7 @@ export function TextLink({ title, onPress, style, muted }: { title: string; onPr
   return (
     <Text
       accessibilityRole="link"
+      accessibilityLabel={title}
       onPress={onPress}
       suppressHighlighting
       style={[styles.link, muted && { color: colors.textMuted }, style]}
@@ -342,7 +345,8 @@ export function CloseButton({
 export const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   btn: {
-    height: 56,
+    minHeight: 56,
+    paddingVertical: 8,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
@@ -394,7 +398,8 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.sm,
     paddingHorizontal: 12,
-    height: 40,
+    minHeight: 44,
+    paddingVertical: 6,
     backgroundColor: '#fff',
   },
   chipSelected: { borderColor: colors.ink, borderWidth: 2, paddingHorizontal: 11 },

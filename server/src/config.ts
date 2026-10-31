@@ -22,6 +22,20 @@ const bool = (name: string, fallback: boolean) => {
   return ['1', 'true', 'yes', 'on'].includes(v.toLowerCase());
 };
 const str = (name: string, fallback: string) => process.env[name] || fallback;
+const list = (name: string) =>
+  (process.env[name] ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+/** TRUST_PROXY: unset/false/0 = ignore X-Forwarded-For; true = 1 proxy hop; N = N proxy hops. */
+const proxyHops = (name: string) => {
+  const v = (process.env[name] ?? '').trim().toLowerCase();
+  if (!v || ['0', 'false', 'no', 'off'].includes(v)) return 0;
+  if (['1', 'true', 'yes', 'on'].includes(v)) return 1;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0 || n > 10) throw new Error(`Env var ${name} must be true/false or a hop count 0-10, got "${v}"`);
+  return n;
+};
 
 export type Config = ReturnType<typeof loadConfig>;
 
@@ -43,13 +57,31 @@ export function loadConfig() {
     offUserAgent: str('OFF_USER_AGENT', 'Tapi/1.0 (contact@example.com)'),
     offLiveMaxPerMinute: num('OFF_LIVE_MAX_PER_MINUTE', 12), // OFF allows 15 product reads/min/IP
 
+    // HTTP hardening
+    /** Browser origins allowed by CORS (the iOS app needs none). Empty = no CORS headers. "*" = any origin. */
+    corsOrigins: list('CORS_ORIGINS'),
+    /** Number of trusted reverse-proxy hops in front of the server (0 = never trust X-Forwarded-For). */
+    trustProxyHops: proxyHops('TRUST_PROXY'),
+    requestTimeoutMs: num('REQUEST_TIMEOUT_MS', 60_000),
+    headersTimeoutMs: num('HEADERS_TIMEOUT_MS', 15_000),
+    shutdownTimeoutMs: num('SHUTDOWN_TIMEOUT_MS', 10_000),
+
     // Vision
     anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+    /** PHOTO_SCANNING: auto (on iff a provider key is set), on (fail at startup without a key), off. */
+    photoScanningMode: str('PHOTO_SCANNING', 'auto').toLowerCase(),
     visionProvider: str('VISION_PROVIDER', 'anthropic'),
     visionModel: str('VISION_MODEL', 'claude-haiku-5-5'),
     visionEscalationModel: str('VISION_ESCALATION_MODEL', 'claude-sonnet-5-5'),
     visionEscalateBelow: num('VISION_ESCALATE_BELOW_CONFIDENCE', 0.6),
     visionMaxImageBytes: num('VISION_MAX_IMAGE_BYTES', 4_000_000),
+    /** Decoded-pixel ceiling for uploads (decompression-bomb guard). */
+    imageMaxInputPixels: num('IMAGE_MAX_INPUT_PIXELS', 40_000_000),
+    visionTimeoutMs: num('VISION_TIMEOUT_MS', 30_000),
+    /** Hard daily ceiling on estimated vision spend across all users (USD, UTC day). 0 = no ceiling. */
+    visionDailyBudgetUsd: num('VISION_DAILY_BUDGET_USD', 20),
+    /** Distinct users (on distinct networks) who must confirm the same product before a front photo maps to it for everyone. */
+    visionConfirmConsensus: num('VISION_CONFIRM_CONSENSUS', 3),
 
     // Matching thresholds
     matchAutoConfirm: num('MATCH_AUTO_CONFIRM_THRESHOLD', 0.85),
@@ -66,5 +98,55 @@ export function loadConfig() {
     dailyFreeScans: num('DAILY_FREE_SCANS', 25),
     dailyFreePhotoScans: num('DAILY_FREE_PHOTO_SCANS', 10),
     rateLimitPerMinute: num('RATE_LIMIT_PER_MINUTE', 30),
+    /** Per-client-IP (IPv6: per /64) daily caps, so minting new device ids can't bypass the per-user quota. 0 = off. */
+    ipDailyScans: num('IP_DAILY_SCANS', 300),
+    ipDailyPhotoScans: num('IP_DAILY_PHOTO_SCANS', 40),
   };
+}
+
+/** True when photo scans (which call the vision model) are enabled. */
+export function photoScanningEnabled(c: Config): boolean {
+  if (c.photoScanningMode === 'off') return false;
+  if (c.photoScanningMode === 'on') return true;
+  return c.visionProvider !== 'anthropic' || !!c.anthropicApiKey;
+}
+
+/** Fail fast on invalid settings; returns warnings worth logging at startup. Never includes secret values. */
+export function validateConfig(c: Config): string[] {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const intIn = (key: keyof Config, min: number, max: number) => {
+    const v = c[key] as number;
+    if (!Number.isInteger(v) || v < min || v > max) errors.push(`${String(key)} must be an integer in [${min}, ${max}] (got ${v})`);
+  };
+  intIn('port', 0, 65535);
+  intIn('rateLimitPerMinute', 1, 100_000);
+  intIn('dailyFreeScans', 0, 1_000_000);
+  intIn('dailyFreePhotoScans', 0, 1_000_000);
+  intIn('ipDailyScans', 0, 10_000_000);
+  intIn('ipDailyPhotoScans', 0, 10_000_000);
+  intIn('visionMaxImageBytes', 10_000, 50_000_000);
+  intIn('imageMaxInputPixels', 1_000_000, 268_402_689);
+  intIn('requestTimeoutMs', 1000, 600_000);
+  intIn('headersTimeoutMs', 1000, 600_000);
+  intIn('visionConfirmConsensus', 1, 1000);
+  intIn('matchCandidateLimit', 1, 200);
+  if (!(c.visionDailyBudgetUsd >= 0)) errors.push('visionDailyBudgetUsd must be >= 0');
+  if (!['auto', 'on', 'off'].includes(c.photoScanningMode)) errors.push(`PHOTO_SCANNING must be auto, on or off (got "${c.photoScanningMode}")`);
+  if (c.photoScanningMode === 'on' && c.visionProvider === 'anthropic' && !c.anthropicApiKey) {
+    errors.push('PHOTO_SCANNING=on but ANTHROPIC_API_KEY is not set');
+  }
+  if (errors.length) throw new Error(`Invalid configuration:\n  - ${errors.join('\n  - ')}`);
+
+  if (!photoScanningEnabled(c)) {
+    warnings.push(
+      c.photoScanningMode === 'off'
+        ? 'Photo scanning is disabled (PHOTO_SCANNING=off); photo endpoints return 503.'
+        : 'ANTHROPIC_API_KEY is not set: photo scanning is disabled (photo endpoints return 503). Barcode scans still work.',
+    );
+  }
+  if (c.visionDailyBudgetUsd === 0 && photoScanningEnabled(c)) warnings.push('VISION_DAILY_BUDGET_USD=0: no daily ceiling on vision spend.');
+  if (c.corsOrigins.includes('*')) warnings.push('CORS_ORIGINS=* allows any website to call this API from a browser.');
+  if (c.offUserAgent.includes('example.com')) warnings.push('OFF_USER_AGENT still uses the example contact address.');
+  return warnings;
 }

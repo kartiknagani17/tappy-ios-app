@@ -117,6 +117,8 @@ export function getProductById(db: DB, id: number): Product | null {
   return (db.prepare('SELECT * FROM products WHERE id = ?').get(id) as Product | undefined) ?? null;
 }
 
+const MAX_FTS_TOKENS = 24;
+
 /** Turn free text into an FTS5 trigram OR-query (tokens shorter than 3 chars can't use trigrams). */
 export function buildFtsQuery(...parts: (string | null | undefined)[]): string | null {
   const tokens = new Set<string>();
@@ -130,7 +132,9 @@ export function buildFtsQuery(...parts: (string | null | undefined)[]): string |
     }
   }
   if (!tokens.size) return null;
-  return [...tokens].map((t) => `"${t.replace(/"/g, '""')}"`).join(' OR ');
+  // Every token is reduced to letters/digits and double-quoted, so FTS5 operators (OR, NEAR, *, ^,
+  // column filters) in extracted text are matched literally. Bounded so a long string can't build a huge query.
+  return [...tokens].slice(0, MAX_FTS_TOKENS).map((t) => t.slice(0, 64)).map((t) => `"${t.replace(/"/g, '""')}"`).join(' OR ');
 }
 
 /** Candidate products for a front-of-package query, best FTS rank first. */
@@ -145,16 +149,35 @@ export function searchProducts(db: DB, q: { brand?: string | null; name?: string
     .all(fts, limit) as unknown as Product[];
 }
 
+/** Strip control/bidi characters, collapse whitespace, cap length. Empty -> null. */
+export function sanitizeReason(v: unknown, max = 500): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v
+    .normalize('NFC')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t ? Array.from(t).slice(0, max).join('') : null;
+}
+
+/**
+ * One report per user per product: a repeat report from the same user is a no-op
+ * (returns the product with duplicate = true) so one device can't inflate report_count.
+ */
 export function reportProduct(db: DB, productId: number, userId: string, reason: string | null) {
   const product = getProductById(db, productId);
   if (!product) return null;
-  db.prepare('INSERT INTO product_reports (product_id, user_id, reason) VALUES (?, ?, ?)').run(productId, userId, reason);
+  const res = db
+    .prepare('INSERT INTO product_reports (product_id, user_id, reason) VALUES (?, ?, ?) ON CONFLICT (product_id, user_id) DO NOTHING')
+    .run(productId, userId, sanitizeReason(reason));
+  if (Number(res.changes) === 0) return Object.assign(product, { duplicate: true as const });
   db.prepare(
     `UPDATE products SET report_count = report_count + 1, needs_review = 1,
        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
   ).run(productId);
   db.prepare('DELETE FROM scan_cache WHERE gtin14 = ?').run(product.gtin14);
-  return getProductById(db, productId);
+  return Object.assign(getProductById(db, productId)!, { duplicate: false as const });
 }
 
 /** Shape sent to the app. Parsed nutrition, explicit provenance. */

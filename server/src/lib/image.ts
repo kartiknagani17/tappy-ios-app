@@ -11,9 +11,22 @@ export class ImageError extends Error {
  * and re-encode as JPEG. The app already resizes before upload; this is the server-side
  * guarantee (and strips EXIF metadata such as GPS location).
  */
-export async function prepareImage(input: Buffer): Promise<{ jpeg: Buffer; width: number; height: number }> {
+export const DEFAULT_MAX_INPUT_PIXELS = 40_000_000;
+/** Raster formats a phone camera/upload pipeline produces. SVG, TIFF, PDF, GIF etc. are refused. */
+const ALLOWED_FORMATS = new Set(['jpeg', 'png', 'webp', 'heif']);
+
+export async function prepareImage(
+  input: Buffer,
+  maxInputPixels = DEFAULT_MAX_INPUT_PIXELS,
+): Promise<{ jpeg: Buffer; width: number; height: number }> {
+  if (!input.length) throw new ImageError('Could not read image: empty');
   try {
-    const { data, info } = await sharp(input, { failOn: 'error' })
+    // limitInputPixels rejects decompression bombs (tiny file, huge canvas) before decoding pixels.
+    const opts = { failOn: 'error' as const, limitInputPixels: maxInputPixels, pages: 1 };
+    const meta = await sharp(input, opts).metadata();
+    if (!meta.format || !ALLOWED_FORMATS.has(meta.format)) throw new Error(`unsupported format ${meta.format ?? 'unknown'}`);
+    if (!meta.width || !meta.height || meta.width * meta.height > maxInputPixels) throw new Error('image dimensions too large');
+    const { data, info } = await sharp(input, opts)
       .rotate()
       .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 80, mozjpeg: true })

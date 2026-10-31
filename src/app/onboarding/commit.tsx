@@ -27,24 +27,29 @@ export default function Commit() {
   const fill = useSharedValue(0);
   const pulse = useSharedValue(0);
   const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
+  const advance = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
     () => () => {
       if (ticker.current) clearInterval(ticker.current);
+      // Don't navigate forward if the user already left this screen.
+      if (advance.current) clearTimeout(advance.current);
     },
     [],
   );
 
   const complete = () => {
     if (ticker.current) clearInterval(ticker.current);
+    if (advance.current) return;
     setState('done');
     haptic.success();
     pulse.set(withRepeat(withSequence(withTiming(1, { duration: 900 }), withTiming(0, { duration: 900 })), -1));
-    setTimeout(() => goNext('commit'), 1400);
+    advance.current = setTimeout(() => goNext('commit'), 1400);
   };
 
   const onPressIn = () => {
     if (state === 'done') return;
+    if (ticker.current) clearInterval(ticker.current);
     setState('holding');
     haptic.light();
     // light haptic ticks while holding
@@ -73,7 +78,7 @@ export default function Commit() {
     opacity: 0.35 + pulse.value * 0.25,
   }));
   const labelStyle = useAnimatedStyle(() => ({
-    color: fill.value > 0.45 ? '#fff' : colors.text,
+    color: fill.value > 0.88 ? '#fff' : colors.text,
   }));
 
   return (

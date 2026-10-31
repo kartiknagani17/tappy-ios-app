@@ -10,6 +10,28 @@ import { z } from 'zod';
 
 const nullableString = z.string().nullable();
 
+/**
+ * Model output is untrusted (photographed text can try to steer it), so every extracted string is
+ * length-bounded and stripped of control / bidi-override characters before it is stored or shown.
+ */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+export const sanitizeText = (v: string) => v.replace(UNSAFE_CHARS, '').trim();
+const safeString = (max: number) => z.string().max(max).transform(sanitizeText);
+const safeNullable = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .nullable()
+    .transform((v) => (v === null ? null : sanitizeText(v) || null));
+/** Out-of-range nutrition numbers become null rather than failing the whole (costly) extraction. */
+const boundedNumber = z
+  .number()
+  .nullable()
+  .transform((v) => (v !== null && Number.isFinite(v) && v >= 0 && v <= 100_000 ? v : null));
+
+export const LIMITS = { brand: 200, name: 300, variant: 200, size: 120, claim: 100, claims: 30, ingredients: 8000, statement: 1000 };
+
 export const FrontOutput = z.object({
   is_food_package: z.boolean().describe('True only if the photo shows a packaged food or drink product.'),
   brand: nullableString.describe('Brand exactly as printed, or null.'),
@@ -22,11 +44,15 @@ export const FrontOutput = z.object({
 });
 
 export const FrontResult = FrontOutput.extend({
-  barcode_if_visible: nullableString.transform((v) => {
+  brand: safeNullable(LIMITS.brand),
+  product_name: safeNullable(LIMITS.name),
+  variant_or_flavor: safeNullable(LIMITS.variant),
+  size_text: safeNullable(LIMITS.size),
+  barcode_if_visible: z.string().max(64).nullable().transform((v) => {
     const d = (v ?? '').replace(/\D/g, '');
     return d.length >= 8 && d.length <= 14 ? d : null;
   }),
-  claims_seen: z.array(z.string()).max(30),
+  claims_seen: z.array(safeString(LIMITS.claim)).max(LIMITS.claims),
   confidence: z.number().min(0).max(1),
 });
 export type FrontResult = z.infer<typeof FrontResult>;
@@ -59,13 +85,30 @@ export const LabelOutput = z.object({
 });
 
 export const LabelResult = LabelOutput.extend({
-  ingredients_text: nullableString.transform((v) => {
-    const t = (v ?? '')
+  // Over-long ingredient lists are rejected (not truncated): a truncated list could drop an allergen.
+  ingredients_text: z.string().max(LIMITS.ingredients).nullable().transform((v) => {
+    const t = sanitizeText(v ?? '')
       .replace(/^\s*ingredients?\s*:\s*/i, '')
       .replace(/\s+/g, ' ')
       .trim();
     return t.length >= 3 ? t : null;
   }),
+  contains_statement: safeNullable(LIMITS.statement),
+  may_contain_statement: safeNullable(LIMITS.statement),
+  nutrition: z
+    .object({
+      serving_size: safeNullable(LIMITS.size),
+      calories: boundedNumber,
+      total_fat_g: boundedNumber,
+      saturated_fat_g: boundedNumber,
+      sodium_mg: boundedNumber,
+      total_carbohydrate_g: boundedNumber,
+      dietary_fiber_g: boundedNumber,
+      total_sugars_g: boundedNumber,
+      added_sugars_g: boundedNumber,
+      protein_g: boundedNumber,
+    })
+    .nullable(),
   confidence: z.number().min(0).max(1),
 });
 export type LabelResult = z.infer<typeof LabelResult>;

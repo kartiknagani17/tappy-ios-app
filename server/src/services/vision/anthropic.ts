@@ -13,9 +13,14 @@ export class AnthropicVisionProvider implements VisionProvider {
   private client: Anthropic;
   private refusalFallback: boolean;
 
-  constructor(opts: { apiKey?: string; refusalFallback?: boolean } = {}) {
+  constructor(opts: { apiKey?: string; refusalFallback?: boolean; timeoutMs?: number } = {}) {
     // With no apiKey the SDK resolves credentials from the environment (ANTHROPIC_API_KEY, etc.).
-    this.client = new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {});
+    // Bounded timeout + one SDK retry: the defaults (10 min, 2 retries) would hold a scan request open far too long.
+    this.client = new Anthropic({
+      ...(opts.apiKey ? { apiKey: opts.apiKey } : {}),
+      timeout: opts.timeoutMs ?? 30_000,
+      maxRetries: 1,
+    });
     this.refusalFallback = opts.refusalFallback ?? true;
   }
 

@@ -47,7 +47,11 @@ describe('HTTP API', () => {
   });
 
   it('rejects bad JSON and missing images', async () => {
-    const bad = await fetch(base + '/api/scan/barcode', { method: 'POST', headers: { 'X-Tapi-User': 'device-test-2' }, body: 'nope' });
+    const bad = await fetch(base + '/api/scan/barcode', {
+      method: 'POST',
+      headers: { 'X-Tapi-User': 'device-test-2', 'Content-Type': 'application/json' },
+      body: 'nope',
+    });
     assert.equal(bad.status, 400);
     const noImg = await post('/api/scan/front', {}, 'device-test-2');
     assert.equal(noImg.status, 400);
@@ -84,7 +88,10 @@ describe('HTTP API', () => {
     await new Promise<void>((r) => s.listen(0, r));
     const url = `http://127.0.0.1:${(s.address() as AddressInfo).port}/api/scan/barcode`;
     const hit = () =>
-      fetch(url, { method: 'POST', headers: { 'X-Tapi-User': 'device-burst-1' }, body: JSON.stringify({ barcode: '013764027503' }) });
+      fetch(url, {
+        method: 'POST',
+        headers: { 'X-Tapi-User': 'device-burst-1', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode: '013764027503' }) });
     assert.equal((await hit()).status, 200);
     assert.equal((await hit()).status, 200);
     const third = await hit();

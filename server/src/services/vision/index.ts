@@ -1,6 +1,8 @@
 import type { z } from 'zod';
 import type { Config } from '../../config.ts';
 import type { DB } from '../../db/index.ts';
+import { logError, redact } from '../../lib/log.ts';
+import { visionSpendToday } from '../limits.ts';
 import { AnthropicVisionProvider } from './anthropic.ts';
 import { estimateCostUsd, type VisionProvider, type VisionTask } from './provider.ts';
 import { FRONT_PROMPT, FrontOutput, FrontResult, LABEL_PROMPT, LabelOutput, LabelResult, RETRY_SUFFIX, SYSTEM_PROMPT } from './schemas.ts';
@@ -10,7 +12,7 @@ export type { VisionProvider } from './provider.ts';
 export function createVisionProvider(config: Config): VisionProvider {
   switch (config.visionProvider) {
     case 'anthropic':
-      return new AnthropicVisionProvider({ apiKey: config.anthropicApiKey || undefined });
+      return new AnthropicVisionProvider({ apiKey: config.anthropicApiKey || undefined, timeoutMs: config.visionTimeoutMs });
     default:
       throw new Error(`Unknown VISION_PROVIDER "${config.visionProvider}"`);
   }
@@ -27,15 +29,37 @@ export type VisionOutcome<T extends VisionTask> =
   | { ok: true; result: ResultFor<T>; model: string; escalated: boolean; calls: number }
   | { ok: false; error: string; calls: number };
 
+export type VisionOptions = {
+  primaryModel: string;
+  escalationModel: string;
+  escalateBelow: number;
+  /** Hard ceiling on estimated spend per UTC day across all users; 0/undefined = none. */
+  dailyBudgetUsd?: number;
+};
+
 export class VisionService {
   private readonly db: DB;
   private readonly provider: VisionProvider;
-  private readonly opts: { primaryModel: string; escalationModel: string; escalateBelow: number };
+  private readonly opts: VisionOptions;
+  private budgetWarnedDay = '';
 
-  constructor(db: DB, provider: VisionProvider, opts: { primaryModel: string; escalationModel: string; escalateBelow: number }) {
+  constructor(db: DB, provider: VisionProvider, opts: VisionOptions) {
     this.db = db;
     this.provider = provider;
     this.opts = opts;
+  }
+
+  /** True when today's estimated vision spend has reached the configured ceiling (circuit breaker). */
+  budgetExhausted(now = new Date()): boolean {
+    const budget = this.opts.dailyBudgetUsd ?? 0;
+    if (!(budget > 0)) return false;
+    const over = visionSpendToday(this.db, now) >= budget;
+    const day = now.toISOString().slice(0, 10);
+    if (over && this.budgetWarnedDay !== day) {
+      this.budgetWarnedDay = day;
+      logError('Vision budget', new Error(`daily vision budget of $${budget} reached; photo scans paused until UTC midnight`));
+    }
+    return over;
   }
 
   /**
@@ -49,6 +73,8 @@ export class VisionService {
       let lastError = 'no response';
       let providerError = false;
       for (let attempt = 1; attempt <= 2; attempt++) {
+        // Checked before every call so a retry or escalation can't push spend past the ceiling.
+        if (this.budgetExhausted()) return { ok: false as const, error: 'budget_exhausted', providerError: true };
         calls++;
         const r = await this.callOnce(task, model, imageJpeg, userId, attempt);
         if (r.ok) return r;
@@ -109,7 +135,7 @@ export class VisionService {
       logged.ok = true;
       return { ok: true as const, result: validated.data as ResultFor<T>, model: res.model };
     } catch (e) {
-      logged.error = (e as Error).message.slice(0, 500);
+      logged.error = redact(e instanceof Error ? e.message : String(e)).slice(0, 500);
       return { ok: false as const, error: 'Vision service unavailable', kind: 'provider_error' as const };
     } finally {
       this.db

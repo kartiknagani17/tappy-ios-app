@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Config } from '../config.ts';
@@ -5,7 +6,17 @@ import type { DB } from '../db/index.ts';
 import { normalizeGtin } from '../lib/gtin.ts';
 import { perceptualHash, prepareImage } from '../lib/image.ts';
 import { decide, rankCandidates, type Decision } from '../lib/match.ts';
-import { findVisionCache, getScanCache, insertVisionCache, setScanCache, setVisionCacheChoice } from './cache.ts';
+import {
+  confirmVisionChoice,
+  findLabelCache,
+  findVisionCache,
+  getScanCache,
+  getUserConfirmation,
+  insertVisionCache,
+  recordVisionOffer,
+  setScanCache,
+  wasOffered,
+} from './cache.ts';
 import type { OffLiveClient } from './off-live.ts';
 import { getProductByGtin, getProductById, searchProducts, toPublicProduct, upsertSourceRecord, type PublicProduct } from './products.ts';
 import type { VisionService } from './vision/index.ts';
@@ -55,10 +66,25 @@ export type LabelScanResult =
 
 type Deps = { db: DB; config: Config; vision: VisionService; offLive: OffLiveClient | null };
 
+export type ConfirmResult = { ok: true; product: PublicProduct; shared_choice: boolean } | { ok: false; reason: 'not_found' | 'not_offered' };
+
+const HEX16 = /^[0-9a-f]{16}$/;
+const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+
 export class ScanService {
   private readonly d: Deps;
+  /** Identical concurrent photo requests share one vision call (double taps, client retries). */
+  private readonly inflight = new Map<string, Promise<unknown>>();
   constructor(deps: Deps) {
     this.d = deps;
+  }
+
+  private singleFlight<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const existing = this.inflight.get(key) as Promise<T> | undefined;
+    if (existing) return existing;
+    const p = fn().finally(() => this.inflight.delete(key));
+    this.inflight.set(key, p);
+    return p;
   }
 
   // ---------------- barcode ----------------
@@ -110,30 +136,43 @@ export class ScanService {
 
   // ---------------- front of package ----------------
   async scanFront(imageBytes: Buffer, userId: string, opts: { contribute?: boolean } = {}): Promise<FrontScanResult> {
+    const result = await this.scanFrontInner(imageBytes, userId, opts);
+    // Remember what this user was offered: /confirm only accepts one of these products.
+    if (result.status === 'match' && result.vision_cache_id !== null) {
+      recordVisionOffer(
+        this.d.db,
+        result.vision_cache_id,
+        userId,
+        result.candidates.map((c) => c.product.id),
+      );
+    }
+    return result;
+  }
+
+  private async scanFrontInner(imageBytes: Buffer, userId: string, opts: { contribute?: boolean }): Promise<FrontScanResult> {
     const { db, config, vision } = this.d;
-    const { jpeg } = await prepareImage(imageBytes);
+    const { jpeg } = await prepareImage(imageBytes, config.imageMaxInputPixels);
     const frontHash = await perceptualHash(jpeg);
 
-    const cached = findVisionCache(db, 'front', frontHash, config.visionCacheMaxHammingDistance);
-    let extracted: FrontResult;
-    let cacheId: number | null;
-    let fromCache = false;
-    if (cached) {
-      extracted = JSON.parse(cached.parsed_json) as FrontResult;
-      cacheId = cached.id;
-      fromCache = true;
-    } else {
+    const lookup = await this.singleFlight(`front:${frontHash}`, async () => {
+      const row = findVisionCache(db, 'front', frontHash, config.visionCacheMaxHammingDistance);
+      if (row) return { kind: 'cached' as const, row };
       const out = await vision.run('front', jpeg, userId);
-      if (!out.ok) {
-        return {
-          status: 'vision_unavailable',
-          front_hash: frontHash,
-          message: 'We could not read that photo. Try scanning the barcode instead.',
-        };
-      }
-      extracted = out.result;
-      cacheId = insertVisionCache(db, 'front', frontHash, out.model, extracted);
+      if (!out.ok) return { kind: 'failed' as const };
+      const id = insertVisionCache(db, 'front', frontHash, out.model, out.result, { userId, contentSha256: sha256(imageBytes) });
+      return { kind: 'fresh' as const, id, result: out.result };
+    });
+    if (lookup.kind === 'failed') {
+      return {
+        status: 'vision_unavailable',
+        front_hash: frontHash,
+        message: 'We could not read that photo. Try scanning the barcode instead.',
+      };
     }
+    const cached = lookup.kind === 'cached' ? lookup.row : null;
+    const extracted: FrontResult = cached ? (JSON.parse(cached.parsed_json) as FrontResult) : (lookup as { result: FrontResult }).result;
+    const cacheId: number = cached ? cached.id : (lookup as { id: number }).id;
+    const fromCache = !!cached;
 
     if (!extracted.is_food_package) {
       return {
@@ -164,9 +203,11 @@ export class ScanService {
       }
     }
 
-    // Repeat photo the user already confirmed: offer that product first (still needs confirmation).
-    if (cached?.chosen_product_id) {
-      const chosen = getProductById(db, cached.chosen_product_id);
+    // Repeat photo: offer this user's own earlier confirmation first, else the choice enough
+    // independent users agreed on (still needs confirmation).
+    const preferredId = (cached && getUserConfirmation(db, cached.id, userId)) ?? cached?.chosen_product_id ?? null;
+    if (preferredId) {
+      const chosen = getProductById(db, preferredId);
       if (chosen) {
         return {
           status: 'match',
@@ -228,12 +269,18 @@ export class ScanService {
     };
   }
 
-  /** User confirmed which product the photo shows; remember it for repeat photos. */
-  confirmFront(visionCacheId: number, productId: number) {
-    const product = getProductById(this.d.db, productId);
-    if (!product) return null;
-    setVisionCacheChoice(this.d.db, visionCacheId, productId);
-    return toPublicProduct(product);
+  /**
+   * User confirmed which product the photo shows. Only a product this user was actually offered
+   * for that photo is accepted. The confirmation applies to this user's repeat photos right away;
+   * it becomes the shared choice for everyone only by consensus (see confirmVisionChoice).
+   */
+  confirmFront(visionCacheId: number, productId: number, userId: string, ipKey: string): ConfirmResult {
+    const { db, config } = this.d;
+    const product = getProductById(db, productId);
+    if (!product) return { ok: false, reason: 'not_found' };
+    if (!wasOffered(db, visionCacheId, userId, productId)) return { ok: false, reason: 'not_offered' };
+    const shared = confirmVisionChoice(db, visionCacheId, userId, ipKey, productId, config.visionConfirmConsensus);
+    return { ok: true, product: toPublicProduct(product), shared_choice: shared === productId };
   }
 
   // ---------------- ingredient panel ----------------
@@ -252,26 +299,25 @@ export class ScanService {
       if (existing?.ingredients_text) return { status: 'existing_product', product: toPublicProduct(existing) };
     }
 
-    const { jpeg } = await prepareImage(imageBytes);
+    const { jpeg } = await prepareImage(imageBytes, config.imageMaxInputPixels);
     const hash = await perceptualHash(jpeg);
-    const cached = findVisionCache(db, 'label', hash, config.visionCacheMaxHammingDistance);
-    let extracted: LabelResult;
-    let model: string;
-    if (cached) {
-      extracted = JSON.parse(cached.parsed_json) as LabelResult;
-      model = cached.model;
-    } else {
+    const contentSha = sha256(imageBytes);
+    // Label results are never shared across users (see findLabelCache).
+    const lookup = await this.singleFlight(`label:${userId}:${contentSha}`, async () => {
+      const row = findLabelCache(db, userId, contentSha);
+      if (row) return { ok: true as const, extracted: JSON.parse(row.parsed_json) as LabelResult, model: row.model };
       const out = await vision.run('label', jpeg, userId);
-      if (!out.ok)
-        return {
-          status: 'unreadable',
-          message: 'We couldn’t read that label. Try again with the whole ingredient list in frame and good light.',
-          extracted: null,
-        };
-      extracted = out.result;
-      model = out.model;
-      insertVisionCache(db, 'label', hash, model, extracted);
-    }
+      if (!out.ok) return { ok: false as const };
+      insertVisionCache(db, 'label', hash, out.model, out.result, { userId, contentSha256: contentSha });
+      return { ok: true as const, extracted: out.result, model: out.model };
+    });
+    if (!lookup.ok)
+      return {
+        status: 'unreadable',
+        message: 'We couldn’t read that label. Try again with the whole ingredient list in frame and good light.',
+        extracted: null,
+      };
+    const { extracted, model } = lookup;
 
     if (!extracted.is_ingredient_panel || !extracted.ingredients_text) {
       return {
@@ -281,7 +327,7 @@ export class ScanService {
       };
     }
 
-    const frontHash = opts.frontHash && /^[0-9a-f]{16}$/.test(opts.frontHash) ? opts.frontHash : null;
+    const frontHash = opts.frontHash && HEX16.test(opts.frontHash) ? opts.frontHash : null;
     if (!gtin14 && !frontHash) {
       // Still usable for this user right now, but there is nothing to attach it to for review.
       return { status: 'contributed', product: this.toContributed(null, extracted, null, -1), extracted };
@@ -354,12 +400,14 @@ export class ScanService {
   }
 
   private saveProductImage(hash: string, jpeg: Buffer) {
+    if (!HEX16.test(hash)) throw new Error('refusing to write upload with a non-hash file name');
     const dir = path.join(this.d.config.uploadsDir, 'products');
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, `${hash}.jpg`), jpeg);
   }
 
   private saveLabelImage(hash: string, jpeg: Buffer): string {
+    if (!HEX16.test(hash)) throw new Error('refusing to write upload with a non-hash file name');
     const dir = path.join(this.d.config.uploadsDir, 'labels');
     mkdirSync(dir, { recursive: true });
     const p = path.join(dir, `${hash}.jpg`);

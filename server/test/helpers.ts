@@ -10,7 +10,16 @@ import { VisionService } from '../src/services/vision/index.ts';
 export const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
 export function testConfig(overrides: Partial<Config> = {}): Config {
-  return { ...loadConfig(), dbPath: ':memory:', offLiveLookup: false, uploadsDir: '/tmp/tapi-test-uploads', ...overrides };
+  return {
+    ...loadConfig(),
+    dbPath: ':memory:',
+    offLiveLookup: false,
+    uploadsDir: '/tmp/tapi-test-uploads',
+    photoScanningMode: 'on',
+    corsOrigins: [],
+    trustProxyHops: 0,
+    ...overrides,
+  };
 }
 
 export function testDb(): DB {
@@ -66,6 +75,7 @@ export function makeScan(db: DB, provider: MockVisionProvider, config = testConf
     primaryModel: 'claude-haiku-5-5',
     escalationModel: 'claude-sonnet-5-5',
     escalateBelow: config.visionEscalateBelow,
+    dailyBudgetUsd: config.visionDailyBudgetUsd,
   });
   return { scan: new ScanService({ db, config, vision, offLive: null }), vision, config };
 }

@@ -104,7 +104,7 @@ describe('front-of-package photo', () => {
     assert.equal(second.status, 'match');
 
     // After the user confirms, the repeat photo pre-selects the confirmed product.
-    scan.confirmFront(first.vision_cache_id!, first.candidates[0].product.id);
+    scan.confirmFront(first.vision_cache_id!, first.candidates[0].product.id, 'u-12345678', '10.0.0.1');
     const third = await scan.scanFront(again, 'u-12345678');
     assert.equal(third.status === 'match' && third.via, 'cache');
   });

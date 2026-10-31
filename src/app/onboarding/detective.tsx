@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { useState } from 'react';
 import { StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { DEMO_PRODUCTS, Package } from '../../components/art';
@@ -20,7 +19,6 @@ const FLAGGED: { text: string; color: string }[] = [
 ];
 
 export default function Detective() {
-  const [notify, setNotify] = useState(true);
   const p = DEMO_PRODUCTS[4];
   return (
     <QuestionLayout
@@ -32,7 +30,13 @@ export default function Detective() {
       footer={<Button testID="continue" title="Continue" onPress={() => goNext('detective')} />}
     >
       <View style={styles.panel}>
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.phone}>
+        <Animated.View
+          entering={FadeInDown.duration(500)}
+          style={styles.phone}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
           <Text style={styles.time}>9:41</Text>
           <View style={styles.productArea}>
             <Package p={p} size={150} />
@@ -45,8 +49,7 @@ export default function Detective() {
               <Feather name="bell" size={13} />
               <Text style={styles.notifyText}>Get notified of ingredient changes</Text>
               <Switch
-                value={notify}
-                onValueChange={setNotify}
+                value
                 trackColor={{ true: colors.purple, false: '#ddd' }}
                 style={{ transform: [{ scale: 0.7 }] }}
               />

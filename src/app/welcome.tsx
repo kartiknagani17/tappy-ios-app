@@ -1,7 +1,5 @@
-import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { PhoneMockup } from '../components/art';
 import { Button, Footer, Logo, Screen, TextLink } from '../components/ui';
@@ -9,17 +7,8 @@ import { useStore } from '../lib/store';
 import { colors } from '../theme';
 
 export default function Welcome() {
-  // Mirrors the reference flow: ask for notification permission on first open (system prompt).
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    const t = setTimeout(() => {
-      Notifications.getPermissionsAsync()
-        .then((p) => (p.status === 'undetermined' ? Notifications.requestPermissionsAsync() : p))
-        .catch(() => {});
-    }, 900);
-    return () => clearTimeout(t);
-  }, []);
-
+  // Notification permission is no longer requested on first open with no context.
+  // It's asked on the trial-reminder screen, where the user sees why (onboarding/reminder.tsx).
   return (
     <Screen>
       <View style={styles.top}>

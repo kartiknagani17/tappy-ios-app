@@ -1,6 +1,7 @@
 import { INGREDIENTS, type Ingredient } from '../data/ingredients';
 import { RESTRICTION_BY_ID, effectiveLevel, selectionTags, type Selection } from '../data/restrictions';
 import type { Rating } from './store';
+import { tagsInText } from './verdict';
 
 const RANK: Record<Rating, number> = { green: 0, yellow: 1, red: 2 };
 
@@ -34,13 +35,19 @@ export function rateAll(restrictions: Record<string, Selection>, overrides: Reco
   return INGREDIENTS.map((ing) => ({ ...ing, rating: rateIngredient(ing, tagRatings, overrides) }));
 }
 
-/** Rate an ingredient list (e.g. a scanned product) by name. Unknown names are treated as green. */
+/**
+ * Rate an ingredient list (e.g. a scanned product) by name. Names that aren't in the catalog
+ * ("Peanuts", "Skim milk", "Wheat flour (enriched)") are matched with the same label matcher as
+ * scan verdicts, so they are never silently treated as green.
+ */
 export function rateNames(names: string[], restrictions: Record<string, Selection>, overrides: Record<string, Rating>) {
   const tagRatings = buildTagRatings(restrictions);
-  const byName = new Map(INGREDIENTS.map((i) => [i.name.toLowerCase(), i]));
+  const byName = new Map(INGREDIENTS.map((i) => [i.name.toLowerCase().trim(), i]));
   return names.map((name) => {
-    const ing = byName.get(name.toLowerCase());
-    return { name, rating: ing ? rateIngredient(ing, tagRatings, overrides) : ('green' as Rating) };
+    const ing = byName.get(name.toLowerCase().trim());
+    if (ing) return { name, rating: rateIngredient(ing, tagRatings, overrides) };
+    const rating = worst(tagsInText(name).map((t) => tagRatings.get(t) ?? 'green'));
+    return { name, rating };
   });
 }
 
