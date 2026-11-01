@@ -18,7 +18,8 @@ esac
 
 read -rsp "Paste $NAME and press Enter: " VALUE
 echo
-VALUE="$(printf '%s' "$VALUE" | tr -d '[:space:]')"
+# Terminals wrap pastes in bracketed-paste codes (ESC[200~ … ESC[201~); drop them and any other control characters.
+VALUE="$(printf '%s' "$VALUE" | sed -e 's/\x1b\[20[01]~//g' | tr -d '[:space:][:cntrl:]')"
 [[ -n "$VALUE" ]] || { echo "Nothing entered; no change." >&2; exit 1; }
 [[ "$VALUE" =~ ^[A-Za-z0-9_.:-]+$ ]] || { echo "That doesn't look like a key; no change." >&2; exit 1; }
 
