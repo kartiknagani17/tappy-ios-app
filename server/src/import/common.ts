@@ -16,23 +16,36 @@ export async function* readRows(input: Readable, options: Options = {}): AsyncGe
   for await (const row of parser) yield row as Record<string, string>;
 }
 
-/** Commits writes in batches so multi-million-row imports stay fast and crash-safe. */
+/**
+ * Commits writes in batches so multi-million-row imports stay fast and crash-safe.
+ * A batch is also committed once it has held the write lock for `maxOpenMs`, so the API
+ * (which shares the database) never waits longer than that for its own writes.
+ */
 export class BatchWriter {
   private pending = 0;
   private open = false;
+  private openedAt = 0;
   private readonly db: DB;
   private readonly size: number;
-  constructor(db: DB, size = 2000) {
+  private readonly maxOpenMs: number;
+  constructor(db: DB, size = 2000, maxOpenMs = 250) {
     this.db = db;
     this.size = size;
+    this.maxOpenMs = maxOpenMs;
   }
   run(fn: () => void) {
     if (!this.open) {
-      this.db.exec('BEGIN');
+      this.db.exec('BEGIN IMMEDIATE');
       this.open = true;
+      this.openedAt = Date.now();
     }
     fn();
     if (++this.pending >= this.size) this.flush();
+    else this.flushIfStale();
+  }
+  /** Call between rows that write nothing, so a long run of skipped rows doesn't hold the lock. */
+  flushIfStale() {
+    if (this.open && Date.now() - this.openedAt >= this.maxOpenMs) this.flush();
   }
   flush() {
     if (this.open) this.db.exec('COMMIT');

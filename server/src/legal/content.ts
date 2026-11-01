@@ -7,7 +7,8 @@
  * Before release, have the operator name and governing-law clause checked for your jurisdiction.
  */
 
-export const LEGAL_OPERATOR = 'Tappy';
+/** Must match the seller name App Store Connect shows for the app. */
+export const LEGAL_OPERATOR = 'Jignesh Mandana';
 export const LEGAL_CONTACT = 'kartiknagani17@gmail.com';
 export const LEGAL_UPDATED = 'November 1, 2026';
 
@@ -46,6 +47,7 @@ export const TERMS: LegalDoc = {
       heading: '4. Subscriptions, free trials and billing',
       body: [
         'Some features require a paid subscription ("Tappy Unlimited"). Prices are shown in the app before you buy, in your local currency.',
+        'Tappy Unlimited removes the daily limit on barcode scans. Photo scans, which use a paid text-recognition service, have a fair-use limit of 100 per day for subscribers.',
         'Payment is charged to your Apple ID account when you confirm the purchase. Subscriptions renew automatically at the end of each period unless auto-renew is turned off at least 24 hours before the end of the current period. Your account is charged for renewal within 24 hours before the end of the current period.',
         'If a free trial is offered, you will be charged when the trial ends unless you cancel at least 24 hours before it ends. Any unused part of a free trial is forfeited when you buy a subscription.',
         'You can manage or cancel your subscription in your iPhone’s Settings → [your name] → Subscriptions. Deleting the app or your Tappy account does not cancel a subscription.',
@@ -112,7 +114,7 @@ export const PRIVACY: LegalDoc = {
   id: 'privacy',
   title: 'Privacy Policy',
   updated: LEGAL_UPDATED,
-  intro: `This Privacy Policy explains what information the Tappy app and service ("Tappy", "we", "us") collect, why, and the choices you have. We collect as little as we need to make Tappy work, we don’t sell your personal information, and we don’t track you across other companies’ apps or websites.`,
+  intro: `This Privacy Policy explains what information the Tappy app and service ("Tappy", "we", "us"), operated by ${LEGAL_OPERATOR}, collect, why, and the choices you have. We collect as little as we need to make Tappy work, we don’t sell your personal information, and we don’t track you across other companies’ apps or websites.`,
   sections: [
     {
       heading: '1. Information on your device',
@@ -161,7 +163,7 @@ export const PRIVACY: LegalDoc = {
     {
       heading: '6. How long we keep it',
       body: [
-        'Scan records and rate-limit data: up to 90 days. Cached product lookups: up to 7 days. Account data and your synced profile: until you delete your account. Contributed ingredient text and opted-in product photos: for as long as they help the database, without being linked to your account. Backups are overwritten within about two weeks.',
+        'Scan records and rate-limit data: up to 90 days. Cached product lookups: up to 7 days. Feedback messages: up to 1 year. Account data and your synced profile: until you delete your account. Contributed ingredient text and opted-in product photos: for as long as they help the database, without being linked to your account. Backups are overwritten within about two weeks.',
       ],
     },
     {

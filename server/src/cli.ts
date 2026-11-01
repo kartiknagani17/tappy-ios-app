@@ -14,6 +14,7 @@ const HELP = `Tappy data CLI
   node src/cli.ts import-usda [path]      Import USDA Branded Foods (.zip or extracted folder)
   node src/cli.ts import-off [path]       Import Open Food Facts US products (.csv or .csv.gz)
   node src/cli.ts stats                   Row counts and vision spend
+  node src/cli.ts feedback [n]            Latest feedback messages (default: 50)
   node src/cli.ts backup [dir] [keep]     Consistent snapshot of the live database (default: keep 2)
 
 Imports are idempotent: re-running with the same file changes nothing.`;
@@ -113,6 +114,17 @@ async function main() {
              sum(output_tokens) AS output_tokens, round(sum(est_cost_usd), 4) AS est_cost_usd, round(avg(latency_ms)) AS avg_ms
            FROM vision_calls GROUP BY day, model ORDER BY day DESC LIMIT 30`),
       );
+      return;
+    }
+    case 'feedback': {
+      const db = openDb(config.dbPath);
+      const rows = db
+        .prepare(`SELECT id, datetime(created_at, 'unixepoch') AS at, topic, message FROM feedback ORDER BY id DESC LIMIT ?`)
+        .all(Number(arg) || 50) as { id: number; at: string; topic: string; message: string }[];
+      for (const r of rows.reverse()) console.log(`#${r.id}  ${r.at} UTC  [${r.topic}]
+${r.message}
+`);
+      if (!rows.length) console.log('No feedback yet.');
       return;
     }
     default:

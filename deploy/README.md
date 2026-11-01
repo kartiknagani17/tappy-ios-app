@@ -56,7 +56,7 @@ sudo bash deploy/oracle/setup.sh
 
 It installs Node 22, creates a `tappy` service user, installs the server into `/opt/tappy`, keeps data in `/var/lib/tappy`, writes the config to `/etc/tappy/tappy.env`, starts the services, installs `cloudflared`, and starts the first data import in the background.
 
-Add your Anthropic API key (needed for photo scanning; barcode scanning works without it), and for password-reset emails your `RESEND_API_KEY`, `EMAIL_FROM` and `SUPPORT_EMAIL` (see the main README, "Accounts"):
+Add your Anthropic API key (needed for photo scanning; barcode scanning works without it), for password-reset emails and feedback your `RESEND_API_KEY`, `EMAIL_FROM` and `SUPPORT_EMAIL` (see the main README, "Accounts"), and `REVENUECAT_SECRET_KEY` so subscribers get unlimited scans (see the main README, "Payments"):
 
 ```bash
 sudo nano /etc/tappy/tappy.env
@@ -127,6 +127,7 @@ Re-running is safe: it updates code, dependencies and services, and never overwr
 | Restart after config change | `sudo systemctl restart tappy-api` |
 | Re-import data now | `sudo systemctl start tappy-import` |
 | Product counts, contributions, vision spend | `cd /opt/tappy/server && sudo -u tappy env TAPPY_ENV_FILE=/etc/tappy/tappy.env node --disable-warning=ExperimentalWarning src/cli.ts stats` |
+| Read feedback from the app | `cd /opt/tappy/server && sudo -u tappy env TAPPY_ENV_FILE=/etc/tappy/tappy.env node --disable-warning=ExperimentalWarning src/cli.ts feedback` |
 | Backup now | `sudo systemctl start tappy-backup` (files in `/var/lib/tappy/backups`) |
 | Timers | `systemctl list-timers 'tappy-*'` |
 

@@ -122,6 +122,7 @@ export async function importOff(db: DB, file: string, log: Logger = console.log,
       const rec = offRowToRecord(row);
       if (!rec) {
         progress.skipped++;
+        batch.flushIfStale();
         continue;
       }
       batch.run(() => {

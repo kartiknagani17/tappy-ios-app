@@ -174,6 +174,7 @@ export async function importUsda(db: DB, source: CsvSource, log: Logger = consol
       const rec = usdaRowToRecord(row, food, nutrients);
       if (!rec) {
         progress.skipped++;
+        batch.flushIfStale();
         continue;
       }
       batch.run(() => {

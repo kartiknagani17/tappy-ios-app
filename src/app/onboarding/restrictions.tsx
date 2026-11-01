@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { RestrictionSheet } from '../../components/RestrictionSheet';
 import { Button, Chip, Footer, OnboardingHeader, Screen } from '../../components/ui';
+import { INGREDIENT_COUNT_LABEL } from '../../data/ingredients';
 import { RESTRICTIONS, SECTION_TITLES, type Restriction, type Section } from '../../data/restrictions';
 import { goNext, progressFor } from '../../lib/flow';
 import { haptic } from '../../lib/haptics';
@@ -44,7 +45,7 @@ export default function Restrictions() {
       >
         <View style={styles.intro}>
           <Text style={styles.title}>What are your dietary restrictions?</Text>
-          <Text style={styles.subtitle}>Don't see your restrictions here? No worries. You can pick from 2,900+ ingredients later!</Text>
+          <Text style={styles.subtitle}>Don't see your restrictions here? No worries. You can pick from {INGREDIENT_COUNT_LABEL} ingredients later!</Text>
         </View>
 
         <View style={styles.searchWrap}>
@@ -107,7 +108,7 @@ export default function Restrictions() {
           {filtered.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>No matches for "{query}"</Text>
-              <Text style={styles.emptyBody}>You'll be able to pick from 2,900+ individual ingredients on the next screen.</Text>
+              <Text style={styles.emptyBody}>You'll be able to pick from {INGREDIENT_COUNT_LABEL} individual ingredients on the next screen.</Text>
             </View>
           ) : null}
         </View>

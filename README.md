@@ -52,7 +52,7 @@ Before submitting, update `ios.bundleIdentifier` in `app.json`, and replace the 
 | 10 | Make it official (press & hold) → Goal set! | `onboarding/commit.tsx` |
 | 11 | You're committed | `onboarding/committed.tsx` |
 | 12 | Other dietary restrictions? | `onboarding/other.tsx` |
-| 13 | Tappy covers 2,900+ needs (+ "Why?" sheet) | `onboarding/covers.tsx` |
+| 13 | Tappy covers N diets/allergies + N ingredients (+ "Why?" sheet) | `onboarding/covers.tsx` |
 | 14 | Dietary restrictions picker + severity/checklist sheets | `onboarding/restrictions.tsx`, `components/RestrictionSheet.tsx` |
 | 15 | Your Tappy looks great: Dietary Profile / Ingredient Lookup | `onboarding/profile.tsx` |
 | 16 | Finishing your profile → confetti | `onboarding/finishing.tsx` |
@@ -74,7 +74,8 @@ Subscriptions go through RevenueCat (`react-native-purchases`) in `src/lib/subsc
 1. **App Store Connect → your app → Subscriptions:** create a subscription group with two auto-renewable subscriptions, `tapi_annual` (1 year, $49.99) and `tapi_annual_offer` (1 year, $39.99, the "Before you go" offer). Give each an introductory offer: **Free, 7 days**. Fill in the localization and review screenshot for each.
 2. **App Store Connect → Users and Access → Integrations → In-App Purchase:** generate an In-App Purchase key (.p8) for RevenueCat.
 3. **RevenueCat (free up to $2.5k/month in revenue):** create a project and an App Store app with bundle id `company.tappy.app`, upload the .p8 key, import both products, and create an entitlement called **`tappy_pro`** with both products attached.
-4. Copy the RevenueCat **public iOS SDK key** (`appl_…`) into `EXPO_PUBLIC_REVENUECAT_IOS_KEY` in `eas.json` (the `preview` and `production` profiles). It's a public key, so it's safe to commit.
+4. Copy the RevenueCat **secret API key** (v1, `sk_…`, Project settings → API keys) into `REVENUECAT_SECRET_KEY` on the server (`/etc/tappy/tappy.env`), then restart `tappy-api`. The server uses it to check the `tappy_pro` entitlement and lift the daily scan limits for subscribers (barcode scans unlimited; photo scans keep a fair-use cap, `SUBSCRIBER_DAILY_PHOTO_SCANS`, default 100/day). Never put this key in the app.
+5. Copy the RevenueCat **public iOS SDK key** (`appl_…`) into `EXPO_PUBLIC_REVENUECAT_IOS_KEY` in `eas.json` (the `preview` and `production` profiles). It's a public key, so it's safe to commit.
 
 The paywall shows the App Store's localized prices, offers the free trial only to Apple IDs that are eligible for it, and keeps the subscription state in step with renewals, refunds and expiry. When someone signs in, their purchases are tied to their Tappy account, so the subscription follows them to a new phone.
 
@@ -87,14 +88,15 @@ Email + password and Sign in with Apple run on the Tappy server (`server/src/ser
 
 ## Terms of Use and Privacy Policy
 
-The text lives in `server/src/legal/content.ts`. The app opens it in a popup (`src/components/LegalSheet.tsx`, closed with the × at the top), and the server publishes the same text at `https://<your API address>/terms` and `/privacy`. Use the `/privacy` URL in App Store Connect's **Privacy Policy URL** field. Before release, set `LEGAL_OPERATOR` and `LEGAL_CONTACT` at the top of that file to your name or company and your support email, and have the text checked for your country.
+The text lives in `server/src/legal/content.ts`. The app opens it in a popup (`src/components/LegalSheet.tsx`, closed with the × at the top), and the server publishes the same text at `https://<your API address>/terms` and `/privacy`. Use the `/privacy` URL in App Store Connect's **Privacy Policy URL** field. `LEGAL_OPERATOR` at the top of that file must match the seller name on the App Store (currently Jignesh Mandana); `LEGAL_CONTACT` is the support email. Have the text checked for your country before release.
 
 ## Still to replace
 
 | What | Where | Replace with |
 |------|-------|--------------|
-| Ingredient catalog (~300 sample entries) | `src/data/ingredients.ts` | Your full 2,900+ ingredient list |
-| Feedback forms | `src/components/FeedbackSheet.tsx` | Your backend or a form endpoint |
+| Ingredient catalog (~300 entries) | `src/data/ingredients.ts` | A larger list, if you have one. The in-app counts (`INGREDIENT_COUNT_LABEL`) follow the catalog automatically. |
+
+Feedback forms post to `POST /api/feedback`; messages are stored on the server (read them with `node src/cli.ts feedback`) and emailed to `SUPPORT_EMAIL` when `RESEND_API_KEY` is set.
 
 Brand colors live in `src/theme.ts`.
 
@@ -197,6 +199,7 @@ The app always asks the user to confirm the matched product before showing a ver
 | `MATCH_AMBIGUITY_MARGIN` | 0.03 | If the runner-up is this close to the top (e.g. several flavors of one product), show the top 3 instead of one |
 | `VISION_ESCALATE_BELOW_CONFIDENCE` | 0.6 | Below this model confidence, retry once on the escalation model |
 | `DAILY_FREE_SCANS` / `DAILY_FREE_PHOTO_SCANS` | 25 / 10 | Per-user daily quota (photo scans cost money) |
+| `SUBSCRIBER_DAILY_PHOTO_SCANS` | 100 | Subscribers: barcode scans are unlimited, photo scans keep this fair-use cap |
 | `RATE_LIMIT_PER_MINUTE` | 30 | Per-user burst limit (4x per IP) |
 
 The score is a weighted blend: brand 0.30, name 0.45, variant 0.10, size 0.15 (`server/src/lib/match.ts`). Components the photo didn't show are left out and the rest renormalized; a photo with a single weak signal is capped at 0.7. To tune, add real photos' extracted JSON and the right answer to `server/test/fixtures/match_cases.json` and run the tests.

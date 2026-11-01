@@ -7,7 +7,7 @@ import { BottomSheet } from '../../components/BottomSheet';
 import { FeedbackSheet } from '../../components/FeedbackSheet';
 import { RestrictionSheet } from '../../components/RestrictionSheet';
 import { Button, CloseButton, Footer, InfoButton, OnboardingHeader, RatingIcon, Screen, TextLink, ratingLabel } from '../../components/ui';
-import { INGREDIENTS } from '../../data/ingredients';
+import { INGREDIENT_COUNT_LABEL, INGREDIENTS } from '../../data/ingredients';
 import { LEVEL_LABEL, RESTRICTIONS, type Level, type Restriction } from '../../data/restrictions';
 import { progressFor } from '../../lib/flow';
 import { haptic } from '../../lib/haptics';
@@ -63,7 +63,7 @@ export default function Profile() {
         onClose={() => setMissing(false)}
         header="Don't see an ingredient?"
         title="What are we missing?"
-        body="While we have over 2,900 options of ingredients you can restrict or limit, we don't have everything. What else would you like to see on Tappy?"
+        body={`While we have ${INGREDIENT_COUNT_LABEL} ingredients you can restrict or limit, we don't have everything. What else would you like to see on Tappy?`}
       />
 
       <BottomSheet

@@ -106,6 +106,13 @@ export function loadConfig() {
     ipDailyScans: num('IP_DAILY_SCANS', 300),
     ipDailyPhotoScans: num('IP_DAILY_PHOTO_SCANS', 40),
 
+    // Subscriptions (RevenueCat)
+    /** RevenueCat secret API key (v1, sk_…). Without it nobody gets subscriber limits. */
+    revenueCatSecretKey: process.env.REVENUECAT_SECRET_KEY || '',
+    revenueCatEntitlementId: str('REVENUECAT_ENTITLEMENT_ID', 'tappy_pro'),
+    /** Subscribers: barcode scans are unlimited; photo scans (paid vision calls) keep a fair-use daily cap. */
+    subscriberDailyPhotoScans: num('SUBSCRIBER_DAILY_PHOTO_SCANS', 100),
+
     // Accounts
     /** Sign in with Apple tokens must be issued for this audience (the iOS bundle id in app.json). */
     appleBundleId: str('APPLE_BUNDLE_ID', 'company.tappy.app'),
@@ -140,6 +147,7 @@ export function validateConfig(c: Config): string[] {
   intIn('dailyFreePhotoScans', 0, 1_000_000);
   intIn('ipDailyScans', 0, 10_000_000);
   intIn('ipDailyPhotoScans', 0, 10_000_000);
+  intIn('subscriberDailyPhotoScans', 0, 1_000_000);
   intIn('visionMaxImageBytes', 10_000, 50_000_000);
   intIn('imageMaxInputPixels', 1_000_000, 268_402_689);
   intIn('requestTimeoutMs', 1000, 600_000);
@@ -166,6 +174,8 @@ export function validateConfig(c: Config): string[] {
     warnings.push('VISION_DAILY_BUDGET_USD=0: no daily ceiling on vision spend.');
   if (c.corsOrigins.includes('*')) warnings.push('CORS_ORIGINS=* allows any website to call this API from a browser.');
   if (c.offUserAgent.includes('example.com')) warnings.push('OFF_USER_AGENT still uses the example contact address.');
+  if (!c.revenueCatSecretKey)
+    warnings.push('REVENUECAT_SECRET_KEY is not set: subscribers get the free daily scan limits instead of unlimited scans.');
   if (!c.resendApiKey) warnings.push('RESEND_API_KEY is not set: password reset emails are off ("Forgot password?" is hidden in the app).');
   return warnings;
 }

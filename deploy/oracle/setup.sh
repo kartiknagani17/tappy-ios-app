@@ -116,6 +116,9 @@ APPLE_BUNDLE_ID=company.tappy.app
 RESEND_API_KEY=
 EMAIL_FROM=Tappy <no-reply@tappy.company>
 SUPPORT_EMAIL=kartiknagani17@gmail.com
+# Subscribers get unlimited barcode scans. RevenueCat → Project settings → API keys → secret key (v1, sk_...).
+REVENUECAT_SECRET_KEY=
+SUBSCRIBER_DAILY_PHOTO_SCANS=100
 
 MATCH_AUTO_CONFIRM_THRESHOLD=0.85
 MATCH_CHOOSE_THRESHOLD=0.5

@@ -323,3 +323,6 @@ export const INGREDIENTS: Ingredient[] = RAW.trim()
       tags: tags.split(',').filter(Boolean),
     };
   });
+
+/** Catalog size for marketing copy, rounded down ("300+"), so the app never claims more than it has. */
+export const INGREDIENT_COUNT_LABEL = `${Math.floor(INGREDIENTS.length / 50) * 50}+`;

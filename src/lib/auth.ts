@@ -2,7 +2,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { API_CONFIG_ERROR, API_URL, ApiError } from './api';
+import { API_CONFIG_ERROR, API_URL, ApiError, setRequestIdentity } from './api';
 import { sanitizePersisted } from './persist';
 import { useStore } from './store';
 import { identifyPurchaser, resetPurchaser } from './subscription';
@@ -54,12 +54,15 @@ const TOKEN_KEY = 'tappy.session';
 
 async function getToken(): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(TOKEN_KEY);
+    const token = await SecureStore.getItemAsync(TOKEN_KEY);
+    setRequestIdentity({ token });
+    return token;
   } catch {
     return null;
   }
 }
 async function setToken(token: string | null) {
+  setRequestIdentity({ token });
   try {
     if (token) await SecureStore.setItemAsync(TOKEN_KEY, token, { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK });
     else await SecureStore.deleteItemAsync(TOKEN_KEY);

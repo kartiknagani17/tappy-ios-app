@@ -144,7 +144,10 @@ export default function Scan() {
 
   const fail = (e: unknown) => {
     haptic.warning();
-    if (e instanceof ApiError && e.code === 'daily_limit_reached') {
+    if (e instanceof ApiError && e.code === 'daily_limit_reached' && useStore.getState().trialActive) {
+      // Subscribers only hit the fair-use photo cap; the server's message says barcodes still work.
+      setPrompt({ title: 'Photo scan limit reached', body: e.message, actions: ['barcode'] });
+    } else if (e instanceof ApiError && e.code === 'daily_limit_reached') {
       setPrompt({ title: 'Daily free scans used', body: e.message + ' Start your free trial for unlimited scans.', actions: ['upgrade'] });
     } else if (e instanceof ApiError && e.code === 'timeout') {
       setPrompt({ title: 'Taking too long', body: e.message, actions: ['retry'] });

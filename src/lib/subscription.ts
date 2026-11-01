@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Purchases, { INTRO_ELIGIBILITY_STATUS, LOG_LEVEL, PURCHASES_ERROR_CODE, type CustomerInfo, type PurchasesStoreProduct } from 'react-native-purchases';
+import { setRequestIdentity } from './api';
 import { useStore } from './store';
 
 /**
@@ -44,6 +45,12 @@ const purchasesAvailable = () => Platform.OS === 'ios' && !!REVENUECAT_IOS_KEY;
 
 const isActive = (info: CustomerInfo) => !!info.entitlements.active[ENTITLEMENT_ID];
 const applyCustomerInfo = (info: CustomerInfo) => useStore.getState().set({ trialActive: isActive(info) });
+/** Lets the server check this purchaser's subscription when it scans (see api.ts). */
+const syncPurchaserId = () =>
+  Purchases.getAppUserID().then(
+    (id) => setRequestIdentity({ purchaser: id }),
+    () => {},
+  );
 
 /** Call once at launch. Keeps `trialActive` in the store in step with the App Store (renewals, refunds, expiry). */
 export function initPurchases() {
@@ -56,6 +63,7 @@ export function initPurchases() {
   configured = true;
   Purchases.addCustomerInfoUpdateListener(applyCustomerInfo);
   Purchases.getCustomerInfo().then(applyCustomerInfo, () => {});
+  void syncPurchaserId();
 }
 
 /** Ties purchases to the Tappy account, so a subscription follows the user to a new phone. */
@@ -64,6 +72,7 @@ export async function identifyPurchaser(appUserId: string) {
   try {
     const { customerInfo } = await Purchases.logIn(appUserId);
     applyCustomerInfo(customerInfo);
+    void syncPurchaserId();
   } catch {
     // ignore: purchases still work anonymously
   }
@@ -74,6 +83,7 @@ export async function resetPurchaser() {
   try {
     if (await Purchases.isAnonymous()) return;
     applyCustomerInfo(await Purchases.logOut());
+    void syncPurchaserId();
   } catch {
     // ignore
   }

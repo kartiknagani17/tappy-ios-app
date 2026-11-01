@@ -40,7 +40,7 @@ export function migrate(db: DB): string[] {
 }
 
 export function transaction<T>(db: DB, fn: () => T): T {
-  db.exec('BEGIN');
+  db.exec('BEGIN IMMEDIATE'); // take the write lock up front: a read-then-write upgrade fails instantly if another connection commits in between
   try {
     const out = fn();
     db.exec('COMMIT');

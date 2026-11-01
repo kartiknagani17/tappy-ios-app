@@ -3,6 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { BottomSheet } from '../../components/BottomSheet';
 import { Button, Footer, OnboardingHeader, Screen, TextLink } from '../../components/ui';
+import { INGREDIENT_COUNT_LABEL } from '../../data/ingredients';
+import { RESTRICTIONS } from '../../data/restrictions';
 import { goNext } from '../../lib/flow';
 import { colors } from '../../theme';
 
@@ -20,7 +22,7 @@ export default function Covers() {
       <OnboardingHeader />
       <View style={styles.content}>
         <Animated.Text entering={FadeInDown.duration(500)} style={styles.title}>
-          Tappy covers over 2,900 dietary needs
+          Tappy covers {RESTRICTIONS.length} diets, allergies and conditions, plus {INGREDIENT_COUNT_LABEL} ingredients
         </Animated.Text>
         <Animated.Text entering={FadeInDown.delay(350).duration(500)} style={styles.lead}>
           Next, select your diets, allergies, and avoidances.

@@ -92,6 +92,16 @@ function deviceId(): string {
   return id;
 }
 
+/**
+ * Sent with every scan so the server can check the subscription with RevenueCat and lift the daily
+ * limits: the session token when signed in, else the RevenueCat anonymous id. Set by auth.ts and
+ * subscription.ts (which import this module, so this module can't import them).
+ */
+const identity: { token: string | null; purchaser: string | null } = { token: null, purchaser: null };
+export function setRequestIdentity(patch: Partial<typeof identity>) {
+  Object.assign(identity, patch);
+}
+
 type PostOptions = { timeoutMs?: number; retries?: number; validate: (json: unknown) => boolean };
 
 const RETRYABLE_STATUS = new Set([502, 503, 504]);
@@ -104,7 +114,13 @@ async function postOnce<T>(path: string, body: string, opts: PostOptions): Promi
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Tappy-User': deviceId() },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Tappy-User': deviceId(),
+        ...(identity.token ? { Authorization: `Bearer ${identity.token}` } : {}),
+        ...(identity.purchaser ? { 'X-Tappy-Purchaser': identity.purchaser } : {}),
+      },
       body,
       signal: controller.signal,
     });
@@ -257,4 +273,7 @@ export const api = {
     if (!Number.isSafeInteger(productId) || productId <= 0) return Promise.reject(new ApiError(0, 'invalid', 'Can’t report this product.'));
     return post<{ ok: true }>(`/api/products/${productId}/report`, { reason: reason.slice(0, 1000) }, { validate: isObj });
   },
+  /** In-app feedback forms. Stored on the server and forwarded to the support email. */
+  feedback: (topic: string, message: string) =>
+    post<{ ok: true }>('/api/feedback', { topic: topic.slice(0, 80), message: message.slice(0, 2000) }, { validate: isObj, retries: 1 }),
 };

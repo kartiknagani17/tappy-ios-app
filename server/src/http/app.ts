@@ -4,6 +4,8 @@ import { photoScanningEnabled, type Config } from '../config.ts';
 import type { DB } from '../db/index.ts';
 import { ImageError, probeImage } from '../lib/image.ts';
 import { logError } from '../lib/log.ts';
+import { accountPurchaserId, ANONYMOUS_PURCHASER_RE, noEntitlements, RevenueCatEntitlements, type EntitlementChecker } from '../services/entitlements.ts';
+import { FeedbackError, submitFeedback } from '../services/feedback.ts';
 import { consumeDailyQuota, ipKey, LimitError, RateLimiter, type QuotaSubject } from '../services/limits.ts';
 import { getProductById, reportProduct, sanitizeReason, toPublicProduct } from '../services/products.ts';
 import type { ScanService } from '../services/scan.ts';
@@ -59,6 +61,7 @@ const ROUTES: Route[] = [
   { name: 'health', pattern: /^\/api\/health$/, methods: ['GET', 'HEAD'] },
   { name: 'product', pattern: /^\/api\/products\/(\d{1,15})$/, methods: ['GET', 'HEAD'] },
   { name: 'report', pattern: /^\/api\/products\/(\d{1,15})\/report$/, methods: ['POST'] },
+  { name: 'feedback', pattern: /^\/api\/feedback$/, methods: ['POST'] },
   { name: 'barcode', pattern: /^\/api\/scan\/barcode$/, methods: ['POST'] },
   { name: 'front', pattern: /^\/api\/scan\/front$/, methods: ['POST'] },
   { name: 'confirm', pattern: /^\/api\/scan\/front\/confirm$/, methods: ['POST'] },
@@ -88,6 +91,8 @@ export type AppDeps = {
   /** Sends password-reset emails; null turns password reset off. */
   mailer?: Mailer | null;
   appleKeys?: AppleKeySource;
+  /** Checks the RevenueCat subscription; defaults to RevenueCat when REVENUECAT_SECRET_KEY is set. */
+  entitlements?: EntitlementChecker;
 };
 
 /** Plain node:http request handler. Routes:
@@ -96,6 +101,7 @@ export type AppDeps = {
  *  POST /api/scan/front/confirm  { vision_cache_id, product_id }
  *  POST /api/scan/label          { image_base64, gtin?, front_hash?, contribute? }
  *  POST /api/products/:id/report { reason? }
+ *  POST /api/feedback             { topic?, message }
  *  GET  /api/products/:id
  *  GET  /api/health
  * Every POST needs an X-Tappy-User header (anonymous device id) and Content-Type: application/json.
@@ -109,6 +115,9 @@ export function createApp({
   authLimiter = new RateLimiter(config.authRateLimitPerMinute),
   mailer = null,
   appleKeys = fetchAppleKeys,
+  entitlements = config.revenueCatSecretKey
+    ? new RevenueCatEntitlements({ secretKey: config.revenueCatSecretKey, entitlementId: config.revenueCatEntitlementId })
+    : noEntitlements,
 }: AppDeps) {
   const maxImageBody = Math.ceil(config.visionMaxImageBytes * 1.4) + 4096; // base64 overhead
   const photosEnabled = photoScanningEnabled(config);
@@ -120,7 +129,7 @@ export function createApp({
     if (!origin || !(corsAny || corsAllowed.has(origin))) return false;
     res.setHeader('Access-Control-Allow-Origin', corsAny ? '*' : origin);
     res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Tappy-User, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Tappy-User, X-Tappy-Purchaser, Authorization');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Max-Age', '600');
     return true;
@@ -179,7 +188,32 @@ export function createApp({
     }
     const body = await readJson(req, isPhoto ? maxImageBody : JSON_BODY_LIMIT);
 
-    const quota = (kind: 'barcode' | 'photo') => {
+    /** The RevenueCat id to check: the signed-in account, else the app's anonymous RevenueCat id. */
+    const purchaserId = () => {
+      const token = bearer(req);
+      const user = token ? userForToken(db, token) : null;
+      if (user) return accountPurchaserId(user.id);
+      const anon = String(req.headers['x-tappy-purchaser'] ?? '');
+      return ANONYMOUS_PURCHASER_RE.test(anon) ? anon : null;
+    };
+
+    const quota = async (kind: 'barcode' | 'photo') => {
+      const purchaser = purchaserId();
+      if (purchaser && (await entitlements.isSubscribed(purchaser))) {
+        if (kind === 'barcode') return; // unlimited
+        // Photo scans call a paid vision model: a fair-use cap per subscription (not per device or network).
+        return consumeDailyQuota(
+          db,
+          [
+            {
+              key: `sub:${purchaser}`,
+              limits: { dailyFreeScans: Number.MAX_SAFE_INTEGER, dailyFreePhotoScans: config.subscriberDailyPhotoScans },
+              message: { barcode: '', photo: 'You’ve reached today’s photo scan limit. Barcode scans are still unlimited.' },
+            },
+          ],
+          kind,
+        );
+      }
       const subjects: QuotaSubject[] = [{ key: userId, limits: config }];
       if (ipk !== 'unknown') {
         subjects.push({
@@ -197,13 +231,13 @@ export function createApp({
     switch (r.name) {
       case 'barcode': {
         const barcode = readBarcode(body.barcode);
-        quota('barcode');
+        await quota('barcode');
         return send(res, 200, await scan.resolveBarcode(barcode, userId));
       }
       case 'front': {
         const image = decodeImage(body.image_base64, config.visionMaxImageBytes);
         await probeImage(image, config.imageMaxInputPixels); // invalid uploads don't cost quota
-        quota('photo');
+        await quota('photo');
         return send(res, 200, await scan.scanFront(image, userId, { contribute: body.contribute === true }));
       }
       case 'confirm': {
@@ -230,7 +264,7 @@ export function createApp({
         const image = decodeImage(body.image_base64, config.visionMaxImageBytes);
         await probeImage(image, config.imageMaxInputPixels);
         const gtin = typeof body.gtin === 'string' || typeof body.gtin === 'number' ? String(body.gtin).slice(0, MAX_BARCODE_CHARS) : null;
-        quota('photo');
+        await quota('photo');
         return send(
           res,
           200,
@@ -245,6 +279,10 @@ export function createApp({
         const p = reportProduct(db, idParam, userId, sanitizeReason(body.reason));
         if (!p) throw new HttpError(404, 'not_found', 'Product not found');
         return send(res, 200, { ok: true, already_reported: p.duplicate, product: toPublicProduct(p) });
+      }
+      case 'feedback': {
+        const out = submitFeedback(db, userId, body, mailer ? { mailer, to: config.supportEmail } : null);
+        return send(res, 200, { ok: true, id: out.id });
       }
     }
     throw new HttpError(404, 'not_found', 'Not found');
@@ -337,7 +375,7 @@ export function createApp({
           res.setHeader('Retry-After', String(e.retryAfterSeconds));
           return send(res, 429, { error: e.code, message: e.message, retry_after_seconds: e.retryAfterSeconds });
         }
-        if (e instanceof AuthError) return send(res, e.status, { error: e.code, message: e.message });
+        if (e instanceof AuthError || e instanceof FeedbackError) return send(res, e.status, { error: e.code, message: e.message });
         if (e instanceof HttpError) {
           for (const [k, v] of Object.entries(e.headers)) res.setHeader(k, v);
           // Unread request body (e.g. 413): don't keep the connection for another request.
