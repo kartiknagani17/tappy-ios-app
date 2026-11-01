@@ -152,7 +152,7 @@ export const PRIVACY: LegalDoc = {
       heading: '5. Who we share it with',
       body: [
         'We don’t sell or rent personal information, and we don’t share it for advertising. We share information only with service providers that process it for us under contract:',
-        '• Anthropic: reads text from package and ingredient-list photos you take (photos only, not your profile or account).',
+        '• OpenAI: reads text from package and ingredient-list photos you take (photos only, not your profile or account). Photos are sent with storage turned off.',
         '• Oracle Cloud and Cloudflare: host and secure our servers and connections.',
         '• RevenueCat and Apple: manage subscriptions and purchase status.',
         '• Resend: sends password reset emails.',

@@ -5,6 +5,7 @@
 
 const SECRET_PATTERNS: RegExp[] = [
   /sk-ant-[A-Za-z0-9_-]{8,}/g, // Anthropic keys
+  /sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}/g, // OpenAI keys
   /\b(?:x-api-key|authorization)\s*[:=]\s*[^\n,}]+/gi,
   /\b(?:api[_-]?key|apikey|token|secret|password)\s*[:=]\s*["']?[^\s"',}]+/gi,
 ];

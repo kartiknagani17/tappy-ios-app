@@ -12,6 +12,7 @@ import { createHttpServer, installShutdown } from './bootstrap.ts';
 
 const config = loadConfig();
 registerSecret(config.anthropicApiKey);
+registerSecret(config.openaiApiKey);
 registerSecret(config.usdaApiKey);
 registerSecret(config.resendApiKey);
 try {

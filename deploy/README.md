@@ -56,7 +56,7 @@ sudo bash deploy/oracle/setup.sh
 
 It installs Node 22, creates a `tappy` service user, installs the server into `/opt/tappy`, keeps data in `/var/lib/tappy`, writes the config to `/etc/tappy/tappy.env`, starts the services, installs `cloudflared`, and starts the first data import in the background.
 
-Add your Anthropic API key (needed for photo scanning; barcode scanning works without it), for password-reset emails and feedback your `RESEND_API_KEY`, `EMAIL_FROM` and `SUPPORT_EMAIL` (see the main README, "Accounts"), and `REVENUECAT_SECRET_KEY` so subscribers get unlimited scans (see the main README, "Payments"):
+Add your OpenAI API key (needed for photo scanning; barcode scanning works without it) with `sudo bash deploy/oracle/set-key.sh OPENAI_API_KEY`; the same script sets `REVENUECAT_SECRET_KEY` and `RESEND_API_KEY` without showing them on screen. Also set, for password-reset emails and feedback your `RESEND_API_KEY`, `EMAIL_FROM` and `SUPPORT_EMAIL` (see the main README, "Accounts"), and `REVENUECAT_SECRET_KEY` so subscribers get unlimited scans (see the main README, "Payments"):
 
 ```bash
 sudo nano /etc/tappy/tappy.env
@@ -137,4 +137,4 @@ Notes:
 - **During the monthly refresh** the import shares the database with the API, so some scans can take up to about a second longer while it runs (it runs at low priority, early on the 1st).
 - **Extra safety:** Oracle includes free block-volume backups; you can schedule them on the boot volume in the console.
 - **Security:** only SSH is open (Oracle images allow key-based SSH only). The API listens on `127.0.0.1`, and `TRUST_PROXY=true` makes rate limiting use the real client IP that Cloudflare forwards.
-- **Cost:** the server and tunnel stay free. Anthropic API usage for photo scans is billed separately; see `stats` for spend.
+- **Cost:** the server and tunnel stay free. OpenAI API usage for photo scans is billed separately; see `stats` for spend.

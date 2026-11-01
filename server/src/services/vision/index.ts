@@ -4,6 +4,7 @@ import type { DB } from '../../db/index.ts';
 import { logError, redact } from '../../lib/log.ts';
 import { visionSpendToday } from '../limits.ts';
 import { AnthropicVisionProvider } from './anthropic.ts';
+import { OpenAIVisionProvider } from './openai.ts';
 import { estimateCostUsd, type VisionProvider, type VisionTask } from './provider.ts';
 import { FRONT_PROMPT, FrontOutput, FrontResult, LABEL_PROMPT, LabelOutput, LabelResult, RETRY_SUFFIX, SYSTEM_PROMPT } from './schemas.ts';
 
@@ -11,6 +12,8 @@ export type { VisionProvider } from './provider.ts';
 
 export function createVisionProvider(config: Config): VisionProvider {
   switch (config.visionProvider) {
+    case 'openai':
+      return new OpenAIVisionProvider({ apiKey: config.openaiApiKey, timeoutMs: config.visionTimeoutMs });
     case 'anthropic':
       return new AnthropicVisionProvider({ apiKey: config.anthropicApiKey || undefined, timeoutMs: config.visionTimeoutMs });
     default:

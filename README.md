@@ -110,7 +110,7 @@ Barcode lookup, front-of-package photo identification and ingredient-panel readi
 cp .env.example .env
 ```
 
-Fill in `ANTHROPIC_API_KEY` for photo scanning. The USDA key is optional: the bulk CSV import doesn't use it. Set `EXPO_PUBLIC_API_URL` to where the app can reach the server (on a physical iPhone, your computer's LAN IP, e.g. `http://192.168.1.20:8787`). Never commit `.env`.
+Fill in `OPENAI_API_KEY` for photo scanning (`VISION_PROVIDER=openai`, the default; `anthropic` with `ANTHROPIC_API_KEY` also works). The USDA key is optional: the bulk CSV import doesn't use it. Set `EXPO_PUBLIC_API_URL` to where the app can reach the server (on a physical iPhone, your computer's LAN IP, e.g. `http://192.168.1.20:8787`). Never commit `.env`.
 
 ### 2. Download the data
 

@@ -39,6 +39,12 @@ const proxyHops = (name: string) => {
   return n;
 };
 
+const visionProvider = () => str('VISION_PROVIDER', 'openai').toLowerCase();
+
+/** API key for the configured vision provider ('' when unset). */
+export const visionApiKey = (c: Config) =>
+  c.visionProvider === 'openai' ? c.openaiApiKey : c.visionProvider === 'anthropic' ? c.anthropicApiKey : '';
+
 export type Config = ReturnType<typeof loadConfig>;
 
 export function loadConfig() {
@@ -72,11 +78,13 @@ export function loadConfig() {
 
     // Vision
     anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+    openaiApiKey: process.env.OPENAI_API_KEY || '',
     /** PHOTO_SCANNING: auto (on iff a provider key is set), on (fail at startup without a key), off. */
     photoScanningMode: str('PHOTO_SCANNING', 'auto').toLowerCase(),
-    visionProvider: str('VISION_PROVIDER', 'anthropic'),
-    visionModel: str('VISION_MODEL', 'claude-haiku-5-5'),
-    visionEscalationModel: str('VISION_ESCALATION_MODEL', 'claude-sonnet-5-5'),
+    /** openai | anthropic. Model defaults follow the provider. */
+    visionProvider: visionProvider(),
+    visionModel: str('VISION_MODEL', visionProvider() === 'openai' ? 'gpt-6-luna' : 'claude-haiku-5-5'),
+    visionEscalationModel: str('VISION_ESCALATION_MODEL', visionProvider() === 'openai' ? 'gpt-6.1-sol' : 'claude-sonnet-5-5'),
     visionEscalateBelow: num('VISION_ESCALATE_BELOW_CONFIDENCE', 0.6),
     visionMaxImageBytes: num('VISION_MAX_IMAGE_BYTES', 4_000_000),
     /** Decoded-pixel ceiling for uploads (decompression-bomb guard). */
@@ -130,7 +138,7 @@ export function loadConfig() {
 export function photoScanningEnabled(c: Config): boolean {
   if (c.photoScanningMode === 'off') return false;
   if (c.photoScanningMode === 'on') return true;
-  return c.visionProvider !== 'anthropic' || !!c.anthropicApiKey;
+  return !!visionApiKey(c);
 }
 
 /** Fail fast on invalid settings; returns warnings worth logging at startup. Never includes secret values. */
@@ -158,8 +166,10 @@ export function validateConfig(c: Config): string[] {
   if (!(c.visionDailyBudgetUsd >= 0)) errors.push('visionDailyBudgetUsd must be >= 0');
   if (!['auto', 'on', 'off'].includes(c.photoScanningMode))
     errors.push(`PHOTO_SCANNING must be auto, on or off (got "${c.photoScanningMode}")`);
-  if (c.photoScanningMode === 'on' && c.visionProvider === 'anthropic' && !c.anthropicApiKey) {
-    errors.push('PHOTO_SCANNING=on but ANTHROPIC_API_KEY is not set');
+  if (!['openai', 'anthropic'].includes(c.visionProvider))
+    errors.push(`VISION_PROVIDER must be openai or anthropic (got "${c.visionProvider}")`);
+  else if (c.photoScanningMode === 'on' && !visionApiKey(c)) {
+    errors.push(`PHOTO_SCANNING=on but ${c.visionProvider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'} is not set`);
   }
   if (errors.length) throw new Error(`Invalid configuration:\n  - ${errors.join('\n  - ')}`);
 
@@ -167,7 +177,7 @@ export function validateConfig(c: Config): string[] {
     warnings.push(
       c.photoScanningMode === 'off'
         ? 'Photo scanning is disabled (PHOTO_SCANNING=off); photo endpoints return 503.'
-        : 'ANTHROPIC_API_KEY is not set: photo scanning is disabled (photo endpoints return 503). Barcode scans still work.',
+        : `${c.visionProvider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'} is not set: photo scanning is disabled (photo endpoints return 503). Barcode scans still work.`,
     );
   }
   if (c.visionDailyBudgetUsd === 0 && photoScanningEnabled(c))

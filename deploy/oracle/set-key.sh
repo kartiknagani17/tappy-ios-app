@@ -8,9 +8,9 @@ set -euo pipefail
 ENV_FILE=/etc/tappy/tappy.env
 NAME="${1:-}"
 case "$NAME" in
-  REVENUECAT_SECRET_KEY | ANTHROPIC_API_KEY | RESEND_API_KEY) ;;
+  REVENUECAT_SECRET_KEY | OPENAI_API_KEY | ANTHROPIC_API_KEY | RESEND_API_KEY) ;;
   *)
-    echo "Usage: sudo bash $0 REVENUECAT_SECRET_KEY|ANTHROPIC_API_KEY|RESEND_API_KEY" >&2
+    echo "Usage: sudo bash $0 REVENUECAT_SECRET_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|RESEND_API_KEY" >&2
     exit 1
     ;;
 esac
@@ -25,6 +25,7 @@ VALUE="$(printf '%s' "$VALUE" | sed -e 's/\x1b\[20[01]~//g' | tr -d '[:space:][:
 # Some terminals drop the first pasted character; catch it here instead of saving a broken key.
 case "$NAME" in
   REVENUECAT_SECRET_KEY) PREFIX=sk_ ;;
+  OPENAI_API_KEY) PREFIX=sk- ;;
   ANTHROPIC_API_KEY) PREFIX=sk-ant- ;;
   RESEND_API_KEY) PREFIX=re_ ;;
 esac

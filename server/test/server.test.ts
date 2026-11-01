@@ -20,6 +20,7 @@ describe('server process', () => {
       DATABASE_PATH: path.join(dir, 't.db'),
       UPLOADS_DIR: path.join(dir, 'u'),
       ANTHROPIC_API_KEY: '',
+      OPENAI_API_KEY: '',
       PHOTO_SCANNING: 'auto',
     };
     const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'src/http/server.ts'], { cwd: SERVER_ROOT, env });
@@ -55,14 +56,14 @@ describe('server process', () => {
 
   it('fails fast when PHOTO_SCANNING=on and no API key is configured', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'tappy-srv-'));
-    const env: NodeJS.ProcessEnv = { ...process.env, PORT: '0', DATABASE_PATH: path.join(dir, 't.db'), PHOTO_SCANNING: 'on', ANTHROPIC_API_KEY: '' };
+    const env: NodeJS.ProcessEnv = { ...process.env, PORT: '0', DATABASE_PATH: path.join(dir, 't.db'), PHOTO_SCANNING: 'on', OPENAI_API_KEY: '' };
     const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'src/http/server.ts'], { cwd: SERVER_ROOT, env });
     let err = '';
     child.stderr.on('data', (d) => (err += d));
     const code = await new Promise<number | null>((resolve) => child.on('exit', (c) => resolve(c)));
     rmSync(dir, { recursive: true, force: true });
     assert.equal(code, 1);
-    assert.match(err, /ANTHROPIC_API_KEY/);
+    assert.match(err, /OPENAI_API_KEY/);
   });
 });
 

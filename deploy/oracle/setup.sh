@@ -102,9 +102,11 @@ RAW_DATA_DIR=$DATA_DIR/data/raw
 UPLOADS_DIR=$DATA_DIR/uploads
 
 # Required for front-of-package and ingredient-panel photos
-ANTHROPIC_API_KEY=
-VISION_MODEL=claude-haiku-5-5
-VISION_ESCALATION_MODEL=claude-sonnet-5-5
+# Photo scanning. Set the key with: sudo bash deploy/oracle/set-key.sh OPENAI_API_KEY
+VISION_PROVIDER=openai
+OPENAI_API_KEY=
+VISION_MODEL=gpt-6-luna
+VISION_ESCALATION_MODEL=gpt-6.1-sol
 
 # Live Open Food Facts fallback for barcodes missing locally
 OFF_LIVE_LOOKUP=false
@@ -197,7 +199,7 @@ Done.
   Import:       sudo systemctl start tappy-import          logs: journalctl -fu tappy-import
 EOF
 if ((NEW_ENV)); then
-  warn "Add your ANTHROPIC_API_KEY to $ENV_FILE (photo scanning), then: sudo systemctl restart tappy-api"
+  warn "Set your OpenAI key for photo scanning: sudo bash deploy/oracle/set-key.sh OPENAI_API_KEY"
 fi
 if [[ -z "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]] && ! systemctl is-active --quiet cloudflared 2>/dev/null; then
   cat <<'EOF'
