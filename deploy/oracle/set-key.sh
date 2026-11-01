@@ -22,6 +22,13 @@ echo
 VALUE="$(printf '%s' "$VALUE" | sed -e 's/\x1b\[20[01]~//g' | tr -d '[:space:][:cntrl:]')"
 [[ -n "$VALUE" ]] || { echo "Nothing entered; no change." >&2; exit 1; }
 [[ "$VALUE" =~ ^[A-Za-z0-9_.:-]+$ ]] || { echo "That doesn't look like a key; no change." >&2; exit 1; }
+# Some terminals drop the first pasted character; catch it here instead of saving a broken key.
+case "$NAME" in
+  REVENUECAT_SECRET_KEY) PREFIX=sk_ ;;
+  ANTHROPIC_API_KEY) PREFIX=sk-ant- ;;
+  RESEND_API_KEY) PREFIX=re_ ;;
+esac
+[[ "$VALUE" == "$PREFIX"* ]] || { echo "$NAME should start with $PREFIX; no change. Try pasting again." >&2; exit 1; }
 
 if grep -q "^$NAME=" "$ENV_FILE"; then
   sed -i "s|^$NAME=.*|$NAME=$VALUE|" "$ENV_FILE"
