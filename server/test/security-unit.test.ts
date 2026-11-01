@@ -14,7 +14,7 @@ import { describeError, redact, registerSecret } from '../src/lib/log.ts';
 import { confirmVisionChoice, recordVisionOffer } from '../src/services/cache.ts';
 import { consumeDailyQuota, ipKey, LimitError, RateLimiter, visionSpendToday } from '../src/services/limits.ts';
 import { OffLiveClient, safeOffImageUrl } from '../src/services/off-live.ts';
-import { buildFtsQuery, getProductByGtin, sanitizeReason, searchProducts } from '../src/services/products.ts';
+import { buildFtsQuery, getProductByGtin, sanitizeReason, searchProducts, searchTiers } from '../src/services/products.ts';
 import { VisionService } from '../src/services/vision/index.ts';
 import { FrontResult, LabelResult } from '../src/services/vision/schemas.ts';
 import { FIXTURES, frontJson, labelJson, makeScan, MockVisionProvider, packagePhoto, testConfig, testDb } from './helpers.ts';
@@ -433,5 +433,17 @@ describe('secrets + config', () => {
     for (const w of validateConfig({ ...base, anthropicApiKey: 'sk-ant-secret-zzz', photoScanningMode: 'on' })) {
       assert.doesNotMatch(w, /sk-ant-secret-zzz/);
     }
+  });
+});
+
+describe('front-of-package search tiers', () => {
+  it('requires every term, most specific first, and never builds a bare OR over everything', () => {
+    const tiers = searchTiers({ brand: 'Cheerios', name: 'Toasted Whole Grain Oat Cereal', variant: 'Honey Nut' });
+    assert.equal(tiers[0], '"cheerios" AND "toasted" AND "whole" AND "grain" AND "oat" AND "cereal" AND "honey" AND "nut"');
+    assert.equal(tiers[1], '"cheerios" AND ("toasted" OR "whole" OR "grain" OR "oat" OR "cereal" OR "honey" OR "nut")');
+    assert.equal(tiers[2], '"toasted" AND "whole" AND "grain" AND "oat" AND "cereal"');
+    assert.equal(tiers.at(-1), '"cheerios"');
+    assert.deepEqual(searchTiers({ brand: null, name: 'ab', variant: null }), []);
+    assert.deepEqual(searchTiers({ name: 'Oreo' }), ['"oreo"']);
   });
 });

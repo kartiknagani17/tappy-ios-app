@@ -119,8 +119,8 @@ export function getProductById(db: DB, id: number): Product | null {
 
 const MAX_FTS_TOKENS = 24;
 
-/** Turn free text into an FTS5 trigram OR-query (tokens shorter than 3 chars can't use trigrams). */
-export function buildFtsQuery(...parts: (string | null | undefined)[]): string | null {
+/** Lowercased letter/digit tokens of 3+ chars (trigrams need 3), deduplicated and bounded. */
+function ftsTokens(...parts: (string | null | undefined)[]): string[] {
   const tokens = new Set<string>();
   for (const p of parts) {
     for (const t of (p ?? '')
@@ -128,25 +128,53 @@ export function buildFtsQuery(...parts: (string | null | undefined)[]): string |
       .normalize('NFKD')
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .split(/\s+/)) {
-      if (t.length >= 3) tokens.add(t);
+      if (t.length >= 3) tokens.add(t.slice(0, 64));
     }
   }
-  if (!tokens.size) return null;
-  // Every token is reduced to letters/digits and double-quoted, so FTS5 operators (OR, NEAR, *, ^,
-  // column filters) in extracted text are matched literally. Bounded so a long string can't build a huge query.
-  return [...tokens].slice(0, MAX_FTS_TOKENS).map((t) => t.slice(0, 64)).map((t) => `"${t.replace(/"/g, '""')}"`).join(' OR ');
+  return [...tokens].slice(0, MAX_FTS_TOKENS);
 }
 
-/** Candidate products for a front-of-package query, best FTS rank first. */
+// Every token is reduced to letters/digits and double-quoted, so FTS5 operators (OR, NEAR, *, ^,
+// column filters) in extracted text are matched literally.
+const quote = (t: string) => `"${t.replace(/"/g, '""')}"`;
+const all = (ts: string[]) => ts.map(quote).join(' AND ');
+const any = (ts: string[]) => ts.map(quote).join(' OR ');
+
+/** Turn free text into an FTS5 trigram OR-query. Bounded so a long string can't build a huge query. */
+export function buildFtsQuery(...parts: (string | null | undefined)[]): string | null {
+  const tokens = ftsTokens(...parts);
+  return tokens.length ? any(tokens) : null;
+}
+
+/**
+ * FTS queries for a front-of-package search, most specific first. A single OR over every token
+ * ranks every product sharing a common word ("whole", "grain") and takes seconds on the full
+ * database, so each tier requires all of its terms (tens to hundreds of ms each).
+ */
+export function searchTiers(q: { brand?: string | null; name?: string | null; variant?: string | null }): string[] {
+  const brand = ftsTokens(q.brand);
+  const rest = ftsTokens(q.name, q.variant).filter((t) => !brand.includes(t));
+  const name = ftsTokens(q.name).filter((t) => !brand.includes(t));
+  const tiers: string[] = [];
+  if (brand.length + rest.length) tiers.push(all([...brand, ...rest]));
+  if (brand.length && rest.length) tiers.push(`${all(brand)} AND (${any(rest)})`);
+  if (name.length > 1) tiers.push(all(name));
+  if (brand.length) tiers.push(all(brand));
+  return [...new Set(tiers)];
+}
+
+/** Candidate products for a front-of-package query: tiered FTS (see searchTiers), best rank first within each tier. */
 export function searchProducts(db: DB, q: { brand?: string | null; name?: string | null; variant?: string | null }, limit = 25): Product[] {
-  const fts = buildFtsQuery(q.brand, q.name, q.variant);
-  if (!fts) return [];
-  return db
-    .prepare(
-      `SELECT p.* FROM product_search s JOIN products p ON p.id = s.rowid
-       WHERE product_search MATCH ? ORDER BY bm25(product_search, 3.0, 4.0, 1.5, 0.5) LIMIT ?`,
-    )
-    .all(fts, limit) as unknown as Product[];
+  const stmt = db.prepare(
+    `SELECT p.* FROM product_search s JOIN products p ON p.id = s.rowid
+     WHERE product_search MATCH ? ORDER BY bm25(product_search, 3.0, 4.0, 1.5, 0.5) LIMIT ?`,
+  );
+  const out = new Map<number, Product>();
+  for (const fts of searchTiers(q)) {
+    for (const p of stmt.all(fts, limit) as unknown as Product[]) if (!out.has(p.id)) out.set(p.id, p);
+    if (out.size >= limit) break;
+  }
+  return [...out.values()].slice(0, limit);
 }
 
 /** Strip control/bidi characters, collapse whitespace, cap length. Empty -> null. */
