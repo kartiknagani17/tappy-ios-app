@@ -1,6 +1,6 @@
 # Refresh product data monthly (Open Food Facts changes daily; USDA publishes about twice a year).
 [Unit]
-Description=Monthly Tapi product data refresh
+Description=Monthly Tappy product data refresh
 
 [Timer]
 OnCalendar=*-*-01 04:30:00

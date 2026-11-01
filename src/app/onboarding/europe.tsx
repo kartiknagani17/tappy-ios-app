@@ -32,7 +32,7 @@ export default function Europe() {
     <QuestionLayout
       step="europe"
       title="If it's banned in Europe, why is it in your pantry?"
-      subtitle="Dozens of additives allowed in the U.S. are restricted overseas due to health concerns. Tapi helps you spot them instantly."
+      subtitle="Dozens of additives allowed in the U.S. are restricted overseas due to health concerns. Tappy helps you spot them instantly."
       footer={<Button testID="continue" title="Continue" onPress={() => goNext('europe')} />}
     >
       <View style={styles.panel}>

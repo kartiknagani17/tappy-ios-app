@@ -104,15 +104,15 @@ async function postOnce<T>(path: string, body: string, opts: PostOptions): Promi
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Tapi-User': deviceId() },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Tappy-User': deviceId() },
       body,
       signal: controller.signal,
     });
   } catch (e) {
     clearTimeout(timer);
-    if (controller.signal.aborted) throw new ApiError(0, 'timeout', 'Tapi is taking too long to respond. Please try again.');
+    if (controller.signal.aborted) throw new ApiError(0, 'timeout', 'Tappy is taking too long to respond. Please try again.');
     if (__DEV__) console.warn(`[api] ${path} network error`, e);
-    throw new ApiError(0, 'network', 'Can’t reach Tapi right now. Check your connection and try again.');
+    throw new ApiError(0, 'network', 'Can’t reach Tappy right now. Check your connection and try again.');
   }
   let json: unknown = null;
   try {
@@ -132,19 +132,19 @@ async function postOnce<T>(path: string, body: string, opts: PostOptions): Promi
         : res.status === 429
           ? 'You’ve hit the scan limit for now. Please try again later.'
           : res.status >= 500
-            ? 'Tapi is having trouble right now. Please try again in a moment.'
+            ? 'Tappy is having trouble right now. Please try again in a moment.'
             : 'Something went wrong.';
     throw new ApiError(res.status, code, message);
   }
   if (!opts.validate(json)) {
     if (__DEV__) console.warn(`[api] ${path} unexpected response`, json);
-    throw new ApiError(res.status, 'bad_response', 'We got an unexpected answer from Tapi. Please try again.');
+    throw new ApiError(res.status, 'bad_response', 'We got an unexpected answer from Tappy. Please try again.');
   }
   return json as T;
 }
 
 async function post<T>(path: string, payload: unknown, opts: PostOptions): Promise<T> {
-  if (API_CONFIG_ERROR) throw new ApiError(0, 'config', 'Tapi isn’t configured correctly. Please update the app.');
+  if (API_CONFIG_ERROR) throw new ApiError(0, 'config', 'Tappy isn’t configured correctly. Please update the app.');
   const body = JSON.stringify(payload);
   const retries = opts.retries ?? 0;
   for (let attempt = 0; ; attempt++) {

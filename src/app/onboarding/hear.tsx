@@ -12,7 +12,7 @@ export default function Hear() {
   return (
     <QuestionLayout
       step="hear"
-      title="How did you hear about Tapi?"
+      title="How did you hear about Tappy?"
       footer={<Button testID="continue" title="Continue" disabled={!heardFrom} onPress={() => goNext('hear')} />}
     >
       <View style={qStyles.stack}>

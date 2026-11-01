@@ -18,7 +18,7 @@ export default function Credits() {
       </View>
       <ScrollView contentContainerStyle={styles.body}>
         <Text style={styles.lead}>
-          Tapi’s product database is built from open data. Every product shows which source it came from and when it was last updated.
+          Tappy’s product database is built from open data. Every product shows which source it came from and when it was last updated.
         </Text>
 
         <View style={styles.card}>
@@ -30,8 +30,8 @@ export default function Credits() {
             product images under {link('https://creativecommons.org/licenses/by-sa/3.0/deed.en', 'CC BY-SA 3.0')}.
           </Text>
           <Text style={styles.text}>
-            Tapi’s product database includes data derived from Open Food Facts; that derived database is also available under the ODbL.
-            Open Food Facts does not endorse Tapi.
+            Tappy’s product database includes data derived from Open Food Facts; that derived database is also available under the ODbL.
+            Open Food Facts does not endorse Tappy.
           </Text>
           <Text style={styles.text}>{link('https://world.openfoodfacts.org', 'openfoodfacts.org')}</Text>
         </View>
@@ -40,7 +40,7 @@ export default function Credits() {
           <Text style={styles.title}>USDA FoodData Central</Text>
           <Text style={styles.text}>
             Branded Foods data from U.S. Department of Agriculture, Agricultural Research Service. FoodData Central. FoodData Central is in
-            the public domain ({link('https://creativecommons.org/publicdomain/zero/1.0/', 'CC0 1.0')}). The USDA does not endorse Tapi.
+            the public domain ({link('https://creativecommons.org/publicdomain/zero/1.0/', 'CC0 1.0')}). The USDA does not endorse Tappy.
           </Text>
           <Text style={styles.text}>{link('https://fdc.nal.usda.gov', 'fdc.nal.usda.gov')}</Text>
         </View>
@@ -55,7 +55,7 @@ export default function Credits() {
 
         <Text style={styles.disclaimer}>
           Data can be incomplete or out of date, and manufacturers change recipes. Always read the package yourself, especially if you have
-          a serious allergy. Tapi does not provide medical advice.
+          a serious allergy. Tappy does not provide medical advice.
         </Text>
       </ScrollView>
     </Screen>

@@ -1,9 +1,9 @@
 {
-  "name": "tapi-server",
+  "name": "tappy-server",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Tapi product database, barcode/photo scan API, and data import CLI",
+  "description": "Tappy product database, barcode/photo scan API, and data import CLI",
   "engines": {
     "node": ">=22.18"
   },

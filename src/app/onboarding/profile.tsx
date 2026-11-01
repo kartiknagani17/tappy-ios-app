@@ -36,11 +36,11 @@ export default function Profile() {
     <Screen>
       <OnboardingHeader progress={editing ? undefined : progressFor('profile')} />
       <View style={styles.head}>
-        <Text style={styles.title}>{editing ? 'Your dietary profile' : 'Your Tapi looks great'}</Text>
+        <Text style={styles.title}>{editing ? 'Your dietary profile' : 'Your Tappy looks great'}</Text>
         <Text style={styles.subtitle}>
           {editing
-            ? 'Changes save automatically and update every rating in Tapi.'
-            : "We've personalized your Tapi based on your selections. You can adjust this anytime!"}
+            ? 'Changes save automatically and update every rating in Tappy.'
+            : "We've personalized your Tappy based on your selections. You can adjust this anytime!"}
         </Text>
       </View>
       <Tabs tab={tab} onChange={switchTab} />
@@ -63,7 +63,7 @@ export default function Profile() {
         onClose={() => setMissing(false)}
         header="Don't see an ingredient?"
         title="What are we missing?"
-        body="While we have over 2,900 options of ingredients you can restrict or limit, we don't have everything. What else would you like to see on Tapi?"
+        body="While we have over 2,900 options of ingredients you can restrict or limit, we don't have everything. What else would you like to see on Tappy?"
       />
 
       <BottomSheet
@@ -86,7 +86,7 @@ export default function Profile() {
             />
           </View>
           <Text style={styles.introBody}>
-            Tapi has automatically rated ingredients as Green, Yellow, or Red based on your selected diets. You can review or fine-tune
+            Tappy has automatically rated ingredients as Green, Yellow, or Red based on your selected diets. You can review or fine-tune
             specific ingredients as needed.
           </Text>
           <View style={styles.legend}>
@@ -184,7 +184,7 @@ function ProfileTab({ onReview, editing }: { onReview: () => void; editing: bool
         {selected.length === 0 ? (
           <View style={styles.emptyProfile}>
             <Text style={styles.emptyTitle}>No restrictions yet</Text>
-            <Text style={styles.emptyBody}>Add diets, allergies, or conditions so Tapi can rate ingredients for you.</Text>
+            <Text style={styles.emptyBody}>Add diets, allergies, or conditions so Tappy can rate ingredients for you.</Text>
           </View>
         ) : null}
 
@@ -480,7 +480,7 @@ function LookupTab() {
             </View>
             {overrides[detail.id] ? (
               <TextLink
-                title="Reset to Tapi's rating"
+                title="Reset to Tappy's rating"
                 style={{ textAlign: 'center', marginTop: 18 }}
                 onPress={() => setOverride(detail.id, null)}
               />

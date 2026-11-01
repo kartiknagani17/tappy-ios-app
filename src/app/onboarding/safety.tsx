@@ -1,15 +1,17 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LegalSheet, type LegalDocId } from '../../components/LegalSheet';
 import { Button, Checkbox, Footer, Screen } from '../../components/ui';
 import { haptic } from '../../lib/haptics';
 import { useStore } from '../../lib/store';
-import { PRIVACY_URL, TERMS_URL } from '../../lib/subscription';
 import { colors, radius } from '../../theme';
 
 export default function Safety() {
   const agreed = useStore((s) => s.agreedToTerms);
   const set = useStore((s) => s.set);
+  const [legal, setLegal] = useState<LegalDocId | null>(null);
 
   return (
     <Screen>
@@ -25,7 +27,7 @@ export default function Safety() {
         <Pressable
           testID="agree"
           accessibilityRole="checkbox"
-          accessibilityLabel="I agree to Tapi's Terms of Service and Privacy Policy, and I'll always double-check ingredient and allergen info."
+          accessibilityLabel="I agree to Tappy's Terms of Service and Privacy Policy, and I'll always double-check ingredient and allergen info."
           accessibilityState={{ checked: agreed }}
           onPress={() => {
             haptic.select();
@@ -35,12 +37,12 @@ export default function Safety() {
         >
           <Checkbox checked={agreed} size={24} />
           <Text style={styles.agreeText}>
-            I agree to Tapi's{' '}
-            <Text accessibilityRole="link" style={styles.link} onPress={() => Linking.openURL(TERMS_URL)}>
+            I agree to Tappy's{' '}
+            <Text accessibilityRole="link" style={styles.link} onPress={() => setLegal('terms')}>
               Terms of Service
             </Text>{' '}
             and{' '}
-            <Text accessibilityRole="link" style={styles.link} onPress={() => Linking.openURL(PRIVACY_URL)}>
+            <Text accessibilityRole="link" style={styles.link} onPress={() => setLegal('privacy')}>
               Privacy Policy
             </Text>
             , and I'll always double-check ingredient and allergen info.
@@ -56,6 +58,7 @@ export default function Safety() {
           }}
         />
       </Footer>
+      <LegalSheet doc={legal} onClose={() => setLegal(null)} />
     </Screen>
   );
 }

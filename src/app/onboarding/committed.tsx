@@ -12,7 +12,7 @@ export default function Committed() {
     <QuestionLayout
       step="committed"
       title="You're committed 🙌"
-      subtitle={`For the next ${duration} days, Tapi will tailor recommendations around your unique profile. Ready to eat with more confidence?`}
+      subtitle={`For the next ${duration} days, Tappy will tailor recommendations around your unique profile. Ready to eat with more confidence?`}
       footer={<Button testID="continue" title="I'm ready" onPress={() => goNext('committed')} />}
     >
       <View style={styles.panel}>

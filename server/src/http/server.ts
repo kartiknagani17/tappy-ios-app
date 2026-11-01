@@ -2,7 +2,9 @@ import type { AddressInfo } from 'node:net';
 import { loadConfig, photoScanningEnabled, validateConfig } from '../config.ts';
 import { openDb } from '../db/index.ts';
 import { logError, registerSecret } from '../lib/log.ts';
+import { resendMailer } from '../services/auth.ts';
 import { OffLiveClient } from '../services/off-live.ts';
+import { pruneOldData } from '../services/retention.ts';
 import { ScanService } from '../services/scan.ts';
 import { createVisionProvider, VisionService } from '../services/vision/index.ts';
 import { createApp } from './app.ts';
@@ -11,6 +13,7 @@ import { createHttpServer, installShutdown } from './bootstrap.ts';
 const config = loadConfig();
 registerSecret(config.anthropicApiKey);
 registerSecret(config.usdaApiKey);
+registerSecret(config.resendApiKey);
 try {
   for (const w of validateConfig(config)) console.warn(`Warning: ${w}`);
 } catch (e) {
@@ -30,14 +33,25 @@ const offLive = config.offLiveLookup
   : null;
 const scan = new ScanService({ db, config, vision, offLive });
 
-const server = createHttpServer(createApp({ db, config, scan }), config);
+const mailer = config.resendApiKey ? resendMailer(config.resendApiKey, config.emailFrom) : null;
+const server = createHttpServer(createApp({ db, config, scan, mailer }), config);
 installShutdown({ server, db, timeoutMs: config.shutdownTimeoutMs });
+
+const prune = () => {
+  try {
+    pruneOldData(db);
+  } catch (e) {
+    logError('pruning old data', e);
+  }
+};
+prune();
+setInterval(prune, 3600_000).unref();
 
 server.listen(config.port, config.host, () => {
   const count = (db.prepare('SELECT count(*) AS n FROM products').get() as { n: number }).n;
   const { port } = server.address() as AddressInfo;
   console.log(
-    `Tapi API listening on http://localhost:${port} (bound to ${config.host}; ${count.toLocaleString()} products, ` +
+    `Tappy API listening on http://localhost:${port} (bound to ${config.host}; ${count.toLocaleString()} products, ` +
       `photo scanning ${photoScanningEnabled(config) ? `on, vision model ${config.visionModel}` : 'off'})`,
   );
 });

@@ -1,18 +1,18 @@
 # Downloads the USDA + Open Food Facts bulk files and (re)imports them.
 # Idempotent: unchanged records are skipped. Runs at low priority so scans stay fast.
-#   Start by hand:   sudo systemctl start tapi-import
-#   Watch progress:  journalctl -fu tapi-import
+#   Start by hand:   sudo systemctl start tappy-import
+#   Watch progress:  journalctl -fu tappy-import
 [Unit]
-Description=Tapi product data download + import
+Description=Tappy product data download + import
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=tapi
-Group=tapi
-WorkingDirectory=/opt/tapi/server
-EnvironmentFile=/etc/tapi/tapi.env
+User=tappy
+Group=tappy
+WorkingDirectory=/opt/tappy/server
+EnvironmentFile=/etc/tappy/tappy.env
 ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts download
 ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts import-usda
 ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts import-off
@@ -24,4 +24,4 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/lib/tapi
+ReadWritePaths=/var/lib/tappy

@@ -24,7 +24,7 @@ describe('HTTP API', () => {
   after(() => server.close());
 
   const post = (p: string, body: unknown, user = 'device-test-1') =>
-    fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Tapi-User': user }, body: JSON.stringify(body) });
+    fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Tappy-User': user }, body: JSON.stringify(body) });
 
   it('POST /api/scan/barcode resolves a product', async () => {
     const res = await post('/api/scan/barcode', { barcode: '013764027503' });
@@ -49,7 +49,7 @@ describe('HTTP API', () => {
   it('rejects bad JSON and missing images', async () => {
     const bad = await fetch(base + '/api/scan/barcode', {
       method: 'POST',
-      headers: { 'X-Tapi-User': 'device-test-2', 'Content-Type': 'application/json' },
+      headers: { 'X-Tappy-User': 'device-test-2', 'Content-Type': 'application/json' },
       body: 'nope',
     });
     assert.equal(bad.status, 400);
@@ -90,7 +90,7 @@ describe('HTTP API', () => {
     const hit = () =>
       fetch(url, {
         method: 'POST',
-        headers: { 'X-Tapi-User': 'device-burst-1', 'Content-Type': 'application/json' },
+        headers: { 'X-Tappy-User': 'device-burst-1', 'Content-Type': 'application/json' },
         body: JSON.stringify({ barcode: '013764027503' }),
       });
     assert.equal((await hit()).status, 200);

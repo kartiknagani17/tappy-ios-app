@@ -22,10 +22,10 @@ type Match = Extract<FrontResult, { status: 'match' }>;
 type Prompt = { title: string; body: string; actions: ('barcode' | 'front' | 'label' | 'retry' | 'upgrade')[] };
 
 const TIPS = [
-  { title: 'Barcode scanner', body: 'Scan barcodes to instantly check the ingredients/allergens for your Tapi profile(s).' },
+  { title: 'Barcode scanner', body: 'Scan barcodes to instantly check the ingredients/allergens for your Tappy profile(s).' },
   { title: 'No barcode handy?', body: 'Switch to Photo and snap the front of the package. You’ll confirm the match before we check it.' },
   { title: 'Color ratings', body: 'Red means it has something you avoid, yellow means something you limit. Always check the package too.' },
-  { title: 'Missing product?', body: 'Photograph the ingredient list and Tapi will read it for you right away.' },
+  { title: 'Missing product?', body: 'Photograph the ingredient list and Tappy will read it for you right away.' },
 ];
 
 const MODE_HINT: Record<Mode, string> = {

@@ -14,7 +14,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     ...loadConfig(),
     dbPath: ':memory:',
     offLiveLookup: false,
-    uploadsDir: '/tmp/tapi-test-uploads',
+    uploadsDir: '/tmp/tappy-test-uploads',
     photoScanningMode: 'on',
     corsOrigins: [],
     trustProxyHops: 0,

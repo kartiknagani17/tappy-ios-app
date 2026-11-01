@@ -7,7 +7,8 @@
     "development": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://localhost:8787"
+        "EXPO_PUBLIC_API_URL": "http://localhost:8787",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu"
       },
       "ios": {
         "simulator": true
@@ -16,17 +17,24 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.tapi.app"
+        "EXPO_PUBLIC_API_URL": "https://api.tappy.company",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.tapi.app"
+        "EXPO_PUBLIC_API_URL": "https://api.tappy.company",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6829390383",
+        "appleTeamId": "86UA5J4B56"
+      }
+    }
   }
 }

@@ -1,4 +1,4 @@
--- Tapi product database (SQLite, FTS5 trigram search).
+-- Tappy product database (SQLite, FTS5 trigram search).
 
 -- One normalized row per product, keyed by GTIN-14. Built from source_records by the
 -- source-priority merge (see src/lib/merge.ts), or from an approved user contribution.

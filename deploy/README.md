@@ -1,12 +1,12 @@
-# Deploying the Tapi API (Oracle Cloud Always Free + Cloudflare Tunnel)
+# Deploying the Tappy API (Oracle Cloud Always Free + Cloudflare Tunnel)
 
 This puts the scan API on a free, always-on Arm server and gives it an HTTPS address the iPhone app can use. Nothing on the server is exposed except SSH: Cloudflare Tunnel makes an outbound connection and serves HTTPS for you.
 
 What you end up with:
 
-- `tapi-api` service: the API on `127.0.0.1:8787`, restarted automatically, survives reboots
-- `tapi-import` service + monthly timer: downloads and re-imports USDA + Open Food Facts data
-- `tapi-backup` timer: weekly database snapshot (keeps the newest 2)
+- `tappy-api` service: the API on `127.0.0.1:8787`, restarted automatically, survives reboots
+- `tappy-import` service + monthly timer: downloads and re-imports USDA + Open Food Facts data
+- `tappy-backup` timer: weekly database snapshot (keeps the newest 2)
 - `cloudflared` service: your HTTPS address, e.g. `https://api.yourdomain.com`
 
 Time: about 15 minutes of setup, then the data import runs on its own (about 25 minutes for USDA, longer for Open Food Facts).
@@ -45,7 +45,7 @@ ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 && cat ~/.ssh/id_ed25519.pub
 On GitHub: repo **Settings → Deploy keys → Add deploy key**, paste that key, leave "Allow write access" off. Then:
 
 ```bash
-git clone git@github.com:kartiknagani17/tapi-ios-app.git && cd tapi-ios-app
+git clone git@github.com:kartiknagani17/tappy-ios-app.git && cd tappy-ios-app
 ```
 
 ## 4. Run the setup script
@@ -54,22 +54,22 @@ git clone git@github.com:kartiknagani17/tapi-ios-app.git && cd tapi-ios-app
 sudo bash deploy/oracle/setup.sh
 ```
 
-It installs Node 22, creates a `tapi` service user, installs the server into `/opt/tapi`, keeps data in `/var/lib/tapi`, writes the config to `/etc/tapi/tapi.env`, starts the services, installs `cloudflared`, and starts the first data import in the background.
+It installs Node 22, creates a `tappy` service user, installs the server into `/opt/tappy`, keeps data in `/var/lib/tappy`, writes the config to `/etc/tappy/tappy.env`, starts the services, installs `cloudflared`, and starts the first data import in the background.
 
-Add your Anthropic API key (needed for photo scanning; barcode scanning works without it):
+Add your Anthropic API key (needed for photo scanning; barcode scanning works without it), and for password-reset emails your `RESEND_API_KEY`, `EMAIL_FROM` and `SUPPORT_EMAIL` (see the main README, "Accounts"):
 
 ```bash
-sudo nano /etc/tapi/tapi.env
+sudo nano /etc/tappy/tappy.env
 ```
 
 ```bash
-sudo systemctl restart tapi-api
+sudo systemctl restart tappy-api
 ```
 
 Watch the import (the API already answers while it runs):
 
 ```bash
-journalctl -fu tapi-import
+journalctl -fu tappy-import
 ```
 
 ## 5. Give it an HTTPS address
@@ -101,7 +101,7 @@ curl https://api.yourdomain.com/api/health
 
 ## 6. Point the app at it
 
-In `eas.json`, set `EXPO_PUBLIC_API_URL` in the `preview` and `production` profiles to your address (it's currently the placeholder `https://api.tapi.app`):
+In `eas.json`, set `EXPO_PUBLIC_API_URL` in the `preview` and `production` profiles to your address (it's currently the placeholder `https://api.tappy.company`):
 
 ```json
 "env": { "EXPO_PUBLIC_API_URL": "https://api.yourdomain.com" }
@@ -109,24 +109,26 @@ In `eas.json`, set `EXPO_PUBLIC_API_URL` in the `preview` and `production` profi
 
 For local development with Expo Go, put the same line in the repo-root `.env` instead.
 
+The same address also serves the legal pages: `https://api.yourdomain.com/privacy` goes in App Store Connect's **Privacy Policy URL** field, and `/terms` can be used as the EULA / Terms of Use link.
+
 ## Updating the server
 
 ```bash
-cd ~/tapi-ios-app && git pull && sudo bash deploy/oracle/setup.sh
+cd ~/tappy-ios-app && git pull && sudo bash deploy/oracle/setup.sh
 ```
 
-Re-running is safe: it updates code, dependencies and services, and never overwrites `/etc/tapi/tapi.env` or the database.
+Re-running is safe: it updates code, dependencies and services, and never overwrites `/etc/tappy/tappy.env` or the database.
 
 ## Day-to-day
 
 | Task | Command |
 |---|---|
-| API logs | `journalctl -u tapi-api -f` |
-| Restart after config change | `sudo systemctl restart tapi-api` |
-| Re-import data now | `sudo systemctl start tapi-import` |
-| Product counts, contributions, vision spend | `cd /opt/tapi/server && sudo -u tapi env TAPI_ENV_FILE=/etc/tapi/tapi.env node --disable-warning=ExperimentalWarning src/cli.ts stats` |
-| Backup now | `sudo systemctl start tapi-backup` (files in `/var/lib/tapi/backups`) |
-| Timers | `systemctl list-timers 'tapi-*'` |
+| API logs | `journalctl -u tappy-api -f` |
+| Restart after config change | `sudo systemctl restart tappy-api` |
+| Re-import data now | `sudo systemctl start tappy-import` |
+| Product counts, contributions, vision spend | `cd /opt/tappy/server && sudo -u tappy env TAPPY_ENV_FILE=/etc/tappy/tappy.env node --disable-warning=ExperimentalWarning src/cli.ts stats` |
+| Backup now | `sudo systemctl start tappy-backup` (files in `/var/lib/tappy/backups`) |
+| Timers | `systemctl list-timers 'tappy-*'` |
 
 Notes:
 

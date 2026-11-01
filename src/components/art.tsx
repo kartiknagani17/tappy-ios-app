@@ -191,7 +191,7 @@ export function PhoneMockup({ style }: { style?: ViewStyle }) {
             <Text style={pk.phoneFilterText}>Likely Works</Text>
           </View>
           <View style={pk.phoneFilter}>
-            <Text style={pk.phoneFilterText}>All Tapis</Text>
+            <Text style={pk.phoneFilterText}>All Tappys</Text>
           </View>
           <View style={pk.phoneFilter}>
             <Text style={pk.phoneFilterText}>Store</Text>

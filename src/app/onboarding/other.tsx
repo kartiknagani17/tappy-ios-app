@@ -11,7 +11,7 @@ export default function Other() {
     <QuestionLayout
       step="other"
       title="Do you have other dietary restrictions?"
-      subtitle="Tell us about any other dietary needs so Tapi can personalize your recommendations."
+      subtitle="Tell us about any other dietary needs so Tappy can personalize your recommendations."
       footer={<Button testID="continue" title="Continue" disabled={wanted === undefined} onPress={() => goNext('other')} />}
     >
       <View style={qStyles.stack}>

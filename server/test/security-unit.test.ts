@@ -342,7 +342,7 @@ describe('migration 002 on an existing database', () => {
         VALUES ('front', '0123456789abcdef', '0123', '4567', '89ab', 'cdef', 'm', '{}', 1, 0),
                ('label', '0123456789abcdef', '0123', '4567', '89ab', 'cdef', 'm', '{}', NULL, 0);
     `);
-    assert.deepEqual(migrate(db), ['002_hardening.sql']);
+    assert.deepEqual(migrate(db), ['002_hardening.sql', '003_accounts.sql']);
     assert.equal((db.prepare('SELECT report_count n FROM products WHERE id = 1').get() as { n: number }).n, 2);
     assert.equal((db.prepare(`SELECT count(*) n FROM vision_cache WHERE kind = 'label'`).get() as { n: number }).n, 0);
     assert.equal((db.prepare(`SELECT chosen_product_id c FROM vision_cache`).get() as { c: number | null }).c, null);
@@ -364,7 +364,7 @@ describe('Open Food Facts live client', () => {
     // Route the fixed OFF URL to the local server, keeping fetch semantics (redirect handling, body streaming).
     const fetchImpl: typeof fetch = (input, init) =>
       fetch(String(input).replace('https://world.openfoodfacts.org', `http://127.0.0.1:${port}`), init);
-    return { server, client: new OffLiveClient({ userAgent: 'Tapi-test/1.0 (t@t.t)', maxPerMinute: 100, fetchImpl }) };
+    return { server, client: new OffLiveClient({ userAgent: 'Tappy-test/1.0 (t@t.t)', maxPerMinute: 100, fetchImpl }) };
   }
 
   it('only requests validated GTINs and pins the record to the requested code', async () => {

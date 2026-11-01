@@ -74,7 +74,7 @@ function SheetBody({ r, current, onClose, onSave }: { r: Restriction } & Omit<Pr
               </View>
               {showSeverityHelp ? (
                 <Text style={[styles.help, { marginTop: -4, marginBottom: 12 }]}>
-                  Tapi uses severity to rate ingredients. Severe and Intolerance mark matching ingredients as Avoid. Preference marks them
+                  Tappy uses severity to rate ingredients. Severe and Intolerance mark matching ingredients as Avoid. Preference marks them
                   as Limit this.
                 </Text>
               ) : null}

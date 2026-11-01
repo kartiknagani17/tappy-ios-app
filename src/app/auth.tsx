@@ -1,12 +1,16 @@
 import { AntDesign, Feather, FontAwesome } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Logo, Screen, TextLink, Tappable } from '../components/ui';
 import {
   AUTH_ENABLED,
+  AuthCancelledError,
   MIN_PASSWORD,
+  confirmPasswordReset,
   isValidEmail,
+  passwordResetAvailable,
   requestPasswordReset,
   signIn,
   signInWithProvider,
@@ -20,12 +24,8 @@ import { useStore } from '../lib/store';
 import { colors, noOutline, radius } from '../theme';
 
 /**
- * Account screen.
- *
- * Accounts have no backend yet (AUTH_ENABLED = false in src/lib/auth.ts). In that state this screen
- * says so plainly: the profile lives on this device, nobody is "signed in", no profile is restored
- * and no reset email is sent. Once `signIn` / `signUp` / `requestPasswordReset` are implemented and
- * AUTH_ENABLED is true, the form below talks to them; only providers that are really wired up are shown.
+ * Account screen: email + password (with an emailed reset code) and Sign in with Apple.
+ * If accounts are switched off (AUTH_ENABLED = false in src/lib/auth.ts) it says so plainly instead.
  */
 export default function Auth() {
   const params = useLocalSearchParams<{ mode?: string; prompt?: string }>();
@@ -57,7 +57,7 @@ function AccountsUnavailable({ fromPrompt }: { fromPrompt: boolean }) {
           <Logo size={40} />
           <Text style={styles.title}>Accounts are coming soon</Text>
           <Text style={[styles.sub, { textAlign: 'center' }]}>
-            Tapi doesn’t have accounts yet. Your profile, saved products and settings are stored only on this device, so there’s
+            Tappy doesn’t have accounts yet. Your profile, saved products and settings are stored only on this device, so there’s
             nothing to log in to.
           </Text>
           <Text style={[styles.sub, { textAlign: 'center', fontSize: 15 }]}>
@@ -82,6 +82,17 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState<null | 'email' | 'reset' | SocialProvider>(null);
+  // Password reset: null = not started; otherwise the user enters the emailed code and a new password.
+  const [resetFor, setResetFor] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [canReset, setCanReset] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    passwordResetAvailable().then((ok) => alive && setCanReset(ok));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Guards against double taps / Return + button firing twice before React re-renders.
@@ -102,6 +113,7 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
     try {
       await fn();
     } catch (e) {
+      if (e instanceof AuthCancelledError) return;
       haptic.warning();
       setError(e instanceof Error && e.message ? e.message : 'Something went wrong. Please try again.');
     } finally {
@@ -112,10 +124,14 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
 
   const finish = (result: AuthResult) => {
     haptic.success();
-    set({ account: { email: result.email, provider: result.provider }, accountPromptDismissed: true });
+    set({ accountPromptDismissed: true });
+    if (result.restoredProfile) {
+      // The profile saved to the account was restored onto this phone.
+      router.replace('/(tabs)/scan');
+      return;
+    }
     if (!useStore.getState().onboarded) {
-      // Signing in does not restore a dietary profile yet, so the user still sets one up.
-      // Never mark someone onboarded with an empty profile: every scan would read "No conflicts found".
+      // No saved profile: never mark someone onboarded with an empty one (every scan would read "No conflicts found").
       router.replace('/onboarding/mindset');
       return;
     }
@@ -125,9 +141,11 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
   const submit = () => {
     if (!emailOk) return setError('Enter a valid email address.');
     if (!pwOk) return setError(`Password must be at least ${MIN_PASSWORD} characters.`);
+    if (resetFor && !/^\d{6}$/.test(code)) return setError('Enter the 6-digit code from the email.');
     void run('email', async () => {
       const addr = email.trim();
-      finish(mode === 'signup' ? await signUp(addr, password) : await signIn(addr, password));
+      if (resetFor) finish(await confirmPasswordReset(addr, code, password));
+      else finish(mode === 'signup' ? await signUp(addr, password) : await signIn(addr, password));
     });
   };
 
@@ -146,8 +164,10 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
           </View>
           <View style={{ alignItems: 'center' }}>
             <Logo size={40} />
-            <Text style={styles.title}>{mode === 'signup' ? 'Create an account' : 'Welcome back'}</Text>
-            <Text style={styles.sub}>{mode === 'signup' ? "Don't lose your progress" : 'Log in to sync your Tapi'}</Text>
+            <Text style={styles.title}>{resetFor ? 'Reset your password' : mode === 'signup' ? 'Create an account' : 'Welcome back'}</Text>
+            <Text style={styles.sub}>
+              {resetFor ? 'Enter the code we emailed you' : mode === 'signup' ? "Don't lose your progress" : 'Log in to sync your Tappy'}
+            </Text>
           </View>
 
           <View style={{ gap: 16, marginTop: 28 }}>
@@ -166,10 +186,28 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
               autoComplete="email"
               textContentType="emailAddress"
               maxLength={254}
-              editable={!loading}
+              editable={!loading && !resetFor}
               style={[styles.input, noOutline]}
               returnKeyType="next"
             />
+            {resetFor ? (
+              <TextInput
+                testID="reset-code"
+                value={code}
+                onChangeText={(t) => {
+                  setCode(t.replace(/\D/g, '').slice(0, 6));
+                  setError(null);
+                }}
+                placeholder="6-digit code"
+                placeholderTextColor={colors.textSubtle}
+                keyboardType="number-pad"
+                autoComplete="one-time-code"
+                textContentType="oneTimeCode"
+                maxLength={6}
+                editable={!loading}
+                style={[styles.input, noOutline]}
+              />
+            ) : null}
             <View style={styles.inputWrap}>
               <TextInput
                 testID="password"
@@ -178,13 +216,13 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
                   setPassword(t);
                   setError(null);
                 }}
-                placeholder="Your Password"
+                placeholder={resetFor ? 'New Password' : 'Your Password'}
                 placeholderTextColor={colors.textSubtle}
                 secureTextEntry={!show}
                 autoCapitalize="none"
                 autoCorrect={false}
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+                autoComplete={mode === 'signup' || resetFor ? 'new-password' : 'current-password'}
+                textContentType={mode === 'signup' || resetFor ? 'newPassword' : 'password'}
                 maxLength={128}
                 editable={!loading}
                 style={[styles.input, { flex: 1, borderWidth: 0 }, noOutline]}
@@ -201,7 +239,7 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
                 <Feather name={show ? 'eye-off' : 'eye'} size={24} color="#555" />
               </Pressable>
             </View>
-            {mode === 'signup' && password.length > 0 && !pwOk ? <Text style={styles.hint}>Use at least {MIN_PASSWORD} characters.</Text> : null}
+            {(mode === 'signup' || resetFor) && password.length > 0 && !pwOk ? <Text style={styles.hint}>Use at least {MIN_PASSWORD} characters.</Text> : null}
             {error ? (
               <Text style={styles.error} accessibilityLiveRegion="polite">
                 {error}
@@ -210,15 +248,15 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
             {notice ? <Text style={styles.notice}>{notice}</Text> : null}
             <Button
               testID="submit"
-              title={mode === 'signup' ? 'Create account' : 'Log in'}
+              title={resetFor ? 'Set new password' : mode === 'signup' ? 'Create account' : 'Log in'}
               disabled={!canSubmit}
               loading={loading === 'email'}
               onPress={submit}
               textStyle={{ fontWeight: '500' }}
             />
-            {mode === 'login' ? (
+            {mode === 'login' && canReset ? (
               <TextLink
-                title={loading === 'reset' ? 'Sending…' : 'Forgot password?'}
+                title={loading === 'reset' ? 'Sending…' : resetFor ? 'Send a new code' : 'Forgot password?'}
                 style={{ textAlign: 'center' }}
                 onPress={() => {
                   if (!emailOk) return setError('Enter your email above first.');
@@ -226,14 +264,29 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
                     const addr = email.trim();
                     await requestPasswordReset(addr);
                     // Only reached once the backend confirms the request.
-                    setNotice(`If an account exists for ${addr}, we’ve sent a password reset link.`);
+                    setResetFor(addr);
+                    setPassword('');
+                    setCode('');
+                    setNotice(`If an account exists for ${addr}, we’ve emailed a 6-digit code. It expires in 15 minutes.`);
                   });
+                }}
+              />
+            ) : null}
+            {resetFor ? (
+              <TextLink
+                title="Back to log in"
+                muted
+                style={{ textAlign: 'center' }}
+                onPress={() => {
+                  setResetFor(null);
+                  setNotice(null);
+                  setError(null);
                 }}
               />
             ) : null}
           </View>
 
-          {providers.length ? (
+          {providers.length && !resetFor ? (
             <>
               <View style={styles.or}>
                 <View style={styles.orLine} />
@@ -241,7 +294,19 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
                 <View style={styles.orLine} />
               </View>
               <View style={{ gap: 14 }}>
-                {providers.map((p) => (
+                {providers.map((p) =>
+                  p === 'apple' && Platform.OS === 'ios' ? (
+                    // Apple's own button (Human Interface Guidelines for Sign in with Apple).
+                    <View key={p} pointerEvents={loading ? 'none' : 'auto'} style={{ opacity: loading && loading !== p ? 0.5 : 1 }}>
+                      <AppleAuthentication.AppleAuthenticationButton
+                        buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                        buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
+                        cornerRadius={radius.pill}
+                        style={{ height: 56 }}
+                        onPress={() => void run(p, async () => finish(await signInWithProvider(p)))}
+                      />
+                    </View>
+                  ) : (
                   <SocialButton
                     key={p}
                     label={`Continue with ${PROVIDER_LABEL[p]}`}
@@ -250,17 +315,19 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
                     icon={PROVIDER_ICON[p]}
                     onPress={() => void run(p, async () => finish(await signInWithProvider(p)))}
                   />
-                ))}
+                  ),
+                )}
               </View>
             </>
           ) : null}
 
           <Text style={styles.switch}>
-            {mode === 'signup' ? 'Already have an account? ' : 'New to Tapi? '}
+            {mode === 'signup' ? 'Already have an account? ' : 'New to Tappy? '}
             <TextLink
               title={mode === 'signup' ? 'Log in' : 'Create account'}
               onPress={() => {
                 setMode(mode === 'signup' ? 'login' : 'signup');
+                setResetFor(null);
                 setError(null);
                 setNotice(null);
               }}

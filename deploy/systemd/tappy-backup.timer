@@ -1,5 +1,5 @@
 [Unit]
-Description=Weekly Tapi database backup
+Description=Weekly Tappy database backup
 
 [Timer]
 OnCalendar=Sun 03:15:00

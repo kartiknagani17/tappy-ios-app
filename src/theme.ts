@@ -1,6 +1,6 @@
 import { Platform, type TextStyle } from 'react-native';
 
-// Single source of truth for Tapi's look. Change brand colors here.
+// Single source of truth for Tappy's look. Change brand colors here.
 export const colors = {
   lime: '#E3FC6D',
   limePressed: '#D4EE55',

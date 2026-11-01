@@ -60,7 +60,7 @@ function FeedbackBody({ onClose, header, title, body, placeholder = 'Let us know
         {sent ? (
           <>
             <Text style={styles.title}>Thank you! 💜</Text>
-            <Text style={styles.lead}>We read every message. Your feedback helps us make Tapi better for everyone.</Text>
+            <Text style={styles.lead}>We read every message. Your feedback helps us make Tappy better for everyone.</Text>
             <Button title="Done" onPress={onClose} style={{ marginTop: 24 }} />
           </>
         ) : (

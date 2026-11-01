@@ -3,22 +3,30 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
-  Linking,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { BottomSheet } from '../../components/BottomSheet';
+import { LegalSheet, type LegalDocId } from '../../components/LegalSheet';
 import { Button, CloseButton, Screen } from '../../components/ui';
 import { haptic } from '../../lib/haptics';
 import { useStore } from '../../lib/store';
-import { PLANS, PRIVACY_URL, TERMS_URL, TRIAL_DAYS, money, restorePurchases, startTrial } from '../../lib/subscription';
+import {
+  PLANS,
+  PurchasesUnavailableError,
+  TRIAL_DAYS,
+  loadPrices,
+  money,
+  restorePurchases,
+  startTrial,
+  type PlanPrice,
+} from '../../lib/subscription';
 import { colors } from '../../theme';
 
 const { width: W } = Dimensions.get('window');
@@ -28,7 +36,7 @@ const { width: W } = Dimensions.get('window');
 // Only add them back with real, verifiable data.)
 const SLIDES = [
   { emoji: '🔎', title: 'Unlimited scans', text: 'Scan any barcode and instantly see if it fits your diet, allergies, and avoidances.' },
-  { emoji: '📸', title: 'Photo scanning', text: 'No barcode handy? Snap the package or the ingredient list and Tapi reads it for you.' },
+  { emoji: '📸', title: 'Photo scanning', text: 'No barcode handy? Snap the package or the ingredient list and Tappy reads it for you.' },
   {
     emoji: '🥗',
     title: 'Personalized ratings',
@@ -38,7 +46,8 @@ const SLIDES = [
 ];
 
 export default function Paywall() {
-  const [trial, setTrial] = useState(true);
+  const [prices, setPrices] = useState<Record<string, PlanPrice> | null>(null);
+  const [legal, setLegal] = useState<LegalDocId | null>(null);
   const [loading, setLoading] = useState(false);
   const [offer, setOffer] = useState(false);
   const [offerLoading, setOfferLoading] = useState(false);
@@ -48,12 +57,24 @@ export default function Paywall() {
   const plan = PLANS.annual;
   const monthly = Math.floor((plan.price / 12) * 100) / 100;
   const mounted = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    loadPrices().then((p) => mounted.current && setPrices(p));
+    return () => {
       mounted.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
+
+  // Localized App Store prices once loaded; the USD fallbacks only show until then (or in dev builds without purchases).
+  const annual = prices?.[plan.id];
+  const offerPrice = prices?.[PLANS.annualOffer.id];
+  const priceText = annual?.priceString ?? money(plan.price);
+  const monthlyText = annual?.perMonthString ?? money(monthly);
+  const offerPriceText = offerPrice?.priceString ?? money(PLANS.annualOffer.price);
+  // Only promise a free trial Apple will actually give this Apple ID.
+  const trial = annual ? annual.trialEligible : true;
+  const trialDays = annual?.trialDays ?? TRIAL_DAYS;
+  const offerTrial = offerPrice ? offerPrice.trialEligible : true;
+  const offerTrialDays = offerPrice?.trialDays ?? TRIAL_DAYS;
 
   // During onboarding the paywall leads to the safety screen. When opened later
   // (e.g. "See plans" on the scanner), it returns to where the user came from.
@@ -76,8 +97,13 @@ export default function Paywall() {
         setOffer(false);
         leave();
       } else setMessage('The purchase was not completed. You have not been charged.');
-    } catch {
-      if (mounted.current) setMessage('Something went wrong with the App Store. Please try again.');
+    } catch (e) {
+      if (!mounted.current) return;
+      setMessage(
+        e instanceof PurchasesUnavailableError
+          ? 'Purchases aren’t available in this build. Install Tappy from the App Store or TestFlight.'
+          : 'Something went wrong with the App Store. Please try again.',
+      );
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -94,7 +120,7 @@ export default function Paywall() {
         haptic.success();
         set({ trialActive: true });
         leave();
-      } else setMessage('No active Tapi subscription was found for this Apple ID.');
+      } else setMessage('No active Tappy subscription was found for this Apple ID.');
     } catch {
       if (mounted.current) setMessage('Could not reach the App Store. Please try again.');
     } finally {
@@ -118,37 +144,29 @@ export default function Paywall() {
         <View style={{ flex: 1 }} />
 
         <View style={styles.bottom}>
-          <View style={styles.trialRow}>
-            <Text style={styles.trialText}>{trial ? `${TRIAL_DAYS} Day Free Trial Activated` : 'Enable free trial'}</Text>
-            <Switch
-              testID="trial-toggle"
-              accessibilityLabel="Free trial"
-              value={trial}
-              onValueChange={(v) => {
-                haptic.select();
-                setTrial(v);
-              }}
-              trackColor={{ true: colors.purpleDark, false: '#D1D1D6' }}
-              ios_backgroundColor="#D1D1D6"
-            />
-          </View>
+          {trial ? (
+            <View style={styles.trialRow}>
+              <Feather name="check-circle" size={20} color={colors.purpleDark} />
+              <Text style={styles.trialText}>{trialDays}-day free trial included</Text>
+            </View>
+          ) : null}
 
           <View
             style={styles.planCard}
             accessible
             accessibilityRole="radio"
             accessibilityState={{ selected: true }}
-            accessibilityLabel={`1 year plan, ${money(plan.price)} per year`}
+            accessibilityLabel={`1 year plan, ${priceText} per year`}
           >
             <View style={styles.planCheck}>
               <Feather name="check" size={16} color={colors.ink} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.planName}>{plan.label}</Text>
-              <Text style={styles.planSub}>{money(monthly)}/month, billed yearly</Text>
+              <Text style={styles.planSub}>{monthlyText}/month, billed yearly</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.planPrice}>{money(plan.price)}</Text>
+              <Text style={styles.planPrice}>{priceText}</Text>
               <Text style={styles.planSub}>/ year</Text>
             </View>
           </View>
@@ -169,10 +187,10 @@ export default function Paywall() {
           />
           <Text style={styles.fine}>
             {trial
-              ? `${TRIAL_DAYS} days free, then ${money(plan.price)}/year. Renews automatically unless canceled at least 24 hours before the trial ends. Cancel anytime in Settings.`
-              : `${money(plan.price)}/year. Renews automatically each year unless canceled at least 24 hours before renewal. Cancel anytime in Settings.`}
+              ? `${trialDays} days free, then ${priceText}/year. Renews automatically unless canceled at least 24 hours before the trial ends. Cancel anytime in Settings.`
+              : `${priceText}/year. Renews automatically each year unless canceled at least 24 hours before renewal. Cancel anytime in Settings.`}
           </Text>
-          <LegalRow onRestore={restore} restoring={restoring} />
+          <LegalRow onRestore={restore} restoring={restoring} onOpen={setLegal} />
         </View>
       </ScrollView>
 
@@ -192,21 +210,21 @@ export default function Paywall() {
         <Animated.View entering={FadeIn} style={styles.offer}>
           <Text style={styles.offerTitle}>Before you go...</Text>
           <Text style={styles.offerSub}>
-            {TRIAL_DAYS} days free, then only {money(PLANS.annualOffer.price)} / year
+            {offerTrial ? `${offerTrialDays} days free, then only ${offerPriceText} / year` : `Only ${offerPriceText} / year`}
           </Text>
-          <Text style={styles.offerNoPay}>No payment now · Cancel anytime</Text>
+          <Text style={styles.offerNoPay}>{offerTrial ? 'No payment now · Cancel anytime' : 'Cancel anytime'}</Text>
           <Button
             testID="offer-accept"
-            title="Start my free week"
+            title={offerTrial ? 'Start my free week' : 'Claim this offer'}
             loading={offerLoading}
-            onPress={() => purchase(PLANS.annualOffer.id, true, setOfferLoading)}
+            onPress={() => purchase(PLANS.annualOffer.id, offerTrial, setOfferLoading)}
             style={{ marginTop: 40 }}
             textStyle={{ fontWeight: '800', fontSize: 19 }}
           />
           <Text style={[styles.fine, { marginTop: 10 }]}>
-            Renews at {money(PLANS.annualOffer.price)}/year unless canceled at least 24 hours before the trial ends.
+            Renews at {offerPriceText}/year unless canceled at least 24 hours before {offerTrial ? 'the trial ends' : 'renewal'}.
           </Text>
-          <LegalRow />
+          <LegalRow onOpen={setLegal} />
           <Pressable
             testID="offer-decline"
             accessibilityRole="button"
@@ -220,11 +238,12 @@ export default function Paywall() {
           </Pressable>
         </Animated.View>
       </BottomSheet>
+      <LegalSheet doc={legal} onClose={() => setLegal(null)} />
     </Screen>
   );
 }
 
-function LegalRow({ onRestore, restoring }: { onRestore?: () => void; restoring?: boolean }) {
+function LegalRow({ onRestore, restoring, onOpen }: { onRestore?: () => void; restoring?: boolean; onOpen: (doc: LegalDocId) => void }) {
   return (
     <View style={styles.legal}>
       {onRestore ? (
@@ -235,11 +254,11 @@ function LegalRow({ onRestore, restoring }: { onRestore?: () => void; restoring?
           <Text style={styles.legalDot}>·</Text>
         </>
       ) : null}
-      <Text accessibilityRole="link" style={styles.legalLink} onPress={() => Linking.openURL(TERMS_URL)}>
+      <Text accessibilityRole="link" style={styles.legalLink} onPress={() => onOpen('terms')}>
         Terms
       </Text>
       <Text style={styles.legalDot}>·</Text>
-      <Text accessibilityRole="link" style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
+      <Text accessibilityRole="link" style={styles.legalLink} onPress={() => onOpen('privacy')}>
         Privacy
       </Text>
     </View>
@@ -313,7 +332,7 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 24 },
   dot: { height: 8, borderRadius: 4 },
   bottom: { paddingHorizontal: 20, paddingBottom: 8 },
-  trialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, marginBottom: 16 },
+  trialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 },
   trialText: { fontSize: 17, fontWeight: '700', color: '#000' },
   planCard: {
     flexDirection: 'row',

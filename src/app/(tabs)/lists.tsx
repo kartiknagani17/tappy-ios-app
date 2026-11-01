@@ -5,17 +5,18 @@ import Constants from 'expo-constants';
 import { Alert, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { DEMO_PRODUCTS, ProductTile, type DemoProduct } from '../../components/art';
 import { BottomSheet } from '../../components/BottomSheet';
+import { LegalSheet, type LegalDocId } from '../../components/LegalSheet';
 import { ProductSheet } from '../../components/ProductSheet';
 import { Button, Screen } from '../../components/ui';
-import { AUTH_ENABLED } from '../../lib/auth';
+import { AUTH_ENABLED, deleteAccount as deleteServerAccount, signOut } from '../../lib/auth';
 import { haptic } from '../../lib/haptics';
 import { rateNames, worst } from '../../lib/ratings';
 import { useStore } from '../../lib/store';
-import { PRIVACY_URL, restorePurchases, TERMS_URL } from '../../lib/subscription';
+import { LEGAL_CONTACT } from '../../../server/src/legal/content';
+import { PurchasesUnavailableError, restorePurchases } from '../../lib/subscription';
 import { colors, radius } from '../../theme';
 
-// TODO: move to src/lib/subscription.ts next to TERMS_URL / PRIVACY_URL and point at a monitored inbox.
-const SUPPORT_EMAIL = 'support@tapi.app';
+const SUPPORT_EMAIL = LEGAL_CONTACT;
 const MANAGE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
 export default function Lists() {
@@ -28,6 +29,7 @@ export default function Lists() {
   const trialActive = useStore((s) => s.trialActive);
   const [settings, setSettings] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [legal, setLegal] = useState<LegalDocId | null>(null);
   const items = DEMO_PRODUCTS.filter((p) => saved.includes(p.id));
 
   const confirm = (title: string, msg: string, onOk: () => void, okText = 'Continue') => {
@@ -53,10 +55,13 @@ export default function Lists() {
       if (ok) {
         haptic.success();
         useStore.getState().set({ trialActive: true });
-        notify('Purchases restored', 'Your Tapi subscription is active on this device.');
-      } else notify('No purchases found', 'We couldn’t find an active Tapi subscription for this Apple ID.');
-    } catch {
-      notify('Couldn’t restore', 'Could not reach the App Store. Please try again.');
+        notify('Purchases restored', 'Your Tappy subscription is active on this device.');
+      } else notify('No purchases found', 'We couldn’t find an active Tappy subscription for this Apple ID.');
+    } catch (e) {
+      notify(
+        'Couldn’t restore',
+        e instanceof PurchasesUnavailableError ? 'Purchases aren’t available in this build.' : 'Could not reach the App Store. Please try again.',
+      );
     } finally {
       setRestoring(false);
     }
@@ -64,16 +69,21 @@ export default function Lists() {
 
   const contactSupport = () => {
     const version = Constants.expoConfig?.version ?? '';
-    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Tapi support (v${version} ${Platform.OS})`)}`;
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Tappy support (v${version} ${Platform.OS})`)}`;
     Linking.openURL(url).catch(() => notify('Contact support', `Email us at ${SUPPORT_EMAIL}`));
   };
 
   const deleteAccount = () =>
     confirm(
       'Delete your account?',
-      'This permanently deletes your Tapi account, dietary profile and saved lists. This can’t be undone. An App Store subscription is not canceled automatically; manage it in Settings > Apple ID > Subscriptions.',
-      () => {
-        // TODO: call the backend account-deletion endpoint here once auth is wired up (Guideline 5.1.1(v)).
+      'This permanently deletes your Tappy account, dietary profile and saved lists. This can’t be undone. An App Store subscription is not canceled automatically; manage it in Settings > Apple ID > Subscriptions.',
+      async () => {
+        try {
+          await deleteServerAccount();
+        } catch {
+          notify('Couldn’t delete your account', 'We couldn’t reach Tappy. Check your connection and try again.');
+          return;
+        }
         haptic.warning();
         setSettings(false);
         useStore.getState().resetAll();
@@ -145,7 +155,7 @@ export default function Lists() {
           <Text style={styles.sheetTitle} accessibilityRole="header">
             Settings
           </Text>
-          {account ? <Text style={styles.account}>Signed in as {account.email}</Text> : null}
+          {account ? <Text style={styles.account}>Signed in as {account.email || 'your Apple ID'}</Text> : null}
           <Row
             icon="sliders"
             label="Edit dietary profile"
@@ -158,7 +168,7 @@ export default function Lists() {
             <Feather name="image" size={20} color={colors.ink} />
             <View style={{ flex: 1 }}>
               <Text style={styles.rowText}>Share product photos</Text>
-              <Text style={styles.rowSub}>Keep package photos to improve Tapi’s database. Off: photos are deleted after scanning.</Text>
+              <Text style={styles.rowSub}>Keep package photos to improve Tappy’s database. Off: photos are deleted after scanning.</Text>
             </View>
             <Switch
               testID="share-photos"
@@ -173,8 +183,8 @@ export default function Lists() {
             <Row icon="credit-card" label="Manage subscription" onPress={() => Linking.openURL(MANAGE_SUBSCRIPTIONS_URL)} external />
           ) : null}
           <Row icon="mail" label="Contact support" onPress={contactSupport} testID="contact" external />
-          <Row icon="shield" label="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_URL)} testID="privacy" external />
-          <Row icon="file-text" label="Terms of Use" onPress={() => Linking.openURL(TERMS_URL)} testID="terms" external />
+          <Row icon="shield" label="Privacy Policy" onPress={() => setLegal('privacy')} testID="privacy" />
+          <Row icon="file-text" label="Terms of Use" onPress={() => setLegal('terms')} testID="terms" />
           <Row
             icon="info"
             label="Data sources & credits"
@@ -188,8 +198,8 @@ export default function Lists() {
               icon="log-out"
               label="Log out"
               onPress={() => {
-                useStore.getState().set({ account: undefined });
                 setSettings(false);
+                void signOut();
               }}
             />
           ) : AUTH_ENABLED ? (
@@ -209,7 +219,7 @@ export default function Lists() {
             testID="reset"
             danger
             onPress={() =>
-              confirm('Reset Tapi?', 'This clears your profile and restarts onboarding on this device.', () => {
+              confirm('Reset Tappy?', 'This clears your profile and restarts onboarding on this device.', () => {
                 setSettings(false);
                 useStore.getState().resetAll();
                 router.replace('/welcome');
@@ -217,6 +227,7 @@ export default function Lists() {
             }
           />
         </ScrollView>
+        <LegalSheet doc={legal} onClose={() => setLegal(null)} />
       </BottomSheet>
     </Screen>
   );

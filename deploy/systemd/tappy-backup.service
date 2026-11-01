@@ -1,0 +1,18 @@
+# Consistent snapshot of the live database (keeps the newest 2).
+[Unit]
+Description=Tappy database backup
+
+[Service]
+Type=oneshot
+User=tappy
+Group=tappy
+WorkingDirectory=/opt/tappy/server
+EnvironmentFile=/etc/tappy/tappy.env
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts backup /var/lib/tappy/backups 2
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/tappy

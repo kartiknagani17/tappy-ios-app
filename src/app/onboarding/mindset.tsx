@@ -68,7 +68,7 @@ function ClinicianSheet({ visible, onClose }: { visible: boolean; onClose: () =>
   return (
     <BottomSheet visible={visible} onClose={onClose} handle>
       <View style={styles.sheet}>
-        <Text style={styles.title}>{sent ? 'Thanks! 🙌' : 'Tapi for clinicians'}</Text>
+        <Text style={styles.title}>{sent ? 'Thanks! 🙌' : 'Tappy for clinicians'}</Text>
         <Text style={styles.body}>
           {sent
             ? "We'll reach out soon with tools to share dietary profiles with your patients."

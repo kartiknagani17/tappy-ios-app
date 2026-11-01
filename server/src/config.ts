@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 
 export const SERVER_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// Load TAPI_ENV_FILE (used on the server, e.g. /etc/tapi/tapi.env), then server/.env, then repo-root .env.
+// Load TAPPY_ENV_FILE (used on the server, e.g. /etc/tappy/tappy.env), then server/.env, then repo-root .env.
 // Real env vars always win; earlier files win over later ones.
-for (const file of [process.env.TAPI_ENV_FILE, path.join(SERVER_ROOT, '.env'), path.join(SERVER_ROOT, '..', '.env')]) {
+for (const file of [process.env.TAPPY_ENV_FILE, path.join(SERVER_ROOT, '.env'), path.join(SERVER_ROOT, '..', '.env')]) {
   if (!file) continue;
   if (existsSync(file)) process.loadEnvFile(file);
 }
@@ -46,7 +46,7 @@ export function loadConfig() {
     port: num('PORT', 8787),
     // 127.0.0.1 when running behind Cloudflare Tunnel (nothing else can reach the port).
     host: str('HOST', '0.0.0.0'),
-    dbPath: path.resolve(SERVER_ROOT, str('DATABASE_PATH', 'data/tapi.db')),
+    dbPath: path.resolve(SERVER_ROOT, str('DATABASE_PATH', 'data/tappy.db')),
     rawDataDir: path.resolve(SERVER_ROOT, str('RAW_DATA_DIR', 'data/raw')),
     uploadsDir: path.resolve(SERVER_ROOT, str('UPLOADS_DIR', 'data/uploads')),
 
@@ -58,7 +58,7 @@ export function loadConfig() {
     ),
     offCsvUrl: str('OFF_CSV_URL', 'https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz'),
     offLiveLookup: bool('OFF_LIVE_LOOKUP', false),
-    offUserAgent: str('OFF_USER_AGENT', 'Tapi/1.0 (contact@example.com)'),
+    offUserAgent: str('OFF_USER_AGENT', 'Tappy/1.0 (contact@example.com)'),
     offLiveMaxPerMinute: num('OFF_LIVE_MAX_PER_MINUTE', 12), // OFF allows 15 product reads/min/IP
 
     // HTTP hardening
@@ -105,6 +105,17 @@ export function loadConfig() {
     /** Per-client-IP (IPv6: per /64) daily caps, so minting new device ids can't bypass the per-user quota. 0 = off. */
     ipDailyScans: num('IP_DAILY_SCANS', 300),
     ipDailyPhotoScans: num('IP_DAILY_PHOTO_SCANS', 40),
+
+    // Accounts
+    /** Sign in with Apple tokens must be issued for this audience (the iOS bundle id in app.json). */
+    appleBundleId: str('APPLE_BUNDLE_ID', 'company.tappy.app'),
+    /** Password-reset emails go through Resend. Without a key, "Forgot password?" is hidden in the app. */
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    emailFrom: str('EMAIL_FROM', 'Tappy <no-reply@tappy.company>'),
+    /** Login / signup / reset attempts per minute, per IP and per email. */
+    authRateLimitPerMinute: num('AUTH_RATE_LIMIT_PER_MINUTE', 10),
+    /** Shown on the hosted Terms / Privacy pages. */
+    supportEmail: str('SUPPORT_EMAIL', 'kartiknagani17@gmail.com'),
   };
 }
 
@@ -135,6 +146,7 @@ export function validateConfig(c: Config): string[] {
   intIn('headersTimeoutMs', 1000, 600_000);
   intIn('visionConfirmConsensus', 1, 1000);
   intIn('matchCandidateLimit', 1, 200);
+  intIn('authRateLimitPerMinute', 1, 10_000);
   if (!(c.visionDailyBudgetUsd >= 0)) errors.push('visionDailyBudgetUsd must be >= 0');
   if (!['auto', 'on', 'off'].includes(c.photoScanningMode))
     errors.push(`PHOTO_SCANNING must be auto, on or off (got "${c.photoScanningMode}")`);
@@ -154,5 +166,6 @@ export function validateConfig(c: Config): string[] {
     warnings.push('VISION_DAILY_BUDGET_USD=0: no daily ceiling on vision spend.');
   if (c.corsOrigins.includes('*')) warnings.push('CORS_ORIGINS=* allows any website to call this API from a browser.');
   if (c.offUserAgent.includes('example.com')) warnings.push('OFF_USER_AGENT still uses the example contact address.');
+  if (!c.resendApiKey) warnings.push('RESEND_API_KEY is not set: password reset emails are off ("Forgot password?" is hidden in the app).');
   return warnings;
 }

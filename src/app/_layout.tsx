@@ -6,7 +6,9 @@ import { Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Button, Logo } from '../components/ui';
+import { checkSession, startProfileSync } from '../lib/auth';
 import { useRouteGuard, useStoreReady } from '../lib/boot';
+import { initPurchases } from '../lib/subscription';
 import { colors } from '../theme';
 
 // Keep the native splash up until the saved profile has loaded (or the fail-safe timeout passes).
@@ -23,7 +25,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       <Logo size={40} />
       <Text style={{ fontSize: 22, fontWeight: '600', color: colors.ink, textAlign: 'center' }}>Something went wrong</Text>
       <Text style={{ fontSize: 16, lineHeight: 23, color: colors.textMuted, textAlign: 'center' }}>
-        Tapi hit an unexpected problem. Your profile is still saved on this device.
+        Tappy hit an unexpected problem. Your profile is still saved on this device.
       </Text>
       <Button title="Try again" onPress={retry} style={{ alignSelf: 'stretch', marginTop: 12 }} />
     </View>
@@ -35,6 +37,12 @@ export default function RootLayout() {
   useRouteGuard(ready);
   useEffect(() => {
     if (ready) SplashScreen.hide();
+  }, [ready]);
+  useEffect(() => {
+    if (!ready) return;
+    initPurchases();
+    void checkSession();
+    return startProfileSync();
   }, [ready]);
   if (!ready) return null;
 

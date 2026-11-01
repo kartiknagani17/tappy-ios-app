@@ -14,10 +14,10 @@ export function Logo({ size = 40, color = colors.ink }: { size?: number; color?:
   return (
     <Text
       accessibilityRole="header"
-      accessibilityLabel="Tapi"
+      accessibilityLabel="Tappy"
       style={{ fontSize: size, fontWeight: '800', color, letterSpacing: -size * 0.06, lineHeight: size * 1.15 }}
     >
-      tapi
+      tappy
     </Text>
   );
 }

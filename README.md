@@ -1,6 +1,6 @@
-# Tapi
+# Tappy
 
-An iOS app that tells people whether a grocery product fits their diet: scan a barcode, and Tapi checks the ingredients against their dietary profile.
+An iOS app that tells people whether a grocery product fits their diet: scan a barcode, and Tappy checks the ingredients against their dietary profile.
 
 Built with Expo (SDK 58) + React Native + Expo Router + TypeScript.
 
@@ -43,7 +43,7 @@ Before submitting, update `ios.bundleIdentifier` in `app.json`, and replace the 
 | 1 | Splash (lime) | `src/app/index.tsx` |
 | 2 | Welcome, notification prompt | `src/app/welcome.tsx` |
 | 3 | How do you think about food? (+ clinician sheet) | `onboarding/mindset.tsx` |
-| 4 | How did you hear about Tapi? | `onboarding/hear.tsx` |
+| 4 | How did you hear about Tappy? | `onboarding/hear.tsx` |
 | 5 | What does eating healthier mean to you? | `onboarding/goal.tsx` |
 | 6 | Banned in Europe | `onboarding/europe.tsx` |
 | 7 | We'll help you avoid these ingredients | `onboarding/avoid.tsx` |
@@ -52,9 +52,9 @@ Before submitting, update `ios.bundleIdentifier` in `app.json`, and replace the 
 | 10 | Make it official (press & hold) → Goal set! | `onboarding/commit.tsx` |
 | 11 | You're committed | `onboarding/committed.tsx` |
 | 12 | Other dietary restrictions? | `onboarding/other.tsx` |
-| 13 | Tapi covers 2,900+ needs (+ "Why?" sheet) | `onboarding/covers.tsx` |
+| 13 | Tappy covers 2,900+ needs (+ "Why?" sheet) | `onboarding/covers.tsx` |
 | 14 | Dietary restrictions picker + severity/checklist sheets | `onboarding/restrictions.tsx`, `components/RestrictionSheet.tsx` |
-| 15 | Your Tapi looks great: Dietary Profile / Ingredient Lookup | `onboarding/profile.tsx` |
+| 15 | Your Tappy looks great: Dietary Profile / Ingredient Lookup | `onboarding/profile.tsx` |
 | 16 | Finishing your profile → confetti | `onboarding/finishing.tsx` |
 | 17 | Personalized scanner ready | `onboarding/scanner-ready.tsx` |
 | 18 | Unlimited Pass, 7 days free | `onboarding/pass.tsx` |
@@ -67,17 +67,34 @@ Before submitting, update `ios.bundleIdentifier` in `app.json`, and replace the 
 
 Onboarding branches based on answers (see `src/lib/flow.ts`). For example, choosing "Avoid controversial and unhealthy ingredients" adds the Europe + avoid-list screens, and skipping the duration question skips the press-and-hold commitment. The progress bar is calculated from the actual path.
 
-## Where to plug in real services
+## Payments (RevenueCat)
 
-These are stubbed so the app is fully clickable today:
+Subscriptions go through RevenueCat (`react-native-purchases`) in `src/lib/subscription.ts`. Purchases only work in a development, TestFlight or App Store build, not in Expo Go.
+
+1. **App Store Connect → your app → Subscriptions:** create a subscription group with two auto-renewable subscriptions, `tapi_annual` (1 year, $49.99) and `tapi_annual_offer` (1 year, $39.99, the "Before you go" offer). Give each an introductory offer: **Free, 7 days**. Fill in the localization and review screenshot for each.
+2. **App Store Connect → Users and Access → Integrations → In-App Purchase:** generate an In-App Purchase key (.p8) for RevenueCat.
+3. **RevenueCat (free up to $2.5k/month in revenue):** create a project and an App Store app with bundle id `company.tappy.app`, upload the .p8 key, import both products, and create an entitlement called **`tappy_pro`** with both products attached.
+4. Copy the RevenueCat **public iOS SDK key** (`appl_…`) into `EXPO_PUBLIC_REVENUECAT_IOS_KEY` in `eas.json` (the `preview` and `production` profiles). It's a public key, so it's safe to commit.
+
+The paywall shows the App Store's localized prices, offers the free trial only to Apple IDs that are eligible for it, and keeps the subscription state in step with renewals, refunds and expiry. When someone signs in, their purchases are tied to their Tappy account, so the subscription follows them to a new phone.
+
+## Accounts
+
+Email + password and Sign in with Apple run on the Tappy server (`server/src/services/auth.ts`, routes under `/api/auth` and `/api/account`). Passwords are hashed with scrypt, sessions are random bearer tokens (only their SHA-256 is stored) kept in the iOS Keychain, and login/signup/reset attempts are rate-limited per IP and per email. While signed in, the dietary profile is synced to the account and restored on a new phone. **Settings → Delete account** permanently deletes the account on the server (App Store Guideline 5.1.1(v)).
+
+- Sign in with Apple: enable the **Sign In with Apple** capability for the `company.tappy.app` App ID in the Apple Developer portal (EAS does this automatically when it creates the provisioning profile). The server checks Apple's token against `APPLE_BUNDLE_ID`.
+- Password reset sends a 6-digit code through [Resend](https://resend.com) (free tier). Set `RESEND_API_KEY` and `EMAIL_FROM` on the server. Without a key, "Forgot password?" is hidden.
+
+## Terms of Use and Privacy Policy
+
+The text lives in `server/src/legal/content.ts`. The app opens it in a popup (`src/components/LegalSheet.tsx`, closed with the × at the top), and the server publishes the same text at `https://<your API address>/terms` and `/privacy`. Use the `/privacy` URL in App Store Connect's **Privacy Policy URL** field. Before release, set `LEGAL_OPERATOR` and `LEGAL_CONTACT` at the top of that file to your name or company and your support email, and have the text checked for your country.
+
+## Still to replace
 
 | What | Where | Replace with |
 |------|-------|--------------|
-| Purchases / free trial | `src/lib/subscription.ts` → `startTrial`, `restorePurchases` | RevenueCat (`react-native-purchases`) or StoreKit |
 | Ingredient catalog (~300 sample entries) | `src/data/ingredients.ts` | Your full 2,900+ ingredient list |
-| Auth (email, Google, Apple, Facebook) | `src/app/auth.tsx` | Supabase / Firebase / Clerk + Sign in with Apple |
 | Feedback forms | `src/components/FeedbackSheet.tsx` | Your backend or a form endpoint |
-| Terms / Privacy URLs | `src/lib/subscription.ts` | Your real legal pages |
 
 Brand colors live in `src/theme.ts`.
 
@@ -155,8 +172,13 @@ To run it in production for free (Oracle Cloud Always Free + Cloudflare Tunnel f
 | `POST /api/scan/front/confirm` | `{ vision_cache_id, product_id }` | Records the user's confirmed choice for repeat photos |
 | `POST /api/scan/label` | `{ image_base64, gtin?, front_hash?, contribute? }` | `contributed` (user-submitted, unverified), `existing_product`, or `unreadable` |
 | `POST /api/products/:id/report` | `{ reason? }` | Increments `report_count` and flags the product for review |
+| `POST /api/auth/signup`, `/api/auth/login` | `{ email, password }` | `{ token, account }` |
+| `POST /api/auth/apple` | `{ identity_token, nonce }` | `{ token, account }` (Sign in with Apple) |
+| `POST /api/auth/reset/request`, `/api/auth/reset/confirm` | `{ email }`, `{ email, code, password }` | Emails a 6-digit code; then sets the new password |
+| `GET /api/account`, `POST /api/account/profile`, `POST /api/account/delete` | Bearer token | Account + synced profile; save profile; delete account |
+| `GET /terms`, `GET /privacy` | | Public Terms of Use / Privacy Policy pages |
 
-Every request sends an anonymous per-install `X-Tapi-User` header, used for rate limiting and the daily free quota.
+Every request sends an anonymous per-install `X-Tappy-User` header, used for rate limiting and the daily free quota.
 
 ### How a scan resolves
 
@@ -202,7 +224,7 @@ The suite covers GTIN normalization and check digits, import idempotency, source
 
 ### Licensing and the share-alike obligation
 
-Open Food Facts data is licensed under the **Open Database License (ODbL)**. Tapi shows attribution in the app (**Settings → Data sources & credits**), and every product keeps its `source` field. ODbL is share-alike: if you publicly use a database **derived** from Open Food Facts (for example, this product table with OFF records merged in), you must offer that derived database, or the changes you made to it, under the ODbL, and keep the attribution. Using the data inside the app is fine; distributing a modified copy of the database means sharing it under the same license. Product images are CC BY-SA. USDA FoodData Central is public domain (CC0). See `NOTICE.md`.
+Open Food Facts data is licensed under the **Open Database License (ODbL)**. Tappy shows attribution in the app (**Settings → Data sources & credits**), and every product keeps its `source` field. ODbL is share-alike: if you publicly use a database **derived** from Open Food Facts (for example, this product table with OFF records merged in), you must offer that derived database, or the changes you made to it, under the ODbL, and keep the attribution. Using the data inside the app is fine; distributing a modified copy of the database means sharing it under the same license. Product images are CC BY-SA. USDA FoodData Central is public domain (CC0). See `NOTICE.md`.
 
 ## How ratings work
 

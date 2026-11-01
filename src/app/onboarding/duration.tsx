@@ -18,7 +18,7 @@ export default function Duration() {
     <QuestionLayout
       step="duration"
       title="How long do you want to try this diet?"
-      subtitle="Select a timeframe so Tapi can support you while you get started."
+      subtitle="Select a timeframe so Tappy can support you while you get started."
       footer={
         duration ? (
           <Button testID="continue" title="Continue" onPress={() => goNext('duration')} />

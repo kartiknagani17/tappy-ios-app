@@ -122,7 +122,7 @@ export const useStore = create<State & Actions>()(
       toggleSaved: (id) => set((st) => ({ saved: st.saved.includes(id) ? st.saved.filter((x) => x !== id) : [...st.saved, id] })),
     }),
     {
-      name: 'tapi-store-v1',
+      name: 'tappy-store-v1',
       // Corrupted JSON or a storage error resets to defaults instead of hanging hydration.
       storage: createJSONStorage(() =>
         safeStorage(AsyncStorage, (where, e) => {

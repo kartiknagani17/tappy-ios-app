@@ -20,7 +20,7 @@ export default function Covers() {
       <OnboardingHeader />
       <View style={styles.content}>
         <Animated.Text entering={FadeInDown.duration(500)} style={styles.title}>
-          Tapi covers over 2,900 dietary needs
+          Tappy covers over 2,900 dietary needs
         </Animated.Text>
         <Animated.Text entering={FadeInDown.delay(350).duration(500)} style={styles.lead}>
           Next, select your diets, allergies, and avoidances.
@@ -44,10 +44,10 @@ export default function Covers() {
         <View style={styles.sheet}>
           <Text style={styles.sheetTitle}>Why is this important?</Text>
           <Text style={styles.sheetBody}>
-            By sharing your dietary restrictions, Tapi can recommend groceries that likely fit your needs.
+            By sharing your dietary restrictions, Tappy can recommend groceries that likely fit your needs.
           </Text>
           <Text style={styles.sheetBody}>
-            Please choose your restrictions carefully—selecting too many may significantly limit the options available to you on Tapi.
+            Please choose your restrictions carefully—selecting too many may significantly limit the options available to you on Tappy.
           </Text>
         </View>
       </BottomSheet>

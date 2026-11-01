@@ -7,6 +7,26 @@ import { logError } from '../lib/log.ts';
 import { consumeDailyQuota, ipKey, LimitError, RateLimiter, type QuotaSubject } from '../services/limits.ts';
 import { getProductById, reportProduct, sanitizeReason, toPublicProduct } from '../services/products.ts';
 import type { ScanService } from '../services/scan.ts';
+import { LEGAL_DOCS } from '../legal/content.ts';
+import {
+  AuthError,
+  confirmPasswordReset,
+  deleteAccount,
+  deleteSession,
+  fetchAppleKeys,
+  logIn,
+  requestPasswordReset,
+  saveProfile,
+  signInWithApple,
+  signUp,
+  toPublicAccount,
+  userForToken,
+  verifyAppleToken,
+  type AppleKeySource,
+  type Mailer,
+  type User,
+} from '../services/auth.ts';
+import { renderLegalPage } from './legal-page.ts';
 
 export class HttpError extends Error {
   readonly status: number;
@@ -43,9 +63,32 @@ const ROUTES: Route[] = [
   { name: 'front', pattern: /^\/api\/scan\/front$/, methods: ['POST'] },
   { name: 'confirm', pattern: /^\/api\/scan\/front\/confirm$/, methods: ['POST'] },
   { name: 'label', pattern: /^\/api\/scan\/label$/, methods: ['POST'] },
+  { name: 'signup', pattern: /^\/api\/auth\/signup$/, methods: ['POST'] },
+  { name: 'login', pattern: /^\/api\/auth\/login$/, methods: ['POST'] },
+  { name: 'apple', pattern: /^\/api\/auth\/apple$/, methods: ['POST'] },
+  { name: 'logout', pattern: /^\/api\/auth\/logout$/, methods: ['POST'] },
+  { name: 'reset_request', pattern: /^\/api\/auth\/reset\/request$/, methods: ['POST'] },
+  { name: 'reset_confirm', pattern: /^\/api\/auth\/reset\/confirm$/, methods: ['POST'] },
+  { name: 'me', pattern: /^\/api\/account$/, methods: ['GET', 'HEAD'] },
+  { name: 'profile', pattern: /^\/api\/account\/profile$/, methods: ['POST'] },
+  { name: 'delete_account', pattern: /^\/api\/account\/delete$/, methods: ['POST'] },
+  { name: 'terms', pattern: /^\/terms\/?$/, methods: ['GET', 'HEAD'] },
+  { name: 'privacy', pattern: /^\/privacy\/?$/, methods: ['GET', 'HEAD'] },
 ];
 
-export type AppDeps = { db: DB; config: Config; scan: ScanService; limiter?: RateLimiter; ipLimiter?: RateLimiter };
+const AUTH_ROUTES = new Set(['signup', 'login', 'apple', 'logout', 'reset_request', 'reset_confirm', 'me', 'profile', 'delete_account']);
+
+export type AppDeps = {
+  db: DB;
+  config: Config;
+  scan: ScanService;
+  limiter?: RateLimiter;
+  ipLimiter?: RateLimiter;
+  authLimiter?: RateLimiter;
+  /** Sends password-reset emails; null turns password reset off. */
+  mailer?: Mailer | null;
+  appleKeys?: AppleKeySource;
+};
 
 /** Plain node:http request handler. Routes:
  *  POST /api/scan/barcode        { barcode }
@@ -55,7 +98,7 @@ export type AppDeps = { db: DB; config: Config; scan: ScanService; limiter?: Rat
  *  POST /api/products/:id/report { reason? }
  *  GET  /api/products/:id
  *  GET  /api/health
- * Every POST needs an X-Tapi-User header (anonymous device id) and Content-Type: application/json.
+ * Every POST needs an X-Tappy-User header (anonymous device id) and Content-Type: application/json.
  */
 export function createApp({
   db,
@@ -63,6 +106,9 @@ export function createApp({
   scan,
   limiter = new RateLimiter(config.rateLimitPerMinute),
   ipLimiter = new RateLimiter(config.rateLimitPerMinute * 4),
+  authLimiter = new RateLimiter(config.authRateLimitPerMinute),
+  mailer = null,
+  appleKeys = fetchAppleKeys,
 }: AppDeps) {
   const maxImageBody = Math.ceil(config.visionMaxImageBytes * 1.4) + 4096; // base64 overhead
   const photosEnabled = photoScanningEnabled(config);
@@ -74,7 +120,7 @@ export function createApp({
     if (!origin || !(corsAny || corsAllowed.has(origin))) return false;
     res.setHeader('Access-Control-Allow-Origin', corsAny ? '*' : origin);
     res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Tapi-User');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Tappy-User, Authorization');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Max-Age', '600');
     return true;
@@ -104,7 +150,10 @@ export function createApp({
       } catch {
         return send(res, 503, { ok: false });
       }
-      return send(res, 200, { ok: true, photo_scanning: photosEnabled });
+      return send(res, 200, { ok: true, photo_scanning: photosEnabled, password_reset: !!mailer });
+    }
+    if (r.name === 'terms' || r.name === 'privacy') {
+      return sendHtml(res, renderLegalPage(LEGAL_DOCS[r.name]));
     }
 
     const ip = clientIp(req, config.trustProxyHops);
@@ -112,14 +161,16 @@ export function createApp({
     // IP first: rotating device ids from one address can't grow the per-user limiter past the IP limit.
     ipLimiter.check(`ip:${ipk}`);
 
+    if (AUTH_ROUTES.has(r.name)) return handleAuth(r.name, req, res, ipk);
+
     if (r.name === 'product') {
       const p = getProductById(db, idParam);
       if (!p) throw new HttpError(404, 'not_found', 'Product not found');
       return send(res, 200, { product: toPublicProduct(p) });
     }
 
-    const userId = String(req.headers['x-tapi-user'] ?? '');
-    if (!USER_ID_RE.test(userId)) throw new HttpError(400, 'missing_user', 'X-Tapi-User header is required');
+    const userId = String(req.headers['x-tappy-user'] ?? '');
+    if (!USER_ID_RE.test(userId)) throw new HttpError(400, 'missing_user', 'X-Tappy-User header is required');
     limiter.check(`u:${userId}`);
 
     const isPhoto = r.name === 'front' || r.name === 'label';
@@ -199,6 +250,80 @@ export function createApp({
     throw new HttpError(404, 'not_found', 'Not found');
   }
 
+  const bearer = (req: IncomingMessage) => {
+    const m = /^Bearer ([A-Za-z0-9_-]{1,128})$/.exec(String(req.headers.authorization ?? ''));
+    return m ? m[1] : null;
+  };
+  const requireUser = (req: IncomingMessage) => {
+    const token = bearer(req);
+    const user = token ? userForToken(db, token) : null;
+    if (!user || !token) throw new HttpError(401, 'unauthorized', 'Please log in again.');
+    return { user, token };
+  };
+  const session = (out: { user: User; token: string }) => ({ token: out.token, account: toPublicAccount(out.user) });
+
+  /** Accounts: /api/auth/* and /api/account*. Credential endpoints are limited per IP and per email. */
+  async function handleAuth(name: string, req: IncomingMessage, res: ServerResponse, ipk: string) {
+    if (name === 'me') {
+      const { user } = requireUser(req);
+      let profile: unknown = null;
+      try {
+        profile = user.profile_json ? JSON.parse(user.profile_json) : null;
+      } catch {
+        profile = null;
+      }
+      return send(res, 200, { account: toPublicAccount(user), profile, profile_updated_at: user.profile_updated_at });
+    }
+    const body = await readJson(req, JSON_BODY_LIMIT);
+    const limitCredentials = () => {
+      authLimiter.check(`auth-ip:${ipk}`);
+      if (typeof body.email === 'string') authLimiter.check(`auth-email:${body.email.trim().toLowerCase().slice(0, 254)}`);
+    };
+    switch (name) {
+      case 'signup':
+        limitCredentials();
+        return send(res, 200, session(await signUp(db, body.email, body.password)));
+      case 'login':
+        limitCredentials();
+        return send(res, 200, session(await logIn(db, body.email, body.password)));
+      case 'apple': {
+        authLimiter.check(`auth-ip:${ipk}`);
+        const apple = await verifyAppleToken(body.identity_token, body.nonce, config.appleBundleId, appleKeys);
+        return send(res, 200, session(signInWithApple(db, apple)));
+      }
+      case 'reset_request': {
+        if (!mailer) throw new HttpError(503, 'reset_unavailable', 'Password reset isn’t available right now. Email support for help.');
+        limitCredentials();
+        try {
+          await requestPasswordReset(db, body.email, mailer);
+        } catch (e) {
+          if (e instanceof AuthError) throw e;
+          logError('sending reset email', e);
+          throw new HttpError(502, 'email_failed', 'We couldn’t send the email. Please try again in a moment.');
+        }
+        return send(res, 200, { ok: true });
+      }
+      case 'reset_confirm':
+        limitCredentials();
+        return send(res, 200, session(await confirmPasswordReset(db, body.email, body.code, body.password)));
+      case 'logout': {
+        const token = bearer(req);
+        if (token) deleteSession(db, token);
+        return send(res, 200, { ok: true });
+      }
+      case 'profile': {
+        const { user } = requireUser(req);
+        return send(res, 200, { ok: true, profile_updated_at: saveProfile(db, user.id, body.profile) });
+      }
+      case 'delete_account': {
+        const { user } = requireUser(req);
+        deleteAccount(db, user.id);
+        return send(res, 200, { ok: true });
+      }
+    }
+    throw new HttpError(404, 'not_found', 'Not found');
+  }
+
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
       await route(req, res);
@@ -212,6 +337,7 @@ export function createApp({
           res.setHeader('Retry-After', String(e.retryAfterSeconds));
           return send(res, 429, { error: e.code, message: e.message, retry_after_seconds: e.retryAfterSeconds });
         }
+        if (e instanceof AuthError) return send(res, e.status, { error: e.code, message: e.message });
         if (e instanceof HttpError) {
           for (const [k, v] of Object.entries(e.headers)) res.setHeader(k, v);
           // Unread request body (e.g. 413): don't keep the connection for another request.
@@ -253,6 +379,13 @@ function send(res: ServerResponse, status: number, body: unknown) {
   }
   const json = JSON.stringify(body);
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(json) }).end(json);
+}
+
+/** Static HTML (the legal pages): inline styles only, no scripts. */
+function sendHtml(res: ServerResponse, html: string) {
+  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'");
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html) }).end(html);
 }
 
 /** Keys that could reach an object prototype if a parsed body were ever merged into another object. */

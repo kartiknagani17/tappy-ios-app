@@ -127,7 +127,7 @@ export function VerdictSheet({
 
             <View style={styles.provenance}>
               <Text style={styles.provText}>
-                Source: {demo ? 'Tapi sample data' : (SOURCE_LABEL[product.source] ?? product.source)} · Updated{' '}
+                Source: {demo ? 'Tappy sample data' : (SOURCE_LABEL[product.source] ?? product.source)} · Updated{' '}
                 {formatDate(product.source_updated_at)}
               </Text>
               {unverified ? (

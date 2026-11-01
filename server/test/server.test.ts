@@ -12,7 +12,7 @@ const SERVER_ROOT = path.join(import.meta.dirname, '..');
 
 describe('server process', () => {
   it('starts without an API key (photo scanning off), serves health, and exits 0 on SIGTERM', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'tapi-srv-'));
+    const dir = mkdtempSync(path.join(tmpdir(), 'tappy-srv-'));
     // Empty values (not deleted) so a developer's server/.env can't fill them back in.
     const env: NodeJS.ProcessEnv = {
       ...process.env,
@@ -40,7 +40,7 @@ describe('server process', () => {
       });
       assert.match(out, /photo scanning is disabled/i);
       const health = await fetch(`http://127.0.0.1:${port}/api/health`);
-      assert.deepEqual(await health.json(), { ok: true, photo_scanning: false });
+      assert.deepEqual(await health.json(), { ok: true, photo_scanning: false, password_reset: false });
       const code = await new Promise<number | null>((resolve) => {
         child.on('exit', (c) => resolve(c));
         child.kill('SIGTERM');
@@ -54,7 +54,7 @@ describe('server process', () => {
   });
 
   it('fails fast when PHOTO_SCANNING=on and no API key is configured', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'tapi-srv-'));
+    const dir = mkdtempSync(path.join(tmpdir(), 'tappy-srv-'));
     const env: NodeJS.ProcessEnv = { ...process.env, PORT: '0', DATABASE_PATH: path.join(dir, 't.db'), PHOTO_SCANNING: 'on', ANTHROPIC_API_KEY: '' };
     const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'src/http/server.ts'], { cwd: SERVER_ROOT, env });
     let err = '';

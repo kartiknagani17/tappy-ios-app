@@ -7,7 +7,7 @@ import { migrate, openDb } from './db/index.ts';
 import { importOff } from './import/off.ts';
 import { importUsda, openUsdaSource } from './import/usda.ts';
 
-const HELP = `Tapi data CLI
+const HELP = `Tappy data CLI
 
   node src/cli.ts migrate                 Create/upgrade the database schema
   node src/cli.ts download [usda|off|all] Stream the bulk files into RAW_DATA_DIR (default: all)
@@ -87,13 +87,13 @@ async function main() {
       const dir = path.resolve(arg ?? path.join(path.dirname(config.dbPath), 'backups'));
       const keep = Math.max(1, Number(process.argv[4] ?? 2));
       mkdirSync(dir, { recursive: true });
-      const target = path.join(dir, `tapi-${new Date().toISOString().replace(/[:.]/g, '-')}.db`);
+      const target = path.join(dir, `tappy-${new Date().toISOString().replace(/[:.]/g, '-')}.db`);
       const db = openDb(config.dbPath, { migrate: false });
       log(`Backing up ${config.dbPath} -> ${target}`);
       db.prepare('VACUUM INTO ?').run(target);
       db.close();
       const old = readdirSync(dir)
-        .filter((f) => /^tapi-.*\.db$/.test(f))
+        .filter((f) => /^tappy-.*\.db$/.test(f))
         .sort()
         .slice(0, -keep);
       for (const f of old) rmSync(path.join(dir, f));

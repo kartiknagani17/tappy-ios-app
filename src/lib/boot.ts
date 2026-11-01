@@ -30,7 +30,7 @@ export function useStoreReady(timeoutMs = 4000): boolean {
 const LATE_ONBOARDING = new Set(['finishing', 'scanner-ready', 'pass', 'reminder', 'paywall', 'safety']);
 
 /**
- * Keeps deep links (tapi://…) from putting the app in a bad state:
+ * Keeps deep links (tappy://…) from putting the app in a bad state:
  *  - the main tabs require a finished onboarding (otherwise every scan is checked against an empty profile);
  *  - the end of onboarding (paywall, safety, …) can't be opened directly by someone who hasn't
  *    set up a profile yet, since finishing there marks them onboarded.

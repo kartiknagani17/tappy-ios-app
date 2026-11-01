@@ -1,15 +1,15 @@
-# Tapi scan API. Listens on 127.0.0.1 only; Cloudflare Tunnel is the only way in.
+# Tappy scan API. Listens on 127.0.0.1 only; Cloudflare Tunnel is the only way in.
 [Unit]
-Description=Tapi scan API
+Description=Tappy scan API
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=tapi
-Group=tapi
-WorkingDirectory=/opt/tapi/server
-EnvironmentFile=/etc/tapi/tapi.env
+User=tappy
+Group=tappy
+WorkingDirectory=/opt/tappy/server
+EnvironmentFile=/etc/tappy/tappy.env
 ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/http/server.ts
 Restart=always
 RestartSec=3
@@ -26,7 +26,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-ReadWritePaths=/var/lib/tapi
+ReadWritePaths=/var/lib/tappy
 
 [Install]
 WantedBy=multi-user.target

@@ -26,7 +26,7 @@ async function start(overrides: Partial<Config> = {}, db?: DB): Promise<Started>
 const post = (base: string, p: string, body: unknown, user = 'device-sec-1', headers: Record<string, string> = {}) =>
   fetch(base + p, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Tapi-User': user, ...headers },
+    headers: { 'Content-Type': 'application/json', 'X-Tappy-User': user, ...headers },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 
@@ -46,7 +46,7 @@ function raw(base: string, text: string): Promise<string> {
 describe('HTTP hardening: headers, CORS, routing, bodies', () => {
   let s: Started;
   before(async () => {
-    s = await start({ corsOrigins: ['https://tapi.example'] });
+    s = await start({ corsOrigins: ['https://tappy.example'] });
   });
   after(() => s.server.close());
 
@@ -62,14 +62,14 @@ describe('HTTP hardening: headers, CORS, routing, bodies', () => {
 
   it('health reports ok and photo-scanning availability', async () => {
     const res = await fetch(`${s.base}/api/health`);
-    assert.deepEqual(await res.json(), { ok: true, photo_scanning: true });
+    assert.deepEqual(await res.json(), { ok: true, photo_scanning: true, password_reset: false });
   });
 
   it('CORS: no wildcard; only configured origins are echoed', async () => {
     const evil = await fetch(`${s.base}/api/health`, { headers: { Origin: 'https://evil.example' } });
     assert.equal(evil.headers.get('access-control-allow-origin'), null);
-    const ok = await fetch(`${s.base}/api/health`, { headers: { Origin: 'https://tapi.example' } });
-    assert.equal(ok.headers.get('access-control-allow-origin'), 'https://tapi.example');
+    const ok = await fetch(`${s.base}/api/health`, { headers: { Origin: 'https://tappy.example' } });
+    assert.equal(ok.headers.get('access-control-allow-origin'), 'https://tappy.example');
     assert.equal(ok.headers.get('vary'), 'Origin');
     const pre = await fetch(`${s.base}/api/scan/barcode`, { method: 'OPTIONS', headers: { Origin: 'https://evil.example' } });
     assert.equal(pre.status, 204);
@@ -91,7 +91,7 @@ describe('HTTP hardening: headers, CORS, routing, bodies', () => {
   it('non-JSON content types are rejected with 415 (no text/plain "simple" requests)', async () => {
     const res = await fetch(`${s.base}/api/scan/barcode`, {
       method: 'POST',
-      headers: { 'X-Tapi-User': 'device-sec-ct', 'Content-Type': 'text/plain' },
+      headers: { 'X-Tappy-User': 'device-sec-ct', 'Content-Type': 'text/plain' },
       body: JSON.stringify({ barcode: '013764027503' }),
     });
     assert.equal(res.status, 415);
@@ -107,7 +107,7 @@ describe('HTTP hardening: headers, CORS, routing, bodies', () => {
     const big = JSON.stringify({ barcode: '1', pad: 'x'.repeat(40_000) });
     const out = await raw(
       s.base,
-      `POST /api/scan/barcode HTTP/1.1\r\nHost: x\r\nX-Tapi-User: device-sec-chunk\r\nContent-Type: application/json\r\n` +
+      `POST /api/scan/barcode HTTP/1.1\r\nHost: x\r\nX-Tappy-User: device-sec-chunk\r\nContent-Type: application/json\r\n` +
         `Transfer-Encoding: chunked\r\n\r\n${big.length.toString(16)}\r\n${big}\r\n0\r\n\r\n`,
     );
     assert.match(out, /^HTTP\/1\.1 413/);
@@ -197,11 +197,11 @@ describe('HTTP hardening: input edge cases', () => {
     assert.equal(after.n, before.n);
   });
 
-  it('rejects malformed X-Tapi-User values', async () => {
+  it('rejects malformed X-Tappy-User values', async () => {
     for (const u of ['short', 'x'.repeat(65), 'bad id with spaces', '../../etc/passwd', 'ip:1.2.3.4-aaaa']) {
       const res = await fetch(`${s.base}/api/scan/barcode`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Tapi-User': u },
+        headers: { 'Content-Type': 'application/json', 'X-Tappy-User': u },
         body: '{"barcode":"013764027503"}',
       });
       assert.equal(res.status, 400, u);
@@ -279,7 +279,7 @@ describe('HTTP hardening: abuse limits', () => {
       assert.equal(res.status, 503);
       assert.equal(((await res.json()) as { error: string }).error, 'photo_scanning_disabled');
       assert.equal(s.provider.calls.length, 0);
-      assert.deepEqual(await (await fetch(`${s.base}/api/health`)).json(), { ok: true, photo_scanning: false });
+      assert.deepEqual(await (await fetch(`${s.base}/api/health`)).json(), { ok: true, photo_scanning: false, password_reset: false });
       assert.equal((await post(s.base, '/api/scan/barcode', { barcode: '013764027503' }, 'device-off-1')).status, 200);
     } finally {
       s.server.close();

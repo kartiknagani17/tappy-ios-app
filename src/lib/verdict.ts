@@ -298,6 +298,6 @@ export function verdictCopy(v: Verdict): { title: string; body: string } {
 export const SOURCE_LABEL: Record<string, string> = {
   usda: 'USDA FoodData Central',
   off: 'Open Food Facts',
-  user: 'Tapi community',
+  user: 'Tappy community',
   ocr: 'Your photo',
 };

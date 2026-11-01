@@ -11,7 +11,7 @@ import { Button, CloseButton, RatingIcon, ratingLabel } from './ui';
 const VERDICT = {
   green: 'No conflicts found',
   yellow: 'Contains ingredients you limit',
-  red: 'Does not fit your Tapi',
+  red: 'Does not fit your Tappy',
 };
 
 export function ProductSheet({

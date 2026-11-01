@@ -25,7 +25,7 @@ export default function Detective() {
       step="detective"
       title="Consider us your digital food detective 🔎"
       subtitle={
-        'You scan the barcode. Tapi checks the fine print against your "no" list. If a restricted ingredient is hiding in there, we flag it.'
+        'You scan the barcode. Tappy checks the fine print against your "no" list. If a restricted ingredient is hiding in there, we flag it.'
       }
       footer={<Button testID="continue" title="Continue" onPress={() => goNext('detective')} />}
     >
@@ -44,7 +44,7 @@ export default function Detective() {
           <View style={{ paddingHorizontal: 14 }}>
             <RatingIcon rating="red" size={22} />
             <Text style={styles.pname}>{p.name}</Text>
-            <Text style={styles.pnote}>Does not fit your Tapi</Text>
+            <Text style={styles.pnote}>Does not fit your Tappy</Text>
             <View style={styles.notifyRow}>
               <Feather name="bell" size={13} />
               <Text style={styles.notifyText}>Get notified of ingredient changes</Text>
