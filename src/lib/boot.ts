@@ -26,6 +26,13 @@ export function useStoreReady(timeoutMs = 4000): boolean {
   return ready;
 }
 
+type NavState = { routes?: { name: string; state?: NavState }[] };
+
+/** Searches nested navigators too: Expo Router wraps the root Stack in a single `__root` route. */
+function hasRoute(state: NavState | undefined, name: string): boolean {
+  return !!state?.routes?.some((r) => r.name === name || hasRoute(r.state, name));
+}
+
 /** Last onboarding screens, which must only be reached by going through the flow (they mark the user onboarded). */
 const LATE_ONBOARDING = new Set(['finishing', 'scanner-ready', 'pass', 'reminder', 'paywall', 'safety']);
 
@@ -43,7 +50,7 @@ export function useRouteGuard(ready: boolean) {
   const first = segments[0];
   const second = segments[1];
   const navKey = nav?.key;
-  const cameThroughProfile = !!nav?.routes?.some((r) => r.name === 'onboarding/profile');
+  const cameThroughProfile = hasRoute(nav as NavState | undefined, 'onboarding/profile');
 
   useEffect(() => {
     if (!ready || !navKey || onboarded) return;

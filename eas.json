@@ -21,6 +21,12 @@
         "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu"
       }
     },
+    "simulator": {
+      "extends": "preview",
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "autoIncrement": true,
       "env": {
