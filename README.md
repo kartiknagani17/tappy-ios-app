@@ -63,7 +63,7 @@ Before submitting, update `ios.bundleIdentifier` in `app.json`, and replace the 
 | 21 | Your safety is our priority (terms) | `onboarding/safety.tsx` |
 | 22 | Scanner tab + push pre-prompt | `(tabs)/scan.tsx` |
 | 23 | Create account / Log in | `src/app/auth.tsx` |
-| 24 | Grocery, Recipes, Lists tabs | `src/app/(tabs)/` |
+| 24 | Grocery and Lists tabs | `src/app/(tabs)/` |
 
 Onboarding branches based on answers (see `src/lib/flow.ts`). For example, choosing "Avoid controversial and unhealthy ingredients" adds the Europe + avoid-list screens, and skipping the duration question skips the press-and-hold commitment. The progress bar is calculated from the actual path.
 

@@ -38,10 +38,6 @@ export default function TabsLayout() {
         options={{ title: 'Grocery', tabBarIcon: ({ color }) => <TabIcon name="cart-outline" color={color as string} /> }}
       />
       <Tabs.Screen
-        name="recipes"
-        options={{ title: 'Recipes', tabBarIcon: ({ color }) => <TabIcon name="chef-hat" color={color as string} badge="Beta" /> }}
-      />
-      <Tabs.Screen
         name="scan"
         options={{ title: 'Scan', tabBarIcon: ({ color }) => <TabIcon name="line-scan" color={color as string} /> }}
       />
