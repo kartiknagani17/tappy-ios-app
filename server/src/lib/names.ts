@@ -9,10 +9,16 @@
  * SA/NV"), and the app shows the brand on its own line anyway.
  */
 
-/** Words people add about the photo, not the product. Only removed from the end of a name. */
-const TRAILING_JUNK = /(?:\s+|^)(?:shelf|front|back|side|photo|pic|picture|image|label|test|unknown|ingredients?|nutrition(?: facts)?)$/i;
+/**
+ * Words people add about the photo, not the product. Only removed from the end of a name. Kept
+ * deliberately short: "ingredients", "nutrition", "label" and "side" end many real names
+ * ("…With Added Ingredients", "Red Label", "Salmon Side"), as the full-database report showed.
+ */
+const TRAILING_JUNK = /\s+(?:shelf|photo|pic|picture|image|front)$/i;
 /** Names that aren't product names at all. */
-const JUNK_NAME = /^(?:my\s|test\b|unknown\b|product\b|untitled\b|no name\b|(?:null|none|n\/a|item|food|food item)$)/i;
+const JUNK_NAME = /^(?:test\b|unknown\b|product\b|untitled\b|no name\b|(?:null|none|n\/a|item|food|food item|nutrition facts)$)/i;
+/** "My Bff" is junk, but "My Deli Sandwich" and the brand "My" are real: see isJunkName. */
+const MY_NAME = /^my\s+\S+$/i;
 const SMALL_WORDS = new Set(['a', 'an', 'and', 'or', 'of', 'with', 'the', 'in', 'on', 'for', 'to', '&', 'de', 'n']);
 
 /** Brand values that are placeholders, not brands. */
@@ -42,40 +48,71 @@ function fixCase(s: string): string {
   return allLower || allUpper ? titleCase(s) : s;
 }
 
-/** What the cleanup did to a name (for the accuracy report). */
-export type NameFix = 'unchanged' | 'trimmed' | 'case' | 'trimmed_and_case' | 'replaced' | 'junk_kept';
+/**
+ * What the cleanup did to a name, for the accuracy report: 'unchanged', 'replaced', 'junk_kept', or
+ * the steps applied joined with '+' ("trimmed+case", "deduped").
+ */
+export type NameFix = string;
 
 const tidy = (name: string) => (name ?? '').replace(/\s+/g, ' ').replace(/^["'“”]+|["'“”]+$/g, '').trim();
+const wordSet = (s: string | null | undefined) => new Set((s ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean));
 
-/** A name that isn't a product name at all ("My Bff", "test", "x"). */
-export function isJunkName(name: string | null | undefined): boolean {
+/**
+ * A name that isn't a product name at all ("test", "x", "3948764032905", "My Bff"). With the brand
+ * and category, "My Steak" from the brand "My" counts as real.
+ */
+export function isJunkName(name: string | null | undefined, brand?: string | null, category?: string | null): boolean {
   const s = tidy(name ?? '');
   const l = letters(s);
-  // No letters ("3948764032905"), or one or two Latin letters ("G"). One Chinese or Japanese
-  // character can be a whole word ("餅"), so short non-Latin names are kept.
-  if (!l || (l.length < 3 && /^\p{Script=Latin}+$/u.test(l))) return true;
-  return JUNK_NAME.test(s) && s.split(' ').filter(Boolean).length <= 3;
+  // No letters ("3948764032905") or a single Latin letter ("G"). "7 up" and "TB" are real names,
+  // and one Chinese or Japanese character can be a whole word ("餅").
+  if (!l || (l.length < 2 && /^\p{Script=Latin}+$/u.test(l))) return true;
+  if (JUNK_NAME.test(s) && s.split(' ').filter(Boolean).length <= 3) return true;
+  if (MY_NAME.test(s)) {
+    // "My <word>" with nothing tying it to the product: a nickname, not a product name.
+    const context = new Set([...wordSet(brand), ...wordSet(category)]);
+    return ![...wordSet(s)].some((w) => context.has(w));
+  }
+  return false;
+}
+
+/**
+ * USDA names often repeat the flavor or variety at the end: "Sweet Teriyaki Beef Jerky, Sweet
+ * Teriyaki". Drop a trailing comma-separated part that already appears earlier in the name.
+ */
+function dropRepeatedTail(s: string): string {
+  const parts = s.split(/\s*,\s*/);
+  for (let i = 1; i < parts.length; i++) {
+    const head = parts.slice(0, i).join(', ');
+    const tail = parts.slice(i).join(', ');
+    if (tail.length >= 3 && head.toLowerCase().includes(tail.toLowerCase())) return head;
+  }
+  return s;
 }
 
 export function cleanName(name: string, brandField: string | null, category: string | null): { name: string; fix: NameFix } {
-  const original = tidy(name);
-  let s = original;
-  for (let i = 0; i < 3 && TRAILING_JUNK.test(s) && s.split(' ').length > 1; i++) s = s.replace(TRAILING_JUNK, '').trim();
-  const trimmed = s !== original;
+  const steps: string[] = [];
+  let s = tidy(name);
+  const before = s;
+  for (let i = 0; i < 2 && TRAILING_JUNK.test(s); i++) s = s.replace(TRAILING_JUNK, '').trim();
+  if (s !== before) steps.push('trimmed');
 
   const brandRaw = (brandField ?? '').split(',')[0]?.trim() ?? '';
   const brand = brandRaw && !PLACEHOLDER_BRAND.test(brandRaw) ? fixCase(brandRaw) : '';
 
-  if (isJunkName(s)) {
+  if (isJunkName(s, brandRaw, category)) {
     const cat = (category ?? '').trim();
     if (brand && cat) return { name: `${brand} ${cat.charAt(0).toLowerCase()}${cat.slice(1)}`, fix: 'replaced' };
     if (brand) return { name: brand, fix: 'replaced' };
     return { name, fix: 'junk_kept' }; // nothing better to show
   }
-  const cased = fixCase(s);
-  const recased = cased !== s;
+
+  const deduped = dropRepeatedTail(s);
+  if (deduped !== s) steps.push('deduped');
+  const cased = fixCase(deduped);
+  if (cased !== deduped) steps.push('case');
   if (cased === name) return { name, fix: 'unchanged' };
-  return { name: cased, fix: trimmed && recased ? 'trimmed_and_case' : trimmed ? 'trimmed' : recased ? 'case' : 'unchanged' };
+  return { name: cased, fix: steps.join('+') || 'unchanged' };
 }
 
 export function displayName(name: string, brandField: string | null, category: string | null): string {

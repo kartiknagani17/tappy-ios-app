@@ -40,7 +40,7 @@ describe('display names', () => {
 
   it('reports what kind of fix it made', () => {
     assert.deepEqual(cleanName('Snickers', 'Mars', null), { name: 'Snickers', fix: 'unchanged' });
-    assert.equal(cleanName('oreo cookies shelf', 'Oreo', null).fix, 'trimmed_and_case');
+    assert.equal(cleanName('oreo cookies shelf', 'Oreo', null).fix, 'trimmed+case');
     assert.equal(cleanName('Oreo Cookies shelf', 'Oreo', null).fix, 'trimmed');
     assert.equal(cleanName('OREO COOKIES', 'Oreo', null).fix, 'case');
     assert.equal(cleanName('My Bff', 'Cheerios', 'Cereals').fix, 'replaced');
@@ -50,8 +50,32 @@ describe('display names', () => {
   it('doesn’t mistake real names for junk (cases the full-database report caught)', () => {
     assert.equal(cleanName('Food Coloring', '365 Whole Foods Market', 'Food colorings').fix, 'unchanged');
     assert.equal(cleanName('餅', null, null).fix, 'unchanged');
+    assert.equal(cleanName('7 up', 'Pepsi-Cola', 'Sodas').name, '7 Up');
+    assert.equal(cleanName('My Deli Sandwich', 'Pilot', 'Sandwiches').fix, 'unchanged');
+    assert.equal(cleanName('My Steak', 'My', null).fix, 'unchanged');
     assert.equal(cleanName('Unknown Food Item', 'Aldi', null).fix, 'replaced');
     assert.equal(cleanName('3948764032905', 'Brand', null).fix, 'replaced');
+  });
+
+  it('keeps real endings that look like photo words', () => {
+    for (const n of [
+      'Apple Juice From Concentrate With Added Ingredients',
+      'Black tea - Red Label',
+      'Atlantic Salmon Side',
+      'Complete Daily Nutrition',
+    ]) {
+      assert.equal(cleanName(n, null, null).name, n);
+    }
+  });
+
+  it('drops a repeated flavor at the end of USDA names', () => {
+    assert.equal(cleanName('SWEET TERIYAKI BEEF JERKY, SWEET TERIYAKI', null, null).name, 'Sweet Teriyaki Beef Jerky');
+    assert.equal(
+      cleanName('GHIRARDELLI, SQUARES, FILLED CHOCOLATE, MOCHA, MILK & CARAMEL, MOCHA, MILK & CARAMEL', null, null).name,
+      'Ghirardelli, Squares, Filled Chocolate, Mocha, Milk & Caramel',
+    );
+    assert.equal(cleanName('SQUIRT, CITRUS SODA', null, null).name, 'Squirt, Citrus Soda');
+    assert.equal(cleanName('LIGHT RED KIDNEY BEANS, LIGHT RED KIDNEY', null, null).fix, 'deduped+case');
   });
 
   it('picks a real name from another source instead of a junk one', () => {
