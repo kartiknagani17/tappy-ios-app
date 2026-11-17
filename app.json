@@ -160,6 +160,11 @@
         "projectId": "174352c7-6bd4-4af9-b97d-7de008bb8780"
       }
     },
-    "owner": "kartiknagani17"
+    "owner": "kartiknagani17",
+    "updates": {
+      "url": "https://u.expo.dev/174352c7-6bd4-4af9-b97d-7de008bb8780",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

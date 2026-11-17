@@ -36,6 +36,18 @@ npx eas-cli@latest submit --platform ios
 
 Before submitting, update `ios.bundleIdentifier` in `app.json`, and replace the app icon and splash in `assets/`.
 
+### Instant updates (no build, no App Store review)
+
+Builds made with the `production` profile check for updates each time the app opens, download them in the background, and use them from the next launch. To ship a JavaScript or image change to everyone:
+
+```bash
+npm run update -- "Fix the Grocery search"
+```
+
+Add `--channel preview` to send it only to `preview` builds. The script copies the `EXPO_PUBLIC_*` values from the matching profile in `eas.json` (`eas update` doesn't read them on its own; without them the app would call `localhost`). Undo a bad update with `npx eas-cli@latest update:rollback`.
+
+These still need a new build: new native libraries, `app.json` plugins or permissions, the icon or name, and Expo SDK upgrades. When you make one, **also raise `version` in `app.json`** (e.g. 1.0.0 → 1.0.1): updates only reach builds with the same version, so an update made for new native code can never be sent to an older build that lacks it.
+
 ## App flow
 
 | # | Screen | File |
