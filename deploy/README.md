@@ -115,8 +115,10 @@ The same address also serves the legal pages: `https://api.yourdomain.com/privac
 ## Updating the server
 
 ```bash
-cd ~/tappy-ios-app && git pull && sudo bash deploy/oracle/setup.sh
+cd ~/tappy && git pull && sudo bash deploy/oracle/setup.sh
 ```
+
+`~/tappy` is a git checkout that reads GitHub with a read-only deploy key (`~/.ssh/tappy_deploy`, listed under the repo's Settings → Deploy keys as "Tappy server (read-only)"). It can download this repo and nothing else, and can't push. To deploy a different branch: `git -C ~/tappy switch <branch>` before pulling.
 
 Re-running is safe: it updates code, dependencies and services, and never overwrites `/etc/tappy/tappy.env` or the database.
 
