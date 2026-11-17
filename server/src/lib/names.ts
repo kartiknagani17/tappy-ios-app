@@ -109,6 +109,12 @@ export function cleanName(name: string, brandField: string | null, category: str
   if (isJunkName(s, brandRaw, category)) {
     const rawCat = (category ?? '').trim();
     const cat = PLACEHOLDER_CATEGORY.test(rawCat) ? '' : rawCat.replace(/^[a-z]{2}:/i, '');
+    // Short number-like names are often real ("88/12" beef, Suntory "-196", "D3-10,000"): keep
+    // them next to the brand. Barcodes typed in as the name (8+ digits) are dropped.
+    const digits = s.replace(/\D/g, '');
+    if (brand && /\d/.test(s) && s.length <= 14 && !(digits.length >= 8 && digits.length === s.replace(/\s/g, '').length)) {
+      return { name: `${brand} ${s}`, fix: 'replaced' };
+    }
     if (brand && cat) return { name: `${brand} ${cat.charAt(0).toLowerCase()}${cat.slice(1)}`, fix: 'replaced' };
     if (brand) return { name: brand, fix: 'replaced' };
     return { name, fix: 'junk_kept' }; // nothing better to show

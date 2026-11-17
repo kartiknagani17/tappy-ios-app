@@ -63,6 +63,9 @@ describe('display names', () => {
     assert.equal(cleanName('Test', 'Datofit', 'en:uncategorized').name, 'Datofit');
     assert.equal(cleanName('No name', 'Sans nom', null).fix, 'junk_kept');
     assert.equal(cleanName('Tums assorted shelf', null, null).name, 'Tums assorted');
+    assert.equal(cleanName('88/12', "Member's Mark", 'Ground beef').name, "Member's Mark 88/12");
+    assert.equal(cleanName('-196', 'Suntory', null).name, 'Suntory -196');
+    assert.equal(cleanName('0645230058843', 'Yoplait', null).name, 'Yoplait');
   });
 
   it('keeps real endings that look like photo words', () => {
