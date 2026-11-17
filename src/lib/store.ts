@@ -35,7 +35,16 @@ type State = {
   deviceId?: string;
   /** User opted in to share scanned product photos to improve the database. */
   contributePhotos: boolean;
+  /** "Tried it?" answers, by GTIN-14. */
+  tried: Record<string, TriedVote>;
+  /** Products to watch for ingredient changes, by GTIN-14, with the label text last seen. */
+  watched: Record<string, WatchedProduct>;
+  /** When the watched products were last checked for changes (ms since epoch). */
+  lastChangeCheck: number;
 };
+
+export type TriedVote = 'up' | 'down';
+export type WatchedProduct = { id: number; name: string; snapshot: string };
 
 type Actions = {
   set: (patch: Partial<State>) => void;
@@ -45,6 +54,8 @@ type Actions = {
   applyAvoidList: () => void;
   resetAll: () => void;
   toggleSaved: (productId: string) => void;
+  setTried: (gtin14: string, vote: TriedVote | null) => void;
+  setWatched: (gtin14: string, product: WatchedProduct | null) => void;
 };
 
 const initial: State = {
@@ -59,6 +70,9 @@ const initial: State = {
   accountPromptDismissed: false,
   saved: [],
   contributePhotos: false,
+  tried: {},
+  watched: {},
+  lastChangeCheck: 0,
 };
 
 export const useStore = create<State & Actions>()(
@@ -120,6 +134,20 @@ export const useStore = create<State & Actions>()(
       // Keep the anonymous device id across resets so daily limits can't be bypassed by resetting.
       resetAll: () => set((st) => ({ ...initial, deviceId: st.deviceId })),
       toggleSaved: (id) => set((st) => ({ saved: st.saved.includes(id) ? st.saved.filter((x) => x !== id) : [...st.saved, id] })),
+      setTried: (gtin14, vote) =>
+        set((st) => {
+          const next = { ...st.tried };
+          if (vote) next[gtin14] = vote;
+          else delete next[gtin14];
+          return { tried: next };
+        }),
+      setWatched: (gtin14, product) =>
+        set((st) => {
+          const next = { ...st.watched };
+          if (product) next[gtin14] = product;
+          else delete next[gtin14];
+          return { watched: next };
+        }),
     }),
     {
       name: 'tappy-store-v1',
@@ -135,7 +163,18 @@ export const useStore = create<State & Actions>()(
       merge: (persisted, current) => ({ ...current, ...(sanitizePersisted(persisted) as Partial<State>) }),
       // Persist data only, not the action functions.
       partialize: (st) => {
-        const { set: _s, setRestriction: _r, setOverride: _o, resetOverrides: _ro, applyAvoidList: _a, resetAll: _ra, toggleSaved: _t, ...data } = st;
+        const {
+          set: _s,
+          setRestriction: _r,
+          setOverride: _o,
+          resetOverrides: _ro,
+          applyAvoidList: _a,
+          resetAll: _ra,
+          toggleSaved: _t,
+          setTried: _st,
+          setWatched: _sw,
+          ...data
+        } = st;
         return data;
       },
     },

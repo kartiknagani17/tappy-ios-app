@@ -9,6 +9,7 @@ import { Button, Logo } from '../components/ui';
 import { checkSession, startProfileSync } from '../lib/auth';
 import { useRouteGuard, useStoreReady } from '../lib/boot';
 import { initPurchases } from '../lib/subscription';
+import { useWatchedProductChecks } from '../lib/watch';
 import { colors } from '../theme';
 
 // Keep the native splash up until the saved profile has loaded (or the fail-safe timeout passes).
@@ -35,6 +36,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 export default function RootLayout() {
   const ready = useStoreReady();
   useRouteGuard(ready);
+  useWatchedProductChecks(ready);
   useEffect(() => {
     if (ready) SplashScreen.hide();
   }, [ready]);

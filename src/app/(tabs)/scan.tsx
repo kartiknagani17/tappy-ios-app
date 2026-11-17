@@ -451,6 +451,7 @@ export default function Scan() {
         onClose={reset}
         onScanAgain={reset}
         onPhotographLabel={(gtin) => goLabel(gtin, gtin ? null : lastFrontHash.current)}
+        onOpenProduct={(p) => setVerdict({ product: p })}
       />
 
       <BottomSheet visible={!!prompt} onClose={reset} handle>

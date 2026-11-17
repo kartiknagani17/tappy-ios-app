@@ -9,7 +9,16 @@ import { INGREDIENTS } from '../../data/ingredients';
 import { RESTRICTIONS, RESTRICTION_BY_ID, type Selection } from '../../data/restrictions';
 import { rateNames } from '../ratings';
 import type { Rating } from '../store';
-import { computeVerdict, formatAllergens, highlightParts, normalizeLabel, tagsInText, verdictCopy } from '../verdict';
+import {
+  computeVerdict,
+  fitLabel,
+  formatAllergens,
+  highlightParts,
+  normalizeLabel,
+  restrictionBreakdown,
+  tagsInText,
+  verdictCopy,
+} from '../verdict';
 
 type R = Record<string, Selection>;
 const v = (ingredients: string | null, restrictions: R, allergens: string | null = null, overrides: Record<string, Rating> = {}) =>
@@ -347,6 +356,60 @@ describe('highlightParts', () => {
     const verdict = v(text, ANTI);
     assert.ok(verdict.flags.some((f) => f.label === 'Canola oil'));
     assert.ok(hits(text, verdict).includes('canola'));
+  });
+});
+
+describe('restrictionBreakdown', () => {
+  const PROFILE: R = {
+    'added-sugar': { level: 'preference' },
+    'artificial-flavors': { level: 'preference' },
+    peanut: { level: 'severe' },
+  };
+  const rows = (ingredients: string, r: R = PROFILE, allergens: string | null = null) =>
+    restrictionBreakdown({ ingredients_text: ingredients, allergens_text: allergens }, r);
+
+  it('gives one row per restriction, worst first, and agrees with the overall verdict', () => {
+    const r = rows(JIF);
+    assert.deepEqual(
+      r.map((x) => [x.id, x.rating]),
+      [
+        ['peanut', 'red'],
+        ['added-sugar', 'yellow'],
+        ['artificial-flavors', 'green'],
+      ],
+    );
+    const overall = v(JIF, PROFILE);
+    assert.equal(overall.state, 'avoid');
+    assert.ok(r[0].flags.some((f) => f.label === 'Peanut'));
+  });
+
+  it('only lists a restriction’s own ingredients in its row', () => {
+    const sugar = rows(JIF).find((x) => x.id === 'added-sugar')!;
+    assert.ok(sugar.flags.length > 0);
+    assert.ok(sugar.flags.every((f) => !/peanut/i.test(f.label)), sugar.flags.map((f) => f.label).join());
+  });
+
+  it('is empty when there is nothing to judge', () => {
+    assert.deepEqual(rows(''), []);
+  });
+
+  it('adds a row for ingredients the user rated themselves', () => {
+    const out = restrictionBreakdown({ ingredients_text: 'water, salt, sugar', allergens_text: null }, {}, { salt: 'red' });
+    assert.deepEqual(
+      out.map((x) => [x.id, x.rating]),
+      [['overrides', 'red']],
+    );
+  });
+});
+
+describe('fitLabel', () => {
+  it('softens preference conflicts and keeps strict ones firm', () => {
+    assert.equal(fitLabel(v(JIF, { 'added-sugar': { level: 'preference' } })), 'May fit your profile');
+    assert.equal(fitLabel(v(JIF, PEANUT_SEVERE)), 'Doesn’t fit your profile');
+    assert.equal(fitLabel(v('water, salt', PEANUT_SEVERE)), 'Fits your profile');
+    assert.equal(fitLabel(v('sugar, salt', PEANUT_SEVERE, 'May contain peanuts')), 'May not fit your profile');
+    assert.equal(fitLabel(v(null, PEANUT_SEVERE)), 'Not enough data');
+    assert.equal(fitLabel(v('water, salt', {})), 'Add your diets to check this');
   });
 });
 

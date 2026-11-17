@@ -14,6 +14,7 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const LEVELS = new Set(['severe', 'intolerance', 'preference']);
 const RATINGS = new Set(['green', 'yellow', 'red']);
 const PROVIDERS = new Set(['email', 'google', 'apple', 'facebook']);
+const GTIN_RE = /^\d{14}$/;
 
 const strArray = (v: unknown): string[] | undefined =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 500) : undefined;
@@ -68,6 +69,31 @@ export function sanitizePersisted(raw: unknown): Record<string, unknown> {
   if (restrictions) out.restrictions = restrictions;
   const overrides = cleanOverrides(raw.ingredientOverrides);
   if (overrides) out.ingredientOverrides = overrides;
+  if (isObj(raw.tried)) {
+    const tried: Record<string, 'up' | 'down'> = {};
+    for (const [gtin, vote] of Object.entries(raw.tried).slice(0, 2000)) {
+      if (GTIN_RE.test(gtin) && (vote === 'up' || vote === 'down')) tried[gtin] = vote;
+    }
+    out.tried = tried;
+  }
+  if (isObj(raw.watched)) {
+    const watched: Record<string, { id: number; name: string; snapshot: string }> = {};
+    for (const [gtin, w] of Object.entries(raw.watched).slice(0, 200)) {
+      if (
+        GTIN_RE.test(gtin) &&
+        isObj(w) &&
+        typeof w.id === 'number' &&
+        Number.isSafeInteger(w.id) &&
+        w.id > 0 &&
+        typeof w.name === 'string' &&
+        typeof w.snapshot === 'string'
+      ) {
+        watched[gtin] = { id: w.id, name: w.name.slice(0, 200), snapshot: w.snapshot.slice(0, 20_000) };
+      }
+    }
+    out.watched = watched;
+  }
+  if (typeof raw.lastChangeCheck === 'number' && Number.isFinite(raw.lastChangeCheck)) out.lastChangeCheck = raw.lastChangeCheck;
   if (isObj(raw.account) && typeof raw.account.email === 'string' && typeof raw.account.provider === 'string' && PROVIDERS.has(raw.account.provider)) {
     out.account = { email: raw.account.email, provider: raw.account.provider };
   }

@@ -177,6 +177,43 @@ export function searchProducts(db: DB, q: { brand?: string | null; name?: string
   return [...out.values()].slice(0, limit);
 }
 
+/**
+ * Candidates for "Similar items": other products in the same category that have an ingredient list,
+ * same brand first. The app decides which of them fit the user's profile (the profile never leaves
+ * the phone), so this returns more than it shows. Products without a category fall back to a name
+ * search without the brand ("Creamy Peanut Butter" → other peanut butters).
+ */
+export function similarProducts(db: DB, product: Product, limit = 60): Product[] {
+  const out = new Map<number, Product>();
+  const usable = (p: Product) =>
+    p.id !== product.id && p.gtin14 !== product.gtin14 && !!p.ingredients_text && p.ingredients_text.length >= 10 && !p.needs_review;
+  if (product.category) {
+    const rows = db
+      .prepare(
+        `SELECT * FROM products WHERE category = ? AND id != ? AND ingredients_text IS NOT NULL
+         ORDER BY (brand IS ?) DESC, report_count ASC, source_updated_at DESC LIMIT ?`,
+      )
+      .all(product.category, product.id, product.brand, limit * 2) as unknown as Product[];
+    for (const p of rows) if (usable(p) && out.size < limit) out.set(p.id, p);
+  }
+  if (out.size < 10) {
+    const brandWords = new Set((product.brand ?? '').toLowerCase().split(/\s+/));
+    const name = product.name
+      .split(/\s+/)
+      .filter((w) => !brandWords.has(w.toLowerCase()))
+      .join(' ');
+    for (const p of searchProducts(db, { name }, limit)) if (usable(p) && !out.has(p.id) && out.size < limit) out.set(p.id, p);
+  }
+  return [...out.values()];
+}
+
+/** Current data for up to 50 product ids (used to tell the app when a watched product changed). */
+export function productsByIds(db: DB, ids: number[]): Product[] {
+  const unique = [...new Set(ids)].filter((x) => Number.isSafeInteger(x) && x > 0).slice(0, 50);
+  if (!unique.length) return [];
+  return db.prepare(`SELECT * FROM products WHERE id IN (${unique.map(() => '?').join(',')})`).all(...unique) as unknown as Product[];
+}
+
 /** Strip control/bidi characters, collapse whitespace, cap length. Empty -> null. */
 export function sanitizeReason(v: unknown, max = 500): string | null {
   if (typeof v !== 'string') return null;

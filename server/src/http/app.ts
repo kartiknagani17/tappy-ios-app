@@ -7,7 +7,14 @@ import { logError } from '../lib/log.ts';
 import { accountPurchaserId, ANONYMOUS_PURCHASER_RE, noEntitlements, RevenueCatEntitlements, type EntitlementChecker } from '../services/entitlements.ts';
 import { FeedbackError, submitFeedback } from '../services/feedback.ts';
 import { consumeDailyQuota, ipKey, LimitError, RateLimiter, type QuotaSubject } from '../services/limits.ts';
-import { getProductById, reportProduct, sanitizeReason, toPublicProduct } from '../services/products.ts';
+import {
+  getProductById,
+  productsByIds,
+  reportProduct,
+  sanitizeReason,
+  similarProducts,
+  toPublicProduct,
+} from '../services/products.ts';
 import type { ScanService } from '../services/scan.ts';
 import { LEGAL_DOCS } from '../legal/content.ts';
 import {
@@ -61,6 +68,8 @@ const ROUTES: Route[] = [
   { name: 'health', pattern: /^\/api\/health$/, methods: ['GET', 'HEAD'] },
   { name: 'product', pattern: /^\/api\/products\/(\d{1,15})$/, methods: ['GET', 'HEAD'] },
   { name: 'report', pattern: /^\/api\/products\/(\d{1,15})\/report$/, methods: ['POST'] },
+  { name: 'similar', pattern: /^\/api\/products\/(\d{1,15})\/similar$/, methods: ['POST'] },
+  { name: 'lookup', pattern: /^\/api\/products\/lookup$/, methods: ['POST'] },
   { name: 'feedback', pattern: /^\/api\/feedback$/, methods: ['POST'] },
   { name: 'barcode', pattern: /^\/api\/scan\/barcode$/, methods: ['POST'] },
   { name: 'front', pattern: /^\/api\/scan\/front$/, methods: ['POST'] },
@@ -279,6 +288,18 @@ export function createApp({
         const p = reportProduct(db, idParam, userId, sanitizeReason(body.reason));
         if (!p) throw new HttpError(404, 'not_found', 'Product not found');
         return send(res, 200, { ok: true, already_reported: p.duplicate, product: toPublicProduct(p) });
+      }
+      case 'similar': {
+        const p = getProductById(db, idParam);
+        if (!p) throw new HttpError(404, 'not_found', 'Product not found');
+        return send(res, 200, { products: similarProducts(db, p).map(toPublicProduct) });
+      }
+      case 'lookup': {
+        const ids = body.ids;
+        if (!Array.isArray(ids) || ids.length > 50 || !ids.every((x) => typeof x === 'number' && Number.isSafeInteger(x) && x > 0)) {
+          throw new HttpError(400, 'bad_request', 'ids must be up to 50 positive integers');
+        }
+        return send(res, 200, { products: productsByIds(db, ids as number[]).map(toPublicProduct) });
       }
       case 'feedback': {
         const out = submitFeedback(db, userId, body, mailer ? { mailer, to: config.supportEmail } : null);

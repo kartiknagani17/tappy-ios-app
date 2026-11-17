@@ -81,6 +81,29 @@ describe('HTTP API', () => {
     assert.equal((await post('/api/products/999999/report', {})).status, 404);
   });
 
+  it('POST /api/products/:id/similar returns other products with ingredients', async () => {
+    const p = getProductByGtin(db, '00013764027503')!;
+    const res = await post(`/api/products/${p.id}/similar`, {});
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { products: { id: number; ingredients_text: string | null }[] };
+    assert.ok(Array.isArray(body.products));
+    assert.ok(body.products.every((x) => x.id !== p.id && !!x.ingredients_text));
+    assert.equal((await post('/api/products/999999/similar', {})).status, 404);
+  });
+
+  it('POST /api/products/lookup returns current data for the given ids', async () => {
+    const p = getProductByGtin(db, '00013764027503')!;
+    const res = await post('/api/products/lookup', { ids: [p.id, 999999] });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { products: { id: number; ingredients_text: string | null }[] };
+    assert.deepEqual(
+      body.products.map((x) => x.id),
+      [p.id],
+    );
+    assert.equal((await post('/api/products/lookup', { ids: ['1'] })).status, 400);
+    assert.equal((await post('/api/products/lookup', { ids: Array.from({ length: 51 }, (_, i) => i + 1) })).status, 400);
+  });
+
   it('rate-limits bursts per user', async () => {
     const tight = testConfig({ rateLimitPerMinute: 2, dailyFreeScans: 100 });
     const { scan } = makeScan(db, new MockVisionProvider(), tight);

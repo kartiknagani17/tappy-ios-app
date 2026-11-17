@@ -239,13 +239,13 @@ export function highlightRanges(text: string, flags: Pick<Flag, 'term'>[]): High
 }
 
 /** Split label text into plain and highlighted pieces, for rendering. */
-export function highlightParts(text: string, flags: Pick<Flag, 'term'>[]): { text: string; hit: boolean }[] {
-  const parts: { text: string; hit: boolean }[] = [];
+export function highlightParts(text: string, flags: Pick<Flag, 'term'>[]): { text: string; hit: boolean; term?: string }[] {
+  const parts: { text: string; hit: boolean; term?: string }[] = [];
   let at = 0;
   for (const r of highlightRanges(text, flags)) {
     if (r.start < at) continue;
     if (r.start > at) parts.push({ text: text.slice(at, r.start), hit: false });
-    parts.push({ text: text.slice(r.start, r.end), hit: true });
+    parts.push({ text: text.slice(r.start, r.end), hit: true, term: r.term });
     at = r.end;
   }
   if (at < text.length) parts.push({ text: text.slice(at), hit: false });
@@ -377,6 +377,61 @@ export function computeVerdict(
     matchedTerms: mainTerms.length,
     ...(worstState === 'no_conflicts' && noProfile ? { reason: 'no_profile' as const } : {}),
   };
+}
+
+/** One row of the "Diet overview": how a product does against one restriction in the profile. */
+export type RestrictionRow = {
+  /** Restriction id, or 'overrides' for the user's own per-ingredient ratings. */
+  id: string;
+  name: string;
+  about: string | null;
+  rating: Rating;
+  /** Ingredients that conflict with this restriction, worst first. */
+  flags: Flag[];
+};
+
+const RANK: Record<Rating, number> = { red: 0, yellow: 1, green: 2 };
+
+/**
+ * The verdict split per restriction, worst first ("Added sugar ✗, Emulsifiers –, Artificial flavors ✓").
+ * Uses the same matcher and ratings as computeVerdict, so the rows always agree with the overall
+ * verdict: the overall state is the worst row. Restrictions with nothing found are green rows.
+ * Returns [] when there is no ingredient data to judge (the verdict is 'unknown').
+ */
+export function restrictionBreakdown(
+  product: { ingredients_text: string | null; allergens_text: string | null },
+  restrictions: Record<string, Selection>,
+  overrides: Record<string, Rating> = {},
+): RestrictionRow[] {
+  const all = computeVerdict(product, restrictions, overrides);
+  if (all.state === 'unknown') return [];
+  const rows: RestrictionRow[] = [];
+  for (const [id, sel] of Object.entries(restrictions ?? {})) {
+    const r = RESTRICTION_BY_ID[id];
+    if (!r || !sel || typeof sel !== 'object') continue;
+    // Rated against this restriction alone (overrides still apply to the terms it covers).
+    const flags = computeVerdict(product, { [id]: sel }, overrides).flags.filter((f) => f.restrictions.includes(r.name));
+    flags.sort((a, b) => RANK[a.rating] - RANK[b.rating]);
+    const rating: Rating = flags[0]?.rating ?? 'green';
+    rows.push({ id, name: r.name, about: r.about, rating, flags });
+  }
+  // Ingredients flagged only because the user rated them themselves.
+  const own = all.flags.filter((f) => f.restrictions.length === 0);
+  if (own.length) {
+    own.sort((a, b) => RANK[a.rating] - RANK[b.rating]);
+    rows.push({ id: 'overrides', name: 'Your ingredient ratings', about: null, rating: own[0].rating, flags: own });
+  }
+  return rows.sort((a, b) => RANK[a.rating] - RANK[b.rating] || a.name.localeCompare(b.name));
+}
+
+/** The one-line answer under the product name ("May fit your profile"). */
+export function fitLabel(v: Verdict): string {
+  if (v.state === 'unknown') return v.reason === 'unrecognized' ? 'Couldn’t read the ingredients' : 'Not enough data';
+  if (v.reason === 'no_profile') return 'Add your diets to check this';
+  const onlyMayContain = v.flags.length > 0 && v.flags.every((f) => f.mayContain);
+  if (v.state === 'avoid') return onlyMayContain ? 'May not fit your profile' : 'Doesn’t fit your profile';
+  if (v.state === 'limit') return 'May fit your profile';
+  return 'Fits your profile';
 }
 
 export const VERDICT_COPY: Record<VerdictState, { title: string; body: string }> = {

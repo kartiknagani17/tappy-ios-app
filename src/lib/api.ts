@@ -199,7 +199,9 @@ export function isApiProduct(v: unknown): v is ApiProduct {
   );
 }
 
-const isExtracted = (v: unknown) => v === null || (isObj(v) && strOrNull(v.brand) && strOrNull(v.product_name));
+const isProductList = (v: unknown) => isObj(v) && Array.isArray(v.products) && v.products.length <= 100 && v.products.every(isApiProduct);
+
+const isExtracted =(v: unknown) => v === null || (isObj(v) && strOrNull(v.brand) && strOrNull(v.product_name));
 
 function isBarcodeResult(v: unknown): boolean {
   if (!isObj(v)) return false;
@@ -273,6 +275,14 @@ export const api = {
     if (!Number.isSafeInteger(productId) || productId <= 0) return Promise.reject(new ApiError(0, 'invalid', 'Can’t report this product.'));
     return post<{ ok: true }>(`/api/products/${productId}/report`, { reason: reason.slice(0, 1000) }, { validate: isObj });
   },
+  /** Other products in the same category (unfiltered: the app checks which fit the profile). */
+  similar: (productId: number) => {
+    if (!Number.isSafeInteger(productId) || productId <= 0) return Promise.resolve({ products: [] as ApiProduct[] });
+    return post<{ products: ApiProduct[] }>(`/api/products/${productId}/similar`, {}, { validate: isProductList });
+  },
+  /** Current data for products the user is watching for ingredient changes (max 50 ids). */
+  lookup: (ids: number[]) =>
+    post<{ products: ApiProduct[] }>('/api/products/lookup', { ids: ids.slice(0, 50) }, { validate: isProductList, retries: 1 }),
   /** In-app feedback forms. Stored on the server and forwarded to the support email. */
   feedback: (topic: string, message: string) =>
     post<{ ok: true }>('/api/feedback', { topic: topic.slice(0, 80), message: message.slice(0, 2000) }, { validate: isObj, retries: 1 }),
