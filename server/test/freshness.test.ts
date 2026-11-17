@@ -9,8 +9,8 @@ import { offJsonToRow, tagToName } from '../src/import/off-json.ts';
 import { dirSource, importUsda } from '../src/import/usda.ts';
 import { findNewUsdaRelease, newestUsdaRelease } from '../src/import/usda-latest.ts';
 import { ingredientSimilarity, sameIngredients } from '../src/lib/ingredients-diff.ts';
-import { displayName } from '../src/lib/names.ts';
-import { approveContribution, getProductByGtin, rejectContribution, toPublicProduct } from '../src/services/products.ts';
+import { cleanName, displayName, pickName } from '../src/lib/names.ts';
+import { approveContribution, getProductByGtin, rebuildProduct, rejectContribution, toPublicProduct } from '../src/services/products.ts';
 import { ScanService } from '../src/services/scan.ts';
 import type { IncomingRecord } from '../src/services/products.ts';
 import { FIXTURES, labelJson, makeScan, MockVisionProvider, packagePhoto, testConfig, testDb } from './helpers.ts';
@@ -36,6 +36,37 @@ describe('display names', () => {
     for (const n of ['Creamy Peanut Butter', 'Snickers', "Lay's Classic Potato Chips", 'Coca-Cola Zero Sugar', 'iPhone-shaped Gummies']) {
       assert.equal(displayName(n, 'Brand', 'Category'), n);
     }
+  });
+
+  it('reports what kind of fix it made', () => {
+    assert.deepEqual(cleanName('Snickers', 'Mars', null), { name: 'Snickers', fix: 'unchanged' });
+    assert.equal(cleanName('oreo cookies shelf', 'Oreo', null).fix, 'trimmed_and_case');
+    assert.equal(cleanName('Oreo Cookies shelf', 'Oreo', null).fix, 'trimmed');
+    assert.equal(cleanName('OREO COOKIES', 'Oreo', null).fix, 'case');
+    assert.equal(cleanName('My Bff', 'Cheerios', 'Cereals').fix, 'replaced');
+    assert.equal(cleanName('x', null, null).fix, 'junk_kept');
+  });
+
+  it('doesn’t mistake real names for junk (cases the full-database report caught)', () => {
+    assert.equal(cleanName('Food Coloring', '365 Whole Foods Market', 'Food colorings').fix, 'unchanged');
+    assert.equal(cleanName('餅', null, null).fix, 'unchanged');
+    assert.equal(cleanName('Unknown Food Item', 'Aldi', null).fix, 'replaced');
+    assert.equal(cleanName('3948764032905', 'Brand', null).fix, 'replaced');
+  });
+
+  it('picks a real name from another source instead of a junk one', () => {
+    assert.equal(pickName(['My Bff', 'CHEERIOS TOASTED WHOLE GRAIN OAT CEREAL']), 'CHEERIOS TOASTED WHOLE GRAIN OAT CEREAL');
+    assert.equal(pickName(['Creamy Peanut Butter', 'PEANUT BUTTER']), 'Creamy Peanut Butter');
+    assert.equal(pickName(['My Bff']), 'My Bff');
+    assert.equal(pickName([null, '']), null);
+  });
+
+  it('stores the USDA name when the Open Food Facts name is junk', async () => {
+    const db = await seededDb();
+    const gtin = '00013764027503';
+    db.prepare(`UPDATE source_records SET name = 'My Bff', source_updated_at = '2099-01-01' WHERE gtin14 = ? AND source = 'off'`).run(gtin);
+    const usdaName = (db.prepare(`SELECT name FROM source_records WHERE gtin14 = ? AND source = 'usda'`).get(gtin) as { name: string }).name;
+    assert.equal(rebuildProduct(db, gtin)!.name, usdaName);
   });
 
   it('is what the app receives, while the stored name is unchanged', async () => {

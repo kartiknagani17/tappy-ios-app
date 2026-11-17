@@ -1,3 +1,5 @@
+import { pickName } from './names.ts';
+
 /**
  * Source-priority merge. When USDA and Open Food Facts both have a GTIN:
  *   1. prefer the record that has an ingredient list,
@@ -53,6 +55,15 @@ export function mergeRecords(records: SourceRecord[]): (SourceRecord & { filled_
   if (!winner) return null;
   const others = records.filter((r) => r !== winner);
   const merged = { ...winner, filled_from: [] as SourceName[] };
+  // Name: the winner's, unless it's junk ("My Bff"); then the first real name from the other
+  // sources, manufacturer data (USDA) first. Ingredients still come only from the winner.
+  const byTrust = [...records].sort((a, b) => (a.source === b.source ? 0 : a.source === 'usda' ? -1 : 1));
+  const name = pickName([winner.name, ...byTrust.map((r) => r.name)]);
+  if (name && name !== winner.name) {
+    const donor = records.find((r) => r.name?.trim() === name);
+    merged.name = name;
+    if (donor && donor !== winner && !merged.filled_from.includes(donor.source)) merged.filled_from.push(donor.source);
+  }
   for (const field of ['brand', 'size_text', 'category', 'image_url', 'nutrition_json', 'variant_or_flavor'] as const) {
     if (merged[field]) continue;
     const donor = others.find((o) => o[field]);

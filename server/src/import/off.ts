@@ -3,6 +3,7 @@ import { createGunzip } from 'node:zlib';
 import type { Readable } from 'node:stream';
 import type { DB } from '../db/index.ts';
 import { toGtin14Lenient } from '../lib/gtin.ts';
+import { pickName } from '../lib/names.ts';
 import { upsertSourceRecord, type IncomingRecord } from '../services/products.ts';
 import { BatchWriter, clean, finishRun, Progress, readRows, startRun, toNumber, type Logger } from './common.ts';
 
@@ -71,7 +72,8 @@ export function offRowToRecord(row: Record<string, string>, opts: { requireUs: b
   if (opts.requireUs && !(row.countries_tags ?? '').split(',').includes('en:united-states')) return null;
   const gtin14 = toGtin14Lenient(row.code);
   if (!gtin14) return null;
-  const name = clean(row.product_name) ?? clean(row.generic_name);
+  // The generic name ("Creamy peanut butter") when the product name is junk ("My Bff") or missing.
+  const name = pickName([clean(row.product_name), clean(row.generic_name)]);
   if (!name) return null;
 
   const contains = tagsToText(clean(row.allergens_en) ?? clean(row.allergens));

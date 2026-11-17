@@ -1,4 +1,4 @@
-import { createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -8,8 +8,8 @@ import { importOff } from './import/off.ts';
 import { updateOffFromDeltas } from './import/off-delta.ts';
 import { importUsda, openUsdaSource } from './import/usda.ts';
 import { findNewUsdaRelease } from './import/usda-latest.ts';
-import { displayName } from './lib/names.ts';
-import { approveContribution, pendingContributions, rejectContribution } from './services/products.ts';
+import { cleanName, isJunkName } from './lib/names.ts';
+import { approveContribution, pendingContributions, rebuildProduct, rejectContribution } from './services/products.ts';
 
 const HELP = `Tappy data CLI
 
@@ -20,7 +20,9 @@ const HELP = `Tappy data CLI
   node src/cli.ts update                  Daily refresh: Open Food Facts daily changes + any new USDA release
   node src/cli.ts update-off              Apply Open Food Facts' daily change files not applied yet
   node src/cli.ts update-usda             Download and import the newest USDA release if it's new
-  node src/cli.ts names [n]               Products whose names the app cleans up (default: 30)
+  node src/cli.ts names-report [n]        Name cleanup over every product: counts per kind of fix,
+                                          and a CSV with up to n random examples of each (default 200)
+  node src/cli.ts fix-names               Replace junk stored names with a real name from another source
   node src/cli.ts review [n]              Ingredient-label photos waiting for review, next to current data
   node src/cli.ts approve <id>            Use a reviewed label photo as the product's data for everyone
   node src/cli.ts reject <id>             Discard a label photo
@@ -148,18 +150,54 @@ async function main() {
       log(cmd === 'approve' ? `Approved #${id}: everyone now sees the photographed ingredients.` : `Rejected #${id}.`);
       return;
     }
-    case 'names': {
+    case 'names-report': {
+      // Every product, not a sample: counts per kind of fix, plus a random sample to check by eye.
       const db = openDb(config.dbPath);
-      const rows = db.prepare('SELECT name, brand, category FROM products ORDER BY random() LIMIT 20000').all() as {
-        name: string;
-        brand: string | null;
-        category: string | null;
-      }[];
-      let shown = 0;
-      for (const r of rows) {
-        const out = displayName(r.name, r.brand, r.category);
-        if (out !== r.name && shown++ < (Number(arg) || 30)) console.log(`${r.name}  →  ${out}`);
+      const sampleSize = Number(arg) || 200;
+      const counts: Record<string, number> = {};
+      const samples: Record<string, string[][]> = {};
+      const seen: Record<string, number> = {};
+      let total = 0;
+      const stmt = db.prepare('SELECT gtin14, name, brand, category, source FROM products');
+      for (const r of stmt.iterate() as Iterable<{ gtin14: string; name: string; brand: string | null; category: string | null; source: string }>) {
+        total++;
+        const { name, fix } = cleanName(r.name, r.brand, r.category);
+        counts[fix] = (counts[fix] ?? 0) + 1;
+        // Reservoir sample per kind, so rare kinds (replaced, junk_kept) are well represented.
+        const n = (seen[fix] = (seen[fix] ?? 0) + 1);
+        const bucket = (samples[fix] ??= []);
+        const row = [fix, r.gtin14, r.source, r.brand ?? '', r.category ?? '', r.name, name];
+        if (bucket.length < sampleSize) bucket.push(row);
+        else if (Math.random() * n < sampleSize) bucket[Math.floor(Math.random() * sampleSize)] = row;
       }
+      const dir = path.join(path.dirname(config.dbPath), 'reports');
+      mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, `names-${new Date().toISOString().slice(0, 10)}.csv`);
+      const csv = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      const lines = [['fix', 'gtin14', 'source', 'brand', 'category', 'stored_name', 'shown_name'].join(',')];
+      for (const rows of Object.values(samples)) for (const row of rows) lines.push(row.map(csv).join(','));
+      writeFileSync(file, lines.join('\n'));
+      console.log(`Products: ${total.toLocaleString()}`);
+      for (const [k, v] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
+        console.log(`  ${k.padEnd(18)} ${v.toLocaleString().padStart(10)}  (${((v / Math.max(total, 1)) * 100).toFixed(2)}%)`);
+      }
+      console.log(`Sample of up to ${sampleSize} per kind: ${file}`);
+      return;
+    }
+    case 'fix-names': {
+      // Re-pick the stored name for products whose name is junk, using every source's name.
+      const db = openDb(config.dbPath);
+      const junk: string[] = [];
+      for (const r of db.prepare('SELECT gtin14, name FROM products').iterate() as Iterable<{ gtin14: string; name: string }>) {
+        if (isJunkName(r.name)) junk.push(r.gtin14);
+      }
+      let fixed = 0;
+      for (const gtin of junk) {
+        const before = db.prepare('SELECT name FROM products WHERE gtin14 = ?').get(gtin) as { name: string };
+        const after = rebuildProduct(db, gtin);
+        if (after && after.name !== before.name) fixed++;
+      }
+      log(`Junk names: ${junk.length.toLocaleString()}; replaced with a real name from another source: ${fixed.toLocaleString()}`);
       return;
     }
     case 'backup': {
