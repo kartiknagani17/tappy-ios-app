@@ -224,14 +224,21 @@ export function browseProducts(db: DB, opts: { q?: string | null; aisle?: Aisle 
   const tokens = ftsTokens(opts.q);
   let rows: Product[];
   if (tokens.length) {
-    // Every word must match ("peanut butter" isn't every peanut product).
+    // Every word must match ("peanut butter" isn't every peanut product). The index ranks first and
+    // only the best few hundred matches are read from the products table: a common word ("chips")
+    // matches tens of thousands, and reading them all took ~8 s on the server.
+    const best = Math.max(400, (offset + GROCERY_PAGE + 1) * 4);
     rows = db
       .prepare(
-        `SELECT p.* FROM product_search s JOIN products p ON p.id = s.rowid
-         WHERE product_search MATCH ? AND p.ingredients_text IS NOT NULL ${opts.aisle ? 'AND p.aisle = ?' : ''}
-         ORDER BY (p.image_url IS NULL), bm25(product_search, 3.0, 4.0, 1.5, 0.5) LIMIT ? OFFSET ?`,
+        `SELECT p.* FROM (
+           SELECT rowid, rank FROM product_search
+           WHERE product_search MATCH ? AND rank MATCH 'bm25(3.0, 4.0, 1.5, 0.5)'
+           ORDER BY rank LIMIT ?
+         ) s JOIN products p ON p.id = s.rowid
+         WHERE p.ingredients_text IS NOT NULL ${opts.aisle ? 'AND p.aisle = ?' : ''}
+         ORDER BY (p.image_url IS NULL), s.rank LIMIT ? OFFSET ?`,
       )
-      .all(...([all(tokens), ...(opts.aisle ? [opts.aisle] : []), GROCERY_PAGE + 1, offset] as (string | number)[])) as unknown as Product[];
+      .all(...([all(tokens), best, ...(opts.aisle ? [opts.aisle] : []), GROCERY_PAGE + 1, offset] as (string | number)[])) as unknown as Product[];
   } else if (opts.aisle) {
     rows = db
       .prepare(
