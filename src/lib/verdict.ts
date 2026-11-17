@@ -1,4 +1,4 @@
-import { EXTRA_TERMS } from '../data/allergenTerms';
+import { EXTRA_TERMS, TERM_LABELS } from '../data/allergenTerms';
 import { INGREDIENTS } from '../data/ingredients';
 import { RESTRICTION_BY_ID, effectiveLevel, selectionTags, type Selection } from '../data/restrictions';
 import type { Rating } from './store';
@@ -28,11 +28,15 @@ export type VerdictReason =
   /** The profile has no restrictions or overrides, so there was nothing to check against. */
   | 'no_profile';
 
-export type Flag = { term: string; rating: Rating; restrictions: string[]; mayContain: boolean };
+/**
+ * `term` is the internal matching key (lower-case, last word singular: "molasse", "oat") and must never
+ * be shown to people. Show `label` ("Molasses", "Oats").
+ */
+export type Flag = { term: string; label: string; rating: Rating; restrictions: string[]; mayContain: boolean };
 
 export type Verdict = { state: VerdictState; flags: Flag[]; matchedTerms: number; reason?: VerdictReason };
 
-type Term = { term: string; tags: string[]; test: RegExp; global: RegExp };
+type Term = { term: string; label: string; tags: string[]; test: RegExp; global: RegExp };
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -81,29 +85,43 @@ function keyFor(phrase: string): string {
   return words.join(' ');
 }
 
+/** "sesame seeds" → "Sesame seeds" */
+const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Regex source for a term key. Tolerates the raw label spellings that normalizeLabel would rewrite. */
+function termBody(term: string): string {
+  // "e220" also matches "E 220" / "E-220"
+  const eNum = /^e(\d{3}[a-z]?)$/.exec(term);
+  if (eNum) return `e[\\s-]?${eNum[1]}`;
+  // "red 40" also matches "Red No. 40", "Red #40", "red40"
+  const color = /^(red|yellow|blue|green) (\d{1,2})$/.exec(term);
+  if (color) return `${color[1]}[\\s-]*(?:no\\.?|#|number)?[\\s-]*${color[2]}`;
+  const words = term.split(' ');
+  // Only the last word is pluralized ("sesame seeds", "egg whites"); spaces also match hyphens/newlines.
+  return [...words.slice(0, -1).map((w) => escape(w).replace(/'/g, "'?")), wordPattern(words[words.length - 1])].join('[\\s-]+');
+}
+
 const TERMS: Term[] = (() => {
-  const map = new Map<string, Set<string>>();
-  const add = (term: string, tags: string[]) => {
-    const key = keyFor(term);
+  const map = new Map<string, { label: string; tags: Set<string> }>();
+  const add = (phrase: string, tags: string[]) => {
+    const key = keyFor(phrase);
     if (!key) return;
-    const set = map.get(key) ?? new Set<string>();
-    tags.forEach((t) => set.add(t));
-    map.set(key, set);
+    // The first spelling wins as the display name: catalog names ("Molasses") come before extra terms.
+    const entry = map.get(key) ?? { label: TERM_LABELS[phrase.toLowerCase()] ?? sentenceCase(phrase.toLowerCase()), tags: new Set<string>() };
+    tags.forEach((t) => entry.tags.add(t));
+    map.set(key, entry);
   };
   for (const ing of INGREDIENTS) add(ing.name, ing.tags);
   for (const [t, tags] of Object.entries(EXTRA_TERMS)) add(t, tags);
   return [...map.entries()]
-    .map(([term, tags]) => {
-      const words = term.split(' ');
-      // Only the last word is pluralized ("sesame seeds", "egg whites"); spaces also match hyphens/newlines.
-      const body = [...words.slice(0, -1).map((w) => escape(w).replace(/'/g, "'?")), wordPattern(words[words.length - 1])].join(
-        '[\\s-]+',
-      );
-      const source = `(^|[^a-z0-9])${body}(?=[^a-z0-9]|$)`;
-      return { term, tags: [...tags], test: new RegExp(source), global: new RegExp(source, 'g') };
+    .map(([term, { label, tags }]) => {
+      const source = `(^|[^a-z0-9])${termBody(term)}(?=[^a-z0-9]|$)`;
+      return { term, label, tags: [...tags], test: new RegExp(source), global: new RegExp(source, 'g') };
     })
     .sort((a, b) => b.term.length - a.term.length);
 })();
+
+const TERM_BY_KEY = new Map(TERMS.map((t) => [t.term, t]));
 
 /**
  * Precautionary ("may contain") statements, in English plus FR/ES/IT/DE. A statement runs until the
@@ -161,6 +179,117 @@ export function tagsInText(text: string): string[] {
   return [...tags];
 }
 
+/**
+ * Character-level version of normalizeLabel that keeps a map back to the original text, so matches
+ * can be highlighted where they really are. `map[i]` is the index in `text` of folded character i.
+ */
+function foldWithMap(text: string): { folded: string; map: number[] } {
+  let folded = '';
+  const map: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    let c = text[i];
+    try {
+      c = c.normalize('NFKD');
+    } catch {
+      // normalize() unavailable: keep the raw character.
+    }
+    c = c
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/œ/g, 'oe')
+      .replace(/æ/g, 'ae')
+      .replace(/ß/g, 'ss')
+      .replace(/[‘’ʼ`´]/g, "'")
+      .replace(/[_*]/g, ' ');
+    for (const ch of c) {
+      folded += ch;
+      map.push(i);
+    }
+  }
+  return { folded, map };
+}
+
+export type HighlightRange = { start: number; end: number; term: string };
+
+/**
+ * Where the flagged terms appear in the original label text, using the exact same matcher as the
+ * verdict (plurals, accents, hyphens, "E 150d", "Red No. 40", longest phrase first). Ranges are
+ * sorted and never overlap.
+ */
+export function highlightRanges(text: string, flags: Pick<Flag, 'term'>[]): HighlightRange[] {
+  const wanted = new Set(flags.map((f) => f.term));
+  if (!text || !wanted.size) return [];
+  const { folded, map } = foldWithMap(text);
+  const ranges: HighlightRange[] = [];
+  // Pad so the "(^|[^a-z0-9])" prefix works at the edges; index 0 of the padded string is the pad.
+  let remaining = ` ${folded} `;
+  for (const t of TERMS) {
+    if (!t.test.test(remaining)) continue;
+    remaining = remaining.replace(t.global, (m: string, pre: string, offset: number) => {
+      const from = offset + pre.length - 1; // back to folded-string indexes
+      const to = offset + m.length - 1;
+      if (wanted.has(t.term) && from >= 0 && to <= folded.length) {
+        ranges.push({ start: map[from], end: map[to - 1] + 1, term: t.term });
+      }
+      // Blank out the match so "peanut butter" doesn't also highlight "butter".
+      return pre + ' '.repeat(m.length - pre.length);
+    });
+  }
+  return ranges.sort((a, b) => a.start - b.start);
+}
+
+/** Split label text into plain and highlighted pieces, for rendering. */
+export function highlightParts(text: string, flags: Pick<Flag, 'term'>[]): { text: string; hit: boolean }[] {
+  const parts: { text: string; hit: boolean }[] = [];
+  let at = 0;
+  for (const r of highlightRanges(text, flags)) {
+    if (r.start < at) continue;
+    if (r.start > at) parts.push({ text: text.slice(at, r.start), hit: false });
+    parts.push({ text: text.slice(r.start, r.end), hit: true });
+    at = r.end;
+  }
+  if (at < text.length) parts.push({ text: text.slice(at), hit: false });
+  return parts;
+}
+
+/** Placeholder values some sources put in allergen fields. */
+const ALLERGEN_PLACEHOLDER = /^(?:none|nothing|null|unknown|undefined|n\/?a|no|-+)$/i;
+
+/**
+ * Tidy a "Contains: …. May contain: …" statement for display: drop placeholders and junk codes,
+ * remove duplicates, and don't repeat under "May contain" what the product definitely contains.
+ * Unrecognized words are kept (lower-cased): hiding real allergen info would be worse than showing
+ * an odd word. Anything that isn't in that two-part shape is returned unchanged.
+ */
+export function formatAllergens(text: string | null): string | null {
+  if (!text) return null;
+  const m = /^\s*(?:contains:\s*(.*?))?\s*(?:\.\s*)?(?:may contain:\s*(.*?))?\s*\.?\s*$/i.exec(text);
+  if (!m || (m[1] === undefined && m[2] === undefined)) return text;
+  const items = (s: string | undefined) => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of (s ?? '').split(',')) {
+      const x = raw.trim().toLowerCase();
+      if (!x || ALLERGEN_PLACEHOLDER.test(x) || /\d/.test(x) || seen.has(x)) continue;
+      seen.add(x);
+      out.push(x);
+    }
+    return out;
+  };
+  const contains = items(m[1]);
+  const containsSet = new Set(contains);
+  const mayContain = items(m[2]).filter((x) => !containsSet.has(x));
+  const out = [contains.length && `Contains: ${contains.join(', ')}`, mayContain.length && `May contain: ${mayContain.join(', ')}`]
+    .filter(Boolean)
+    .join('. ');
+  return out ? `${out}.` : null;
+}
+
+/** Display name for a term key ("molasse" → "Molasses"). */
+export function termLabel(term: string): string {
+  return TERM_BY_KEY.get(term)?.label ?? sentenceCase(term);
+}
+
 const asText = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 export function computeVerdict(
@@ -208,7 +337,7 @@ export function computeVerdict(
       if (r === 'red' || (r === 'yellow' && rating === 'green')) rating = r;
     }
     if (override && !isMayContain) rating = override;
-    if (rating !== 'green') flags.push({ term: t.term, rating, restrictions: [...names], mayContain: isMayContain });
+    if (rating !== 'green') flags.push({ term: t.term, label: t.label, rating, restrictions: [...names], mayContain: isMayContain });
   };
 
   const hasIngredients = ingredients.replace(/[^a-z0-9]/g, '').length >= 3;

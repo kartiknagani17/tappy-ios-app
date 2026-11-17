@@ -5,7 +5,15 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { api, ApiError, type ApiProduct } from '../lib/api';
 import { haptic } from '../lib/haptics';
 import { useStore } from '../lib/store';
-import { computeVerdict, SOURCE_LABEL, verdictCopy, type VerdictState } from '../lib/verdict';
+import {
+  computeVerdict,
+  formatAllergens,
+  highlightParts,
+  SOURCE_LABEL,
+  verdictCopy,
+  type Flag,
+  type VerdictState,
+} from '../lib/verdict';
 import { colors, noOutline, radius } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Button, CloseButton, RatingIcon } from './ui';
@@ -43,7 +51,7 @@ export function VerdictSheet({
 
   const verdict = product ? computeVerdict(product, restrictions, overrides) : null;
   const unverified = product && (product.source === 'ocr' || product.source === 'user') && !product.verified;
-  const flaggedTerms = new Set(verdict?.flags.map((f) => f.term) ?? []);
+  const allergenLine = product ? formatAllergens(product.allergens_text) : null;
 
   return (
     <BottomSheet visible={!!product} onClose={onClose} handle maxHeight={0.9}>
@@ -90,7 +98,7 @@ export function VerdictSheet({
                     <View key={f.term + f.mayContain} style={styles.flag}>
                       <RatingIcon rating={f.rating} size={16} />
                       <Text style={styles.flagText}>
-                        <Text style={{ fontWeight: '700', textTransform: 'capitalize' }}>{f.term}</Text>
+                        <Text style={{ fontWeight: '700' }}>{f.label}</Text>
                         {f.mayContain ? ' (may contain)' : ''}
                         {f.restrictions.length ? ` · ${f.restrictions.join(', ')}` : ''}
                       </Text>
@@ -117,12 +125,12 @@ export function VerdictSheet({
             {/* What the verdict was based on */}
             <Text style={styles.section}>Ingredients this is based on</Text>
             {product.ingredients_text ? (
-              <Text style={styles.ingredients}>{highlight(product.ingredients_text, flaggedTerms)}</Text>
+              <Text style={styles.ingredients}>{highlight(product.ingredients_text, verdict.flags)}</Text>
             ) : (
               <Text style={styles.missing}>No ingredient list on file for this product.</Text>
             )}
-            {product.allergens_text ? (
-              <Text style={[styles.ingredients, { marginTop: 6, fontWeight: '600' }]}>{product.allergens_text}</Text>
+            {allergenLine ? (
+              <Text style={[styles.ingredients, { marginTop: 6, fontWeight: '600' }]}>{allergenLine}</Text>
             ) : null}
 
             <View style={styles.provenance}>
@@ -165,21 +173,16 @@ export function VerdictSheet({
   );
 }
 
-function highlight(text: string, terms: Set<string>) {
-  if (!terms.size) return text;
-  // Whole words only, so "egg" isn't highlighted inside "eggplant".
-  const alts = [...terms]
-    .sort((a, b) => b.length - a.length)
-    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('|');
-  const re = new RegExp(`(?<![A-Za-z0-9])(${alts})(?![A-Za-z0-9])`, 'gi');
-  return text.split(re).map((part, i) =>
-    terms.has(part.toLowerCase()) ? (
+/** Underline flagged ingredients, found by the same matcher that produced the verdict. */
+function highlight(text: string, flags: Flag[]) {
+  if (!flags.length) return text;
+  return highlightParts(text, flags).map((part, i) =>
+    part.hit ? (
       <Text key={i} style={{ color: colors.danger, fontWeight: '700', textDecorationLine: 'underline' }}>
-        {part}
+        {part.text}
       </Text>
     ) : (
-      part
+      part.text
     ),
   );
 }

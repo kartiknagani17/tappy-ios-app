@@ -75,7 +75,14 @@ export function offRowToRecord(row: Record<string, string>, opts: { requireUs: b
   if (!name) return null;
 
   const contains = tagsToText(clean(row.allergens_en) ?? clean(row.allergens));
-  const traces = tagsToText(clean(row.traces_en) ?? clean(row.traces));
+  // Don't repeat under "May contain" what the product definitely contains.
+  const containsSet = new Set((contains ?? '').toLowerCase().split(', '));
+  const traces = tagsToText(
+    (clean(row.traces_en) ?? clean(row.traces) ?? '')
+      .split(',')
+      .filter((t) => !containsSet.has(t.trim().replace(/^[a-z]{2}:/, '').replace(/-/g, ' ').toLowerCase()))
+      .join(','),
+  );
   const allergens = [contains && `Contains: ${contains}`, traces && `May contain: ${traces}`].filter(Boolean).join('. ') || null;
 
   const nutrition: Record<string, number | string> = {};

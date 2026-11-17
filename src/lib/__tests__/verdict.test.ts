@@ -9,7 +9,7 @@ import { INGREDIENTS } from '../../data/ingredients';
 import { RESTRICTIONS, RESTRICTION_BY_ID, type Selection } from '../../data/restrictions';
 import { rateNames } from '../ratings';
 import type { Rating } from '../store';
-import { computeVerdict, normalizeLabel, tagsInText, verdictCopy } from '../verdict';
+import { computeVerdict, formatAllergens, highlightParts, normalizeLabel, tagsInText, verdictCopy } from '../verdict';
 
 type R = Record<string, Selection>;
 const v = (ingredients: string | null, restrictions: R, allergens: string | null = null, overrides: Record<string, Rating> = {}) =>
@@ -272,5 +272,94 @@ describe('rateNames', () => {
 describe('normalizeLabel', () => {
   it('folds accents, ligatures, E-numbers and color numbers', () => {
     assert.equal(normalizeLabel('Blé, Œufs, E-220, FD&C Yellow #5'), 'ble, oeufs, e220, fd&c yellow 5');
+  });
+});
+
+const ANTI: R = { 'anti-inflammatory': { level: 'intolerance' } };
+const JIF =
+  'MADE FROM ROASTED PEANUTS AND SUGAR, CONTAINS 2% OR LESS OF: MOLASSES, FULLY HYDROGENATED VEGETABLE OILS (RAPESEED AND SOYBEAN), MONO AND DIGLYCERIDES, SALT.';
+const hits = (text: string, verdict: { flags: { term: string }[] }) =>
+  highlightParts(text, verdict.flags)
+    .filter((p) => p.hit)
+    .map((p) => p.text);
+
+describe('flag labels', () => {
+  it('shows real ingredient names, never the singular matching key', () => {
+    const labels = v(JIF, ANTI).flags.map((f) => f.label);
+    assert.ok(labels.includes('Molasses'), labels.join());
+    assert.ok(labels.includes('Hydrogenated oil'), labels.join());
+    assert.ok(!labels.some((l) => /^(molasse|hydrogenated)$/i.test(l)), labels.join());
+    assert.deepEqual(
+      v('Whole grain oats, sesame seeds', { 'gluten-free': { level: 'severe' }, sesame: { level: 'severe' } }).flags.map((f) => f.label).sort(),
+      ['Sesame seeds'],
+    );
+  });
+
+  it('gives every catalog and extra term a readable label', () => {
+    for (const ing of INGREDIENTS) {
+      for (const f of v(ing.name, Object.fromEntries(RESTRICTIONS.map((r) => [r.id, { level: 'intolerance', items: (r.items ?? []).map((i) => i.id) } as Selection]))).flags) {
+        assert.ok(/^[A-Z0-9]/.test(f.label), `${ing.name} → "${f.label}"`);
+      }
+    }
+  });
+
+  it('labels foreign words in English', () => {
+    assert.equal(v('farine de blé', WHEAT).flags[0].label, 'Wheat (blé)');
+  });
+});
+
+describe('highlightParts', () => {
+  it('underlines every flagged ingredient, including plurals', () => {
+    const verdict = v(JIF, ANTI);
+    const h = hits(JIF, verdict);
+    assert.ok(h.includes('MOLASSES'), h.join('|'));
+    assert.ok(h.includes('VEGETABLE OILS'), h.join('|'));
+    assert.ok(h.includes('SUGAR'), h.join('|'));
+    for (const f of verdict.flags) assert.ok(highlightParts(JIF, [f]).some((p) => p.hit), `${f.label} not highlighted`);
+  });
+
+  it('keeps the original text intact', () => {
+    const text = 'Blé, œufs, E 150d, FD&C Red No. 40, peanut butter, butter';
+    assert.equal(
+      highlightParts(text, v(text, { ...WHEAT, ...EGG, ...MILK }).flags)
+        .map((p) => p.text)
+        .join(''),
+      text,
+    );
+  });
+
+  it('matches accents, ligatures, E-numbers and color numbers where they really are', () => {
+    const text = 'Farine de blé, Œufs frais, colour: E 150d, FD&C Red No. 40';
+    const verdict = v(text, { ...WHEAT, ...EGG, ...ANTI });
+    const h = hits(text, verdict);
+    assert.ok(h.includes('blé'), h.join('|'));
+    assert.ok(h.includes('Œufs'), h.join('|'));
+    assert.ok(h.includes('E 150d'), h.join('|'));
+  });
+
+  it('does not highlight a word inside a longer phrase', () => {
+    const text = 'peanut butter, cocoa butter, sugar';
+    assert.deepEqual(hits(text, v(text, MILK)), []);
+  });
+
+  it('highlights oil sources listed on their own', () => {
+    const text = 'Potatoes, vegetable oil (canola, corn, soybean, and/or sunflower oil), and salt';
+    const verdict = v(text, ANTI);
+    assert.ok(verdict.flags.some((f) => f.label === 'Canola oil'));
+    assert.ok(hits(text, verdict).includes('canola'));
+  });
+});
+
+describe('formatAllergens', () => {
+  it('drops duplicates, placeholders and junk codes, and repeats nothing under "may contain"', () => {
+    assert.equal(formatAllergens('Contains: gluten, milk, Lactic. May contain: gluten, milk'), 'Contains: gluten, milk, lactic.');
+    assert.equal(formatAllergens('Contains: none. May contain: 3520367101, nuts'), 'May contain: nuts.');
+    assert.equal(formatAllergens('Contains: none'), null);
+  });
+
+  it('keeps unrecognized words and leaves other formats alone', () => {
+    assert.equal(formatAllergens('Contains: Koemelk'), 'Contains: koemelk.');
+    assert.equal(formatAllergens('Allergens: see packaging'), 'Allergens: see packaging');
+    assert.equal(formatAllergens(null), null);
   });
 });
