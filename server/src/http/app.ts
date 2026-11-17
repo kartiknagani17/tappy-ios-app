@@ -281,6 +281,7 @@ export function createApp({
             gtin,
             frontHash: typeof body.front_hash === 'string' ? body.front_hash.slice(0, 64) : null,
             contribute: body.contribute === true,
+            recheck: body.recheck === true,
           }),
         );
       }

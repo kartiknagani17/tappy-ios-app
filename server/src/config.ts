@@ -63,7 +63,9 @@ export function loadConfig() {
       'https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_branded_food_csv_2026-10-29.zip',
     ),
     offCsvUrl: str('OFF_CSV_URL', 'https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz'),
-    offLiveLookup: bool('OFF_LIVE_LOOKUP', false),
+    // Fetch missing barcodes from OFF live, and refresh products whose data is older than OFF_REFRESH_AFTER_DAYS.
+    offLiveLookup: bool('OFF_LIVE_LOOKUP', true),
+    offRefreshAfterDays: num('OFF_REFRESH_AFTER_DAYS', 180),
     offUserAgent: str('OFF_USER_AGENT', 'Tappy/1.0 (contact@example.com)'),
     offLiveMaxPerMinute: num('OFF_LIVE_MAX_PER_MINUTE', 12), // OFF allows 15 product reads/min/IP
 

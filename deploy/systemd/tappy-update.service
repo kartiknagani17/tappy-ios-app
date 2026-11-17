@@ -1,0 +1,24 @@
+# Daily refresh: Open Food Facts' daily change files (about 30 MB each) and any new USDA release.
+#   Start by hand:   sudo systemctl start tappy-update
+#   Watch progress:  journalctl -fu tappy-update
+[Unit]
+Description=Tappy daily product data update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=tappy
+Group=tappy
+WorkingDirectory=/opt/tappy/server
+EnvironmentFile=/etc/tappy/tappy.env
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts update
+TimeoutStartSec=6h
+Nice=10
+IOSchedulingClass=idle
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/tappy

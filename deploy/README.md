@@ -5,7 +5,8 @@ This puts the scan API on a free, always-on Arm server and gives it an HTTPS add
 What you end up with:
 
 - `tappy-api` service: the API on `127.0.0.1:8787`, restarted automatically, survives reboots
-- `tappy-import` service + monthly timer: downloads and re-imports USDA + Open Food Facts data
+- `tappy-update` service + daily timer: applies Open Food Facts' daily change files and any new USDA release
+- `tappy-import` service + monthly timer: full Open Food Facts re-import (catches anything the daily files missed)
 - `tappy-backup` timer: weekly database snapshot (keeps the newest 2)
 - `cloudflared` service: your HTTPS address, e.g. `https://api.yourdomain.com`
 
@@ -119,13 +120,18 @@ cd ~/tappy-ios-app && git pull && sudo bash deploy/oracle/setup.sh
 
 Re-running is safe: it updates code, dependencies and services, and never overwrites `/etc/tappy/tappy.env` or the database.
 
+Servers set up before live refresh existed have `OFF_LIVE_LOOKUP=false` in `/etc/tappy/tappy.env`. Set it to `true` (and put a real contact email in `OFF_USER_AGENT`, which Open Food Facts requires), then `sudo systemctl restart tappy-api`. Products older than `OFF_REFRESH_AFTER_DAYS` (default 180) are then refreshed from Open Food Facts when someone scans them.
+
 ## Day-to-day
 
 | Task | Command |
 |---|---|
 | API logs | `journalctl -u tappy-api -f` |
 | Restart after config change | `sudo systemctl restart tappy-api` |
-| Re-import data now | `sudo systemctl start tappy-import` |
+| Daily data update now | `sudo systemctl start tappy-update` (logs: `journalctl -fu tappy-update`) |
+| Full re-import now | `sudo systemctl start tappy-import` |
+| Label photos waiting for review | `cd /opt/tappy/server && sudo -u tappy env TAPPY_ENV_FILE=/etc/tappy/tappy.env node --disable-warning=ExperimentalWarning src/cli.ts review` |
+| Approve / reject a label photo | same command with `approve <id>` or `reject <id>` instead of `review` |
 | Product counts, contributions, vision spend | `cd /opt/tappy/server && sudo -u tappy env TAPPY_ENV_FILE=/etc/tappy/tappy.env node --disable-warning=ExperimentalWarning src/cli.ts stats` |
 | Read feedback from the app | `cd /opt/tappy/server && sudo -u tappy env TAPPY_ENV_FILE=/etc/tappy/tappy.env node --disable-warning=ExperimentalWarning src/cli.ts feedback` |
 | Backup now | `sudo systemctl start tappy-backup` (files in `/var/lib/tappy/backups`) |

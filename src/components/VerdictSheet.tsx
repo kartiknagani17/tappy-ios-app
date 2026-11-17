@@ -52,7 +52,8 @@ export function VerdictSheet({
   demo?: boolean;
   onClose: () => void;
   onScanAgain?: () => void;
-  onPhotographLabel?: (gtin: string | null) => void;
+  /** recheck: the product has ingredients on file, but the user's package may show a newer recipe. */
+  onPhotographLabel?: (gtin: string | null, recheck?: boolean) => void;
   /** Open another product's result (from "Similar items"). */
   onOpenProduct?: (product: ApiProduct) => void;
 }) {
@@ -276,6 +277,17 @@ export function VerdictSheet({
 
             {!demo ? (
               <>
+                {product.ingredients_text && product.gtin14 && product.id !== null && onPhotographLabel ? (
+                  <>
+                    <View style={styles.divider} />
+                    <LinkRow
+                      icon="camera"
+                      title="Package looks different?"
+                      body="Photograph the ingredient list. If the recipe changed, we’ll update it."
+                      onPress={() => onPhotographLabel(product.gtin14, true)}
+                    />
+                  </>
+                ) : null}
                 <View style={styles.divider} />
                 <LinkRow
                   icon="activity"

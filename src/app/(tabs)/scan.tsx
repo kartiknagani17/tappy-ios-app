@@ -81,7 +81,11 @@ export default function Scan() {
   const camera = useRef<CameraView>(null);
   const locked = useRef(false);
   const [mode, setMode] = useState<Mode>('barcode');
-  const [labelCtx, setLabelCtx] = useState<{ gtin: string | null; frontHash: string | null }>({ gtin: null, frontHash: null });
+  const [labelCtx, setLabelCtx] = useState<{ gtin: string | null; frontHash: string | null; recheck: boolean }>({
+    gtin: null,
+    frontHash: null,
+    recheck: false,
+  });
   const [busy, setBusy] = useState<string | null>(null);
   const [match, setMatch] = useState<Match | null>(null);
   const [verdict, setVerdict] = useState<{ product: ApiProduct; demo?: boolean } | null>(null);
@@ -168,11 +172,11 @@ export default function Scan() {
     }
   };
 
-  const goLabel = (gtin: string | null, frontHash: string | null) => {
+  const goLabel = (gtin: string | null, frontHash: string | null, recheck = false) => {
     setVerdict(null);
     setMatch(null);
     setPrompt(null);
-    setLabelCtx({ gtin, frontHash });
+    setLabelCtx({ gtin, frontHash, recheck });
     setMode('label');
     unlock();
   };
@@ -201,7 +205,7 @@ export default function Scan() {
       const res = await api.scanBarcode(code);
       if (res.status === 'found') setVerdict({ product: res.product });
       else if (res.status === 'needs_label_photo') {
-        setLabelCtx({ gtin: res.gtin14, frontHash: null });
+        setLabelCtx({ gtin: res.gtin14, frontHash: null, recheck: false });
         setPrompt({
           title: 'We don’t know this one yet',
           body: 'Take a photo of the ingredient list and we’ll read it for you right now.',
@@ -235,7 +239,7 @@ export default function Scan() {
         const res = await api.scanFront(base64);
         lastFrontHash.current = res.front_hash;
         // A label photo taken next belongs to this front photo, not to any earlier barcode.
-        setLabelCtx({ gtin: null, frontHash: res.front_hash });
+        setLabelCtx({ gtin: null, frontHash: res.front_hash, recheck: false });
         if (res.status === 'match') setMatch(res);
         else if (res.status === 'needs_barcode_or_label')
           setPrompt({ title: 'Not sure which product this is', body: res.message, actions: ['barcode', 'label'] });
@@ -264,7 +268,7 @@ export default function Scan() {
 
   const onPromptAction = (a: Prompt['actions'][number]) => {
     setPrompt(null);
-    if (a === 'label') return goLabel(labelCtx.gtin, labelCtx.frontHash);
+    if (a === 'label') return goLabel(labelCtx.gtin, labelCtx.frontHash, labelCtx.recheck);
     if (a === 'upgrade') return router.push('/onboarding/paywall');
     if (a === 'front' || a === 'barcode') setMode(a);
     unlock();
@@ -450,7 +454,7 @@ export default function Scan() {
         demo={verdict?.demo}
         onClose={reset}
         onScanAgain={reset}
-        onPhotographLabel={(gtin) => goLabel(gtin, gtin ? null : lastFrontHash.current)}
+        onPhotographLabel={(gtin, recheck) => goLabel(gtin, gtin ? null : lastFrontHash.current, recheck)}
         onOpenProduct={(p) => setVerdict({ product: p })}
       />
 

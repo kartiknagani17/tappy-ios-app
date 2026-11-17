@@ -5,7 +5,11 @@ import { pipeline } from 'node:stream/promises';
 import { loadConfig } from './config.ts';
 import { migrate, openDb } from './db/index.ts';
 import { importOff } from './import/off.ts';
+import { updateOffFromDeltas } from './import/off-delta.ts';
 import { importUsda, openUsdaSource } from './import/usda.ts';
+import { findNewUsdaRelease } from './import/usda-latest.ts';
+import { displayName } from './lib/names.ts';
+import { approveContribution, pendingContributions, rejectContribution } from './services/products.ts';
 
 const HELP = `Tappy data CLI
 
@@ -13,6 +17,13 @@ const HELP = `Tappy data CLI
   node src/cli.ts download [usda|off|all] Stream the bulk files into RAW_DATA_DIR (default: all)
   node src/cli.ts import-usda [path]      Import USDA Branded Foods (.zip or extracted folder)
   node src/cli.ts import-off [path]       Import Open Food Facts US products (.csv or .csv.gz)
+  node src/cli.ts update                  Daily refresh: Open Food Facts daily changes + any new USDA release
+  node src/cli.ts update-off              Apply Open Food Facts' daily change files not applied yet
+  node src/cli.ts update-usda             Download and import the newest USDA release if it's new
+  node src/cli.ts names [n]               Products whose names the app cleans up (default: 30)
+  node src/cli.ts review [n]              Ingredient-label photos waiting for review, next to current data
+  node src/cli.ts approve <id>            Use a reviewed label photo as the product's data for everyone
+  node src/cli.ts reject <id>             Discard a label photo
   node src/cli.ts stats                   Row counts and vision spend
   node src/cli.ts feedback [n]            Latest feedback messages (default: 50)
   node src/cli.ts backup [dir] [keep]     Consistent snapshot of the live database (default: keep 2)
@@ -81,6 +92,74 @@ async function main() {
       if (!existsSync(file)) throw new Error(`${file} not found. Run "npm run data:download -- off" first.`);
       log(`Importing Open Food Facts (US only) from ${file}`);
       await importOff(db, file, log);
+      return;
+    }
+    case 'update':
+    case 'update-off':
+    case 'update-usda': {
+      const db = openDb(config.dbPath);
+      // OFF first: it's small and daily. A USDA failure must not undo it, and vice versa.
+      let failed = false;
+      if (cmd !== 'update-usda') {
+        try {
+          await updateOffFromDeltas(db, { userAgent: config.offUserAgent }, log);
+        } catch (e) {
+          failed = true;
+          log(`Open Food Facts update failed: ${e instanceof Error ? e.message : e}`);
+        }
+      }
+      if (cmd !== 'update-off') {
+        try {
+          const release = await findNewUsdaRelease(db, { userAgent: config.offUserAgent });
+          if (!release) log('USDA: already on the newest release');
+          else {
+            log(`USDA: new release ${release.date}`);
+            const file = path.join(config.rawDataDir, release.name);
+            await download(release.url, file);
+            await importUsda(db, await openUsdaSource(file), log);
+          }
+        } catch (e) {
+          failed = true;
+          log(`USDA update failed: ${e instanceof Error ? e.message : e}`);
+        }
+      }
+      if (failed) process.exitCode = 1;
+      return;
+    }
+    case 'review': {
+      const db = openDb(config.dbPath);
+      const rows = pendingContributions(db, Number(arg) || 20);
+      for (const r of rows) {
+        console.log(`#${r.id}  ${r.created_at.slice(0, 10)}  ${r.product_name ?? '(no product yet)'}  barcode ${r.gtin14}`);
+        console.log(`  photo: ${r.ingredients_text}`);
+        if (r.allergens_text) console.log(`         ${r.allergens_text}`);
+        console.log(`  now:   ${r.current_ingredients ?? '(none)'}\n`);
+      }
+      console.log(rows.length ? 'Approve with: approve <id>   Reject with: reject <id>' : 'Nothing waiting for review.');
+      return;
+    }
+    case 'approve':
+    case 'reject': {
+      const db = openDb(config.dbPath);
+      const id = Number(arg);
+      if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`Usage: node src/cli.ts ${cmd} <contribution id>`);
+      const out = cmd === 'approve' ? approveContribution(db, id) : rejectContribution(db, id);
+      if (!out.ok) throw new Error(`Can't ${cmd} #${id}: ${out.reason}`);
+      log(cmd === 'approve' ? `Approved #${id}: everyone now sees the photographed ingredients.` : `Rejected #${id}.`);
+      return;
+    }
+    case 'names': {
+      const db = openDb(config.dbPath);
+      const rows = db.prepare('SELECT name, brand, category FROM products ORDER BY random() LIMIT 20000').all() as {
+        name: string;
+        brand: string | null;
+        category: string | null;
+      }[];
+      let shown = 0;
+      for (const r of rows) {
+        const out = displayName(r.name, r.brand, r.category);
+        if (out !== r.name && shown++ < (Number(arg) || 30)) console.log(`${r.name}  →  ${out}`);
+      }
       return;
     }
     case 'backup': {

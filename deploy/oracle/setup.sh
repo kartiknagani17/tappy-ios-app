@@ -108,8 +108,9 @@ OPENAI_API_KEY=
 VISION_MODEL=gpt-6-luna
 VISION_ESCALATION_MODEL=gpt-6.1-sol
 
-# Live Open Food Facts fallback for barcodes missing locally
-OFF_LIVE_LOOKUP=false
+# Live Open Food Facts lookup: barcodes missing locally, and products older than OFF_REFRESH_AFTER_DAYS
+OFF_LIVE_LOOKUP=true
+OFF_REFRESH_AFTER_DAYS=180
 OFF_USER_AGENT=Tappy/1.0 (you@example.com)
 
 # Accounts. APPLE_BUNDLE_ID must match ios.bundleIdentifier in app.json (Sign in with Apple).
@@ -147,7 +148,7 @@ install -m 644 "$REPO_DIR"/deploy/systemd/tappy-*.service "$REPO_DIR"/deploy/sys
 systemctl daemon-reload
 systemctl enable --now tappy-api.service
 systemctl restart tappy-api.service
-systemctl enable --now tappy-import.timer tappy-backup.timer
+systemctl enable --now tappy-import.timer tappy-update.timer tappy-backup.timer
 
 for _ in $(seq 1 20); do
   curl -fsS http://127.0.0.1:8787/api/health >/dev/null 2>&1 && break

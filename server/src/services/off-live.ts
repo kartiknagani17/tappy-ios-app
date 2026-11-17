@@ -1,28 +1,16 @@
 import type { IncomingRecord } from './products.ts';
 import { offRowToRecord } from '../import/off.ts';
+import { OFF_JSON_FIELDS, offJsonToRow } from '../import/off-json.ts';
+
+export { safeOffImageUrl } from '../import/off-json.ts';
 
 /**
- * Live Open Food Facts product lookup, used only behind the OFF_LIVE_LOOKUP feature flag
- * when a barcode is missing from the local database.
+ * Live Open Food Facts product lookup (OFF_LIVE_LOOKUP): for barcodes missing from the local
+ * database, and to refresh products whose data is old.
  * OFF rules: a custom User-Agent ("AppName/Version (ContactEmail)") and at most
  * 15 product reads per minute per IP. We stay under a configurable lower cap.
  */
 const MAX_RESPONSE_BYTES = 1_000_000;
-const MAX_FIELD_CHARS = 10_000;
-
-/** Only OFF-hosted https image URLs are passed on to the app (no tracking pixels / javascript: URLs). */
-export function safeOffImageUrl(v: unknown): string {
-  if (typeof v !== 'string' || v.length > 2048) return '';
-  try {
-    const u = new URL(v);
-    const okHost = u.hostname === 'openfoodfacts.org' || u.hostname.endsWith('.openfoodfacts.org');
-    return u.protocol === 'https:' && okHost && !u.username && !u.password ? u.toString() : '';
-  } catch {
-    return '';
-  }
-}
-
-const field = (v: unknown) => (v === undefined || v === null ? '' : String(v).slice(0, MAX_FIELD_CHARS));
 
 /** Read a JSON body with a hard byte cap (the declared Content-Length is not trusted). */
 async function readJsonLimited(res: Response, maxBytes: number): Promise<unknown> {
@@ -68,20 +56,7 @@ export class OffLiveClient {
 
     // Query by the EAN-13 form; OFF resolves leading-zero variants of UPC-A codes itself.
     const code = gtin14.startsWith('0') ? gtin14.slice(1) : gtin14;
-    const fields = [
-      'code',
-      'product_name',
-      'brands',
-      'quantity',
-      'ingredients_text',
-      'allergens',
-      'traces',
-      'categories',
-      'image_url',
-      'last_modified_t',
-      'countries_tags',
-      'nutriments',
-    ].join(',');
+    const fields = OFF_JSON_FIELDS.join(',');
     try {
       const res = await this.fetchImpl(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=${fields}`, {
         headers: { 'User-Agent': this.userAgent, Accept: 'application/json' },
@@ -92,34 +67,9 @@ export class OffLiveClient {
       if (!res.ok) return 'skipped';
       const body = (await readJsonLimited(res, MAX_RESPONSE_BYTES)) as { status?: number; product?: Record<string, unknown> } | null;
       if (!body || typeof body !== 'object' || body.status !== 1 || !body.product || typeof body.product !== 'object') return null;
-      const p = body.product;
-      const n = (p.nutriments ?? {}) as Record<string, unknown>;
-      // Reuse the dump mapper so live and bulk records look identical.
-      return offRowToRecord(
-        {
-          // Always the code we asked for: a response can't attach its data to a different GTIN.
-          code,
-          product_name: field(p.product_name),
-          brands: field(p.brands),
-          quantity: field(p.quantity),
-          ingredients_text: field(p.ingredients_text),
-          allergens: field(p.allergens),
-          traces: field(p.traces),
-          categories_en: field(p.categories),
-          image_url: safeOffImageUrl(p.image_url),
-          last_modified_t: field(p.last_modified_t),
-          countries_tags: Array.isArray(p.countries_tags) ? field(p.countries_tags.join(',')) : field(p.countries_tags),
-          'energy-kcal_100g': String(n['energy-kcal_100g'] ?? ''),
-          proteins_100g: String(n.proteins_100g ?? ''),
-          fat_100g: String(n.fat_100g ?? ''),
-          'saturated-fat_100g': String(n['saturated-fat_100g'] ?? ''),
-          carbohydrates_100g: String(n.carbohydrates_100g ?? ''),
-          sugars_100g: String(n.sugars_100g ?? ''),
-          fiber_100g: String(n.fiber_100g ?? ''),
-          sodium_100g: String(n.sodium_100g ?? ''),
-        },
-        { requireUs: false },
-      );
+      // Reuse the dump mapper so live and bulk records look identical. Always the code we asked
+      // for: a response can't attach its data to a different GTIN.
+      return offRowToRecord(offJsonToRow(body.product, code), { requireUs: false });
     } catch {
       return 'skipped';
     }

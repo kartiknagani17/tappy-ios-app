@@ -260,7 +260,8 @@ export const api = {
       { vision_cache_id: visionCacheId, product_id: productId },
       { validate: (v) => isObj(v) && isApiProduct(v.product), retries: 1 },
     ),
-  scanLabel: (imageBase64: string, ctx: { gtin?: string | null; frontHash?: string | null }) =>
+  /** recheck: the product is known but the package may have a newer recipe; compare the photo with our data. */
+  scanLabel: (imageBase64: string, ctx: { gtin?: string | null; frontHash?: string | null; recheck?: boolean }) =>
     post<LabelResult>(
       '/api/scan/label',
       {
@@ -268,6 +269,7 @@ export const api = {
         gtin: ctx.gtin ?? null,
         front_hash: ctx.frontHash ?? null,
         contribute: useStore.getState().contributePhotos,
+        recheck: ctx.recheck === true,
       },
       { validate: isLabelResult, timeoutMs: TIMEOUT_MS.upload },
     ),

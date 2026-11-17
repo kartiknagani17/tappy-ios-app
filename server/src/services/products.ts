@@ -1,5 +1,6 @@
 import type { DB } from '../db/index.ts';
 import { mergeRecords, type SourceRecord } from '../lib/merge.ts';
+import { displayName } from '../lib/names.ts';
 
 export type Product = {
   id: number;
@@ -245,12 +246,96 @@ export function reportProduct(db: DB, productId: number, userId: string, reason:
   return Object.assign(getProductById(db, productId)!, { duplicate: false as const });
 }
 
+/** Mark a product as under review (shown to everyone) and drop its cached scan result. */
+export function flagForReview(db: DB, productId: number) {
+  const p = getProductById(db, productId);
+  if (!p) return;
+  db.prepare(`UPDATE products SET needs_review = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`).run(productId);
+  db.prepare('DELETE FROM scan_cache WHERE gtin14 = ?').run(p.gtin14);
+}
+
+export type PendingContribution = {
+  id: number;
+  gtin14: string | null;
+  created_at: string;
+  confidence: number | null;
+  ingredients_text: string;
+  allergens_text: string | null;
+  product_name: string | null;
+  current_ingredients: string | null;
+};
+
+/** Label photos waiting for review, oldest first, next to what the database has now. */
+export function pendingContributions(db: DB, limit = 50): PendingContribution[] {
+  return db
+    .prepare(
+      `SELECT c.id, c.gtin14, c.created_at, c.confidence, c.ingredients_text, c.allergens_text,
+         p.name AS product_name, p.ingredients_text AS current_ingredients
+       FROM contributions c LEFT JOIN products p ON p.gtin14 = c.gtin14
+       WHERE c.status = 'pending' AND c.gtin14 IS NOT NULL ORDER BY c.id LIMIT ?`,
+    )
+    .all(limit) as unknown as PendingContribution[];
+}
+
+/**
+ * Approve a label photo: its ingredients become the product's data for everyone, as reviewed
+ * ("verified") OCR data that imports never overwrite. Other pending photos for the same product are
+ * left for review. Returns the updated product, or an error reason.
+ */
+export function approveContribution(db: DB, id: number): { ok: true; product: Product } | { ok: false; reason: string } {
+  const c = db.prepare(`SELECT * FROM contributions WHERE id = ?`).get(id) as
+    | { id: number; gtin14: string | null; status: string; ingredients_text: string; allergens_text: string | null; nutrition_json: string | null; created_at: string }
+    | undefined;
+  if (!c) return { ok: false, reason: 'not found' };
+  if (c.status !== 'pending') return { ok: false, reason: `already ${c.status}` };
+  if (!c.gtin14) return { ok: false, reason: 'no barcode: nothing to attach it to' };
+  const product = getProductByGtin(db, c.gtin14);
+  if (!product) return { ok: false, reason: 'no product with this barcode yet (scan it once so it exists)' };
+  db.exec('BEGIN');
+  try {
+    db.prepare(
+      `UPDATE products SET ingredients_text = ?, allergens_text = ?, nutrition_json = coalesce(?, nutrition_json),
+         source = 'ocr', source_record_id = ?, source_updated_at = ?, verified = 1, needs_review = 0,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
+    ).run(c.ingredients_text, c.allergens_text, c.nutrition_json, `contribution:${c.id}`, c.created_at, product.id);
+    db.prepare(`UPDATE contributions SET status = 'approved' WHERE id = ?`).run(c.id);
+    db.prepare('DELETE FROM scan_cache WHERE gtin14 = ?').run(c.gtin14);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return { ok: true, product: getProductById(db, product.id)! };
+}
+
+/** Reject a label photo. If no other photo for the product is waiting, the product leaves review. */
+export function rejectContribution(db: DB, id: number): { ok: true } | { ok: false; reason: string } {
+  const c = db.prepare(`SELECT id, gtin14, status FROM contributions WHERE id = ?`).get(id) as
+    | { id: number; gtin14: string | null; status: string }
+    | undefined;
+  if (!c) return { ok: false, reason: 'not found' };
+  if (c.status !== 'pending') return { ok: false, reason: `already ${c.status}` };
+  db.prepare(`UPDATE contributions SET status = 'rejected' WHERE id = ?`).run(c.id);
+  if (c.gtin14) {
+    const others = db.prepare(`SELECT count(*) AS n FROM contributions WHERE gtin14 = ? AND status = 'pending'`).get(c.gtin14) as { n: number };
+    const reports = db
+      .prepare(`SELECT count(*) AS n FROM product_reports r JOIN products p ON p.id = r.product_id WHERE p.gtin14 = ?`)
+      .get(c.gtin14) as { n: number };
+    if (!others.n && !reports.n) {
+      db.prepare(`UPDATE products SET needs_review = 0 WHERE gtin14 = ?`).run(c.gtin14);
+      db.prepare('DELETE FROM scan_cache WHERE gtin14 = ?').run(c.gtin14);
+    }
+  }
+  return { ok: true };
+}
+
 /** Shape sent to the app. Parsed nutrition, explicit provenance. */
 export function toPublicProduct(p: Product) {
   return {
     id: p.id,
     gtin14: p.gtin14,
-    name: p.name,
+    // Cleaned for display only; the stored name stays as imported (search uses it).
+    name: displayName(p.name, p.brand, p.category),
     brand: p.brand,
     variant_or_flavor: p.variant_or_flavor,
     size_text: p.size_text,

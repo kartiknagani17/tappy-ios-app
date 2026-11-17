@@ -1,4 +1,5 @@
-# Downloads the USDA + Open Food Facts bulk files and (re)imports them.
+# Monthly full refresh: the whole Open Food Facts US export (catches anything the daily files
+# missed) plus the newest USDA release if there is one. The daily refresh is tappy-update.
 # Idempotent: unchanged records are skipped. Runs at low priority so scans stay fast.
 #   Start by hand:   sudo systemctl start tappy-import
 #   Watch progress:  journalctl -fu tappy-import
@@ -13,8 +14,8 @@ User=tappy
 Group=tappy
 WorkingDirectory=/opt/tappy/server
 EnvironmentFile=/etc/tappy/tappy.env
-ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts download
-ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts import-usda
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts update-usda
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts download off
 ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts import-off
 TimeoutStartSec=infinity
 Nice=10

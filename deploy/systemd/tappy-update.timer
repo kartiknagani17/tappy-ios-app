@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Tappy product data update
+
+[Timer]
+# Open Food Facts publishes the previous day's changes overnight (UTC).
+OnCalendar=*-*-* 06:15:00 UTC
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

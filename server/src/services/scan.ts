@@ -18,7 +18,18 @@ import {
   wasOffered,
 } from './cache.ts';
 import type { OffLiveClient } from './off-live.ts';
-import { getProductByGtin, getProductById, searchProducts, toPublicProduct, upsertSourceRecord, type PublicProduct } from './products.ts';
+import {
+  flagForReview,
+  getProductByGtin,
+  getProductById,
+  searchProducts,
+  toPublicProduct,
+  upsertSourceRecord,
+  type Product,
+  type PublicProduct,
+} from './products.ts';
+import { sameIngredients } from '../lib/ingredients-diff.ts';
+import { displayName } from '../lib/names.ts';
 import type { VisionService } from './vision/index.ts';
 import type { FrontResult, LabelResult } from './vision/schemas.ts';
 
@@ -38,7 +49,7 @@ export type BarcodeResult =
       gtin14: string;
       product: PublicProduct | ContributedProduct;
       from_cache: boolean;
-      via: 'cache' | 'db' | 'contribution' | 'off_live';
+      via: 'cache' | 'db' | 'contribution' | 'off_live' | 'off_refresh';
     }
   | { status: 'needs_label_photo'; gtin14: string; from_cache: boolean }
   | { status: 'invalid_barcode'; reason: string };
@@ -99,7 +110,8 @@ export class ScanService {
 
   // ---------------- barcode ----------------
   /**
-   * cache -> local DB -> this user's pending contribution -> live Open Food Facts (feature flag) -> not found.
+   * this user's own newer label photo -> cache -> local DB (refreshed from OFF when old) -> this user's
+   * pending contribution -> live Open Food Facts -> not found.
    * "Not found" is a normal state (needs_label_photo), not an error. Negative results are cached briefly.
    */
   async resolveBarcode(barcode: string, userId: string): Promise<BarcodeResult> {
@@ -108,20 +120,24 @@ export class ScanService {
     if (!norm.ok) return { status: 'invalid_barcode', reason: norm.reason };
     const gtin14 = norm.gtin14;
 
+    // A user who photographed a newer label sees their own reading until it's reviewed
+    // (it's only theirs: never cached, never shown to anyone else).
+    const own = this.findOwnContribution(userId, { gtin14 });
+    const current = getProductByGtin(db, gtin14);
+    if (own && (!current || (own.source_updated_at ?? '') > (current.source_updated_at ?? ''))) {
+      return { status: 'found', gtin14, product: own, from_cache: false, via: 'contribution' };
+    }
+
     const cached = getScanCache<PublicProduct>(db, gtin14);
     if (cached?.found) return { status: 'found', gtin14, product: cached.result, from_cache: true, via: 'cache' };
 
-    if (!cached) {
-      const product = getProductByGtin(db, gtin14);
-      if (product) {
-        const pub = toPublicProduct(product);
-        setScanCache(db, gtin14, true, pub, config.scanCacheTtlSeconds);
-        return { status: 'found', gtin14, product: pub, from_cache: false, via: 'db' };
-      }
+    if (!cached && current) {
+      const product = (await this.refreshIfStale(current)) ?? current;
+      const pub = toPublicProduct(product);
+      setScanCache(db, gtin14, true, pub, config.scanCacheTtlSeconds);
+      return { status: 'found', gtin14, product: pub, from_cache: false, via: product === current ? 'db' : 'off_refresh' };
     }
 
-    // A user's own unverified submission is usable for that user only (never cached globally).
-    const own = this.findOwnContribution(userId, { gtin14 });
     if (own) return { status: 'found', gtin14, product: own, from_cache: false, via: 'contribution' };
 
     if (cached && !cached.found) return { status: 'needs_label_photo', gtin14, from_cache: true };
@@ -142,6 +158,31 @@ export class ScanService {
 
     setScanCache(db, gtin14, false, null, config.scanCacheNegativeTtlSeconds);
     return { status: 'needs_label_photo', gtin14, from_cache: false };
+  }
+
+  /** When each GTIN was last refreshed from OFF, so an old product OFF can't improve isn't fetched on every scan. */
+  private readonly refreshedAt = new Map<string, number>();
+
+  /**
+   * Products imported long ago may have an old recipe. If live lookups are on and the data is older
+   * than OFF_REFRESH_AFTER_DAYS, fetch the current OFF record (at most once a week per product) and
+   * return the rebuilt product, or null when nothing changed. Reviewed user data is never replaced.
+   */
+  private async refreshIfStale(product: Product): Promise<Product | null> {
+    const { db, config, offLive } = this.d;
+    if (!config.offLiveLookup || !offLive || config.offRefreshAfterDays <= 0) return null;
+    if (product.verified && (product.source === 'user' || product.source === 'ocr')) return null;
+    const updated = product.source_updated_at ? Date.parse(product.source_updated_at) : 0;
+    const now = Date.now();
+    if (Number.isFinite(updated) && now - updated < config.offRefreshAfterDays * 86_400_000) return null;
+    const last = this.refreshedAt.get(product.gtin14) ?? 0;
+    if (now - last < 7 * 86_400_000) return null;
+    const rec = await offLive.lookup(product.gtin14);
+    if (rec === 'skipped') return null; // rate-limited or OFF is down: try again on a later scan
+    this.refreshedAt.set(product.gtin14, now);
+    if (this.refreshedAt.size > 50_000) this.refreshedAt.delete(this.refreshedAt.keys().next().value!);
+    if (!rec || !upsertSourceRecord(db, rec)) return null;
+    return getProductByGtin(db, product.gtin14);
   }
 
   // ---------------- front of package ----------------
@@ -297,17 +338,16 @@ export class ScanService {
   async scanLabel(
     imageBytes: Buffer,
     userId: string,
-    opts: { gtin?: string | null; frontHash?: string | null; contribute?: boolean } = {},
+    opts: { gtin?: string | null; frontHash?: string | null; contribute?: boolean; recheck?: boolean } = {},
   ): Promise<LabelScanResult> {
     const { db, config, vision } = this.d;
     const norm = opts.gtin ? normalizeGtin(opts.gtin) : null;
     const gtin14 = norm?.ok ? norm.gtin14 : null;
 
-    // Never call vision when the barcode already resolves to a product with ingredients.
-    if (gtin14) {
-      const existing = getProductByGtin(db, gtin14);
-      if (existing?.ingredients_text) return { status: 'existing_product', product: toPublicProduct(existing) };
-    }
+    // Don't call vision when the barcode already resolves to a product with ingredients, unless the
+    // user says the package looks different (recheck): then their photo is compared with our data.
+    const existing = gtin14 ? getProductByGtin(db, gtin14) : null;
+    if (existing?.ingredients_text && !opts.recheck) return { status: 'existing_product', product: toPublicProduct(existing) };
 
     const { jpeg } = await prepareImage(imageBytes, config.imageMaxInputPixels);
     const hash = await perceptualHash(jpeg);
@@ -335,6 +375,11 @@ export class ScanService {
         message: 'We couldn’t find a readable ingredient list. Make sure the whole list is in frame and in focus.',
         extracted,
       };
+    }
+
+    // Recheck: the photo matches what we have, so our data is current. Nothing to review.
+    if (existing?.ingredients_text && sameIngredients(existing.ingredients_text, extracted.ingredients_text)) {
+      return { status: 'existing_product', product: toPublicProduct(existing) };
     }
 
     const frontHash = opts.frontHash && HEX16.test(opts.frontHash) ? opts.frontHash : null;
@@ -367,6 +412,8 @@ export class ScanService {
         imagePath,
       );
     const id = Number(res.lastInsertRowid);
+    // The package differs from our data: everyone sees "being reviewed" until it's approved or rejected.
+    if (existing?.ingredients_text) flagForReview(db, existing.id);
     return { status: 'contributed', product: this.toContributed(gtin14, extracted, frontHash, id), extracted };
   }
 
@@ -383,16 +430,23 @@ export class ScanService {
       JSON.parse(row.raw_json as string) as LabelResult,
       row.front_photo_hash as string | null,
       row.id as number,
+      row.created_at as string,
     );
   }
 
-  private toContributed(gtin14: string | null, x: LabelResult, _frontHash: string | null, contributionId: number): ContributedProduct {
+  private toContributed(
+    gtin14: string | null,
+    x: LabelResult,
+    _frontHash: string | null,
+    contributionId: number,
+    photographedAt = new Date().toISOString(),
+  ): ContributedProduct {
     const existing = gtin14 ? getProductByGtin(this.d.db, gtin14) : null;
     return {
       id: null,
       contribution_id: contributionId,
       gtin14: gtin14 ?? '',
-      name: existing?.name ?? 'Your scanned product',
+      name: existing ? displayName(existing.name, existing.brand, existing.category) : 'Your scanned product',
       brand: existing?.brand ?? null,
       variant_or_flavor: existing?.variant_or_flavor ?? null,
       size_text: existing?.size_text ?? null,
@@ -402,7 +456,8 @@ export class ScanService {
       category: existing?.category ?? null,
       image_url: existing?.image_url ?? null,
       source: 'ocr',
-      source_updated_at: new Date().toISOString(),
+      // When the label was photographed, so a later import or refresh can win over it.
+      source_updated_at: photographedAt,
       verified: false,
       under_review: true,
       label: UNVERIFIED_LABEL,
