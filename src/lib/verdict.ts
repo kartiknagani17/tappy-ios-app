@@ -485,3 +485,17 @@ export const SOURCE_LABEL: Record<string, string> = {
   user: 'Tappy community',
   ocr: 'Your photo',
 };
+
+/** The color shown for a verdict (null when there isn't enough data to say). */
+export function verdictRating(v: Verdict): Rating | null {
+  return v.state === 'avoid' ? 'red' : v.state === 'limit' ? 'yellow' : v.state === 'no_conflicts' ? 'green' : null;
+}
+
+/**
+ * A confident "fits": no conflicts, nothing that made the check uncertain, and at least one of
+ * the profile's terms was actually checked against a real ingredient list. Used for Similar items
+ * and the Grocery tab's "Likely works" filter.
+ */
+export function fitsProfile(v: Verdict): boolean {
+  return v.state === 'no_conflicts' && !v.reason && v.matchedTerms > 0;
+}

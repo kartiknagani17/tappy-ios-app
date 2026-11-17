@@ -63,8 +63,33 @@ export function sanitizePersisted(raw: unknown): Record<string, unknown> {
   if (typeof raw.duration === 'number' && Number.isFinite(raw.duration)) out.duration = raw.duration;
   const avoid = strArray(raw.avoidList);
   if (avoid) out.avoidList = avoid;
-  const saved = strArray(raw.saved);
-  if (saved) out.saved = saved;
+  // Bookmarked products. Older builds saved demo product ids (strings); those are dropped.
+  if (Array.isArray(raw.saved)) {
+    const seen = new Set<number>();
+    const saved: { id: number; gtin14: string; name: string; brand: string | null; image_url: string | null }[] = [];
+    for (const p of raw.saved.slice(0, 300)) {
+      if (
+        isObj(p) &&
+        typeof p.id === 'number' &&
+        Number.isSafeInteger(p.id) &&
+        p.id > 0 &&
+        !seen.has(p.id) &&
+        typeof p.gtin14 === 'string' &&
+        GTIN_RE.test(p.gtin14) &&
+        typeof p.name === 'string'
+      ) {
+        seen.add(p.id);
+        saved.push({
+          id: p.id,
+          gtin14: p.gtin14,
+          name: p.name.slice(0, 200),
+          brand: typeof p.brand === 'string' ? p.brand.slice(0, 200) : null,
+          image_url: typeof p.image_url === 'string' && /^https:\/\//.test(p.image_url) ? p.image_url.slice(0, 2048) : null,
+        });
+      }
+    }
+    out.saved = saved;
+  }
   const restrictions = cleanRestrictions(raw.restrictions);
   if (restrictions) out.restrictions = restrictions;
   const overrides = cleanOverrides(raw.ingredientOverrides);

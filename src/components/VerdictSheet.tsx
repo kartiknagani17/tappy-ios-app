@@ -8,6 +8,7 @@ import { useStore, type Rating } from '../lib/store';
 import {
   computeVerdict,
   fitLabel,
+  fitsProfile,
   formatAllergens,
   highlightParts,
   restrictionBreakdown,
@@ -61,6 +62,7 @@ export function VerdictSheet({
   const overrides = useStore((s) => s.ingredientOverrides);
   const tried = useStore((s) => (product ? s.tried[product.gtin14] : undefined));
   const watched = useStore((s) => (product ? !!s.watched[product.gtin14] : false));
+  const saved = useStore((s) => (product?.id ? s.saved.some((x) => x.id === product.id) : false));
   const [reporting, setReporting] = useState(false);
   const [reacting, setReacting] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -97,6 +99,28 @@ export function VerdictSheet({
             <Text style={styles.topTitle} numberOfLines={2}>
               {scrolled ? product.name : demo ? 'Sample product' : ''}
             </Text>
+            {canFollow ? (
+              <Pressable
+                testID="bookmark"
+                accessibilityRole="button"
+                accessibilityLabel={saved ? 'Remove from Lists' : 'Save to Lists'}
+                accessibilityState={{ selected: saved }}
+                hitSlop={10}
+                onPress={() => {
+                  haptic.select();
+                  useStore.getState().toggleSaved({
+                    id: product.id!,
+                    gtin14: product.gtin14,
+                    name: product.name,
+                    brand: product.brand,
+                    image_url: product.image_url,
+                  });
+                }}
+                style={styles.iconBtn}
+              >
+                <Feather name="bookmark" size={22} color={saved ? colors.purple : colors.ink} />
+              </Pressable>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Share"
@@ -472,12 +496,7 @@ function useSimilar(
   const candidates = result && result.id === id ? result.products : null;
   const items = useMemo(() => {
     if (!Array.isArray(candidates)) return [];
-    return candidates
-      .filter((p) => {
-        const v = computeVerdict(p, restrictions, overrides);
-        return v.state === 'no_conflicts' && !v.reason && v.matchedTerms > 0;
-      })
-      .slice(0, SIMILAR_SHOWN);
+    return candidates.filter((p) => fitsProfile(computeVerdict(p, restrictions, overrides))).slice(0, SIMILAR_SHOWN);
   }, [candidates, restrictions, overrides]);
   if (id === null || !hasProfile || candidates === 'error') return { state: 'off', items: [] };
   if (candidates === null) return { state: 'loading', items: [] };

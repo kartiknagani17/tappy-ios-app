@@ -9,6 +9,9 @@ import { FeedbackError, submitFeedback } from '../services/feedback.ts';
 import { IMAGE_PATH_RE, imageKey, type ImageCache } from '../services/images.ts';
 import { consumeDailyQuota, ipKey, LimitError, RateLimiter, type QuotaSubject } from '../services/limits.ts';
 import {
+  AISLES,
+  browseProducts,
+  type Aisle,
   getProductById,
   productsByIds,
   reportProduct,
@@ -71,6 +74,7 @@ const ROUTES: Route[] = [
   { name: 'report', pattern: /^\/api\/products\/(\d{1,15})\/report$/, methods: ['POST'] },
   { name: 'similar', pattern: /^\/api\/products\/(\d{1,15})\/similar$/, methods: ['POST'] },
   { name: 'lookup', pattern: /^\/api\/products\/lookup$/, methods: ['POST'] },
+  { name: 'browse', pattern: /^\/api\/products\/browse$/, methods: ['POST'] },
   { name: 'feedback', pattern: /^\/api\/feedback$/, methods: ['POST'] },
   { name: 'barcode', pattern: /^\/api\/scan\/barcode$/, methods: ['POST'] },
   { name: 'front', pattern: /^\/api\/scan\/front$/, methods: ['POST'] },
@@ -327,6 +331,17 @@ export function createApp({
           throw new HttpError(400, 'bad_request', 'ids must be up to 50 positive integers');
         }
         return send(res, 200, { products: productsByIds(db, ids as number[]).map(toPublicProduct) });
+      }
+      case 'browse': {
+        const q = body.q === undefined || body.q === null ? null : typeof body.q === 'string' ? body.q.slice(0, 100) : undefined;
+        const aisle = body.aisle === undefined || body.aisle === null ? null : (AISLES as readonly unknown[]).includes(body.aisle) ? (body.aisle as Aisle) : undefined;
+        const offset = body.offset === undefined ? 0 : body.offset;
+        if (q === undefined || aisle === undefined || typeof offset !== 'number' || !Number.isSafeInteger(offset) || offset < 0 || offset > 2000) {
+          throw new HttpError(400, 'bad_request', 'Expected { q?: string, aisle?: one of the aisles, offset?: 0-2000 }');
+        }
+        const out = browseProducts(db, { q, aisle, offset });
+        images?.warm(out.products.slice(0, 12)); // the first screenful of photos
+        return send(res, 200, { products: out.products.map(toPublicProduct), next_offset: out.nextOffset });
       }
       case 'feedback': {
         const out = submitFeedback(db, userId, body, mailer ? { mailer, to: config.supportEmail } : null);

@@ -1,17 +1,18 @@
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Constants from 'expo-constants';
 import { Alert, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { DEMO_PRODUCTS, ProductTile, type DemoProduct } from '../../components/art';
 import { BottomSheet } from '../../components/BottomSheet';
 import { LegalSheet, type LegalDocId } from '../../components/LegalSheet';
-import { ProductSheet } from '../../components/ProductSheet';
+import { ProductCard } from '../../components/ProductCard';
 import { Button, Screen } from '../../components/ui';
+import { VerdictSheet } from '../../components/VerdictSheet';
+import { api, type ApiProduct } from '../../lib/api';
 import { AUTH_ENABLED, deleteAccount as deleteServerAccount, signOut } from '../../lib/auth';
 import { haptic } from '../../lib/haptics';
-import { rateNames, worst } from '../../lib/ratings';
 import { useStore } from '../../lib/store';
+import { computeVerdict, verdictRating } from '../../lib/verdict';
 import { LEGAL_CONTACT } from '../../../server/src/legal/content';
 import { PurchasesUnavailableError, restorePurchases } from '../../lib/subscription';
 import { colors, radius } from '../../theme';
@@ -25,12 +26,25 @@ export default function Lists() {
   const contributePhotos = useStore((s) => s.contributePhotos);
   const restrictions = useStore((s) => s.restrictions);
   const overrides = useStore((s) => s.ingredientOverrides);
-  const [product, setProduct] = useState<DemoProduct | null>(null);
+  const [open, setOpen] = useState<ApiProduct | null>(null);
+  const fresh = useFreshProducts(saved.map((p) => p.id));
   const trialActive = useStore((s) => s.trialActive);
   const [settings, setSettings] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [legal, setLegal] = useState<LegalDocId | null>(null);
-  const items = DEMO_PRODUCTS.filter((p) => saved.includes(p.id));
+  const items = useMemo(
+    () =>
+      saved.map((s) => {
+        const p = fresh.products.get(s.id);
+        return {
+          saved: p ? { ...s, name: p.name, brand: p.brand, image_url: p.image_url } : s,
+          product: p ?? null,
+          // undefined = still checking; null = not enough data (or couldn't refresh)
+          rating: p ? verdictRating(computeVerdict(p, restrictions, overrides)) : fresh.state === 'loading' ? undefined : null,
+        };
+      }),
+    [saved, fresh, restrictions, overrides],
+  );
 
   const confirm = (title: string, msg: string, onOk: () => void, okText = 'Continue') => {
     if (Platform.OS === 'web') {
@@ -60,7 +74,9 @@ export default function Lists() {
     } catch (e) {
       notify(
         'Couldn’t restore',
-        e instanceof PurchasesUnavailableError ? 'Purchases aren’t available in this build.' : 'Could not reach the App Store. Please try again.',
+        e instanceof PurchasesUnavailableError
+          ? 'Purchases aren’t available in this build.'
+          : 'Could not reach the App Store. Please try again.',
       );
     } finally {
       setRestoring(false);
@@ -123,22 +139,28 @@ export default function Lists() {
         </Pressable>
       ) : null}
 
+      {fresh.state === 'error' && saved.length ? (
+        <Text style={styles.offline}>Couldn’t check your saved products right now. Pull down or reopen Lists to try again.</Text>
+      ) : null}
+
       <FlatList
         data={items}
-        keyExtractor={(p) => p.id}
+        keyExtractor={(i) => String(i.saved.id)}
         numColumns={2}
         columnWrapperStyle={{ gap: 14 }}
-        contentContainerStyle={{ padding: 16, gap: 18, flexGrow: 1 }}
+        contentContainerStyle={{ padding: 16, gap: 20, flexGrow: 1 }}
+        refreshing={false}
+        onRefresh={fresh.reload}
         renderItem={({ item }) => (
-          <Pressable style={{ flex: 1 }} accessibilityRole="button" accessibilityLabel={item.name} onPress={() => setProduct(item)}>
-            <ProductTile p={item} saved rating={worst(rateNames(item.ingredients, restrictions, overrides).map((r) => r.rating))} />
-          </Pressable>
+          <ProductCard product={item.saved} rating={item.rating} onPress={() => (item.product ? setOpen(item.product) : fresh.reload())} />
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Feather name="bookmark" size={40} color={colors.textSubtle} />
             <Text style={styles.emptyTitle}>No saved products yet</Text>
-            <Text style={styles.emptyBody}>Tap the bookmark on any product to save it here.</Text>
+            <Text style={styles.emptyBody}>
+              Tap the bookmark on a scanned product, or in Grocery, to keep the ones that work for you here.
+            </Text>
             <Button
               title="Browse groceries"
               onPress={() => router.navigate('/(tabs)/grocery')}
@@ -148,7 +170,7 @@ export default function Lists() {
         }
       />
 
-      <ProductSheet product={product} onClose={() => setProduct(null)} />
+      <VerdictSheet product={open} onClose={() => setOpen(null)} onOpenProduct={(p) => setOpen(p)} />
 
       <BottomSheet visible={settings} onClose={() => setSettings(false)} handle>
         <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: 16 }}>
@@ -233,6 +255,40 @@ export default function Lists() {
   );
 }
 
+/**
+ * Current data for the saved products, fetched whenever Lists comes into view (ingredients and
+ * ratings can change; only names and photos are stored on the phone).
+ */
+function useFreshProducts(ids: number[]) {
+  const [state, setState] = useState<{ products: Map<number, ApiProduct>; state: 'loading' | 'done' | 'error' }>({
+    products: new Map(),
+    state: 'loading',
+  });
+  const idsKey = ids.join(',');
+  const run = useRef(0);
+  const reload = useCallback(() => {
+    const list = idsKey ? idsKey.split(',').map(Number) : [];
+    const mine = ++run.current;
+    if (!list.length) {
+      setState({ products: new Map(), state: 'done' });
+      return;
+    }
+    setState((s) => ({ ...s, state: 'loading' }));
+    const chunks: number[][] = [];
+    for (let i = 0; i < list.length; i += 50) chunks.push(list.slice(i, i + 50));
+    Promise.all(chunks.map((c) => api.lookup(c)))
+      .then((res) => {
+        if (mine !== run.current) return;
+        const products = new Map<number, ApiProduct>();
+        for (const r of res) for (const p of r.products) if (p.id !== null) products.set(p.id, p);
+        setState({ products, state: 'done' });
+      })
+      .catch(() => mine === run.current && setState((s) => ({ ...s, state: 'error' })));
+  }, [idsKey]);
+  useFocusEffect(reload);
+  return { ...state, reload };
+}
+
 function Row({
   icon,
   label,
@@ -292,5 +348,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   rowText: { flex: 1, fontSize: 17, color: colors.ink },
+  offline: { fontSize: 14, color: colors.textMuted, paddingHorizontal: 16, paddingTop: 8 },
   rowSub: { fontSize: 13, color: colors.textMuted, marginTop: 2, lineHeight: 18 },
 });

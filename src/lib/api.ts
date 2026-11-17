@@ -42,6 +42,21 @@ export type ApiProduct = {
   label?: string;
 };
 
+/** Store aisles on the Grocery tab (the server's AISLES). */
+export const AISLES = [
+  { id: 'snacks', label: 'Snacks', emoji: '🥨' },
+  { id: 'sweets', label: 'Sweets & cookies', emoji: '🍫' },
+  { id: 'breakfast', label: 'Breakfast', emoji: '🥣' },
+  { id: 'bakery', label: 'Bread & bakery', emoji: '🍞' },
+  { id: 'drinks', label: 'Drinks', emoji: '🥤' },
+  { id: 'pantry', label: 'Pantry', emoji: '🥫' },
+  { id: 'dairy', label: 'Dairy & eggs', emoji: '🧀' },
+  { id: 'frozen', label: 'Frozen', emoji: '🧊' },
+  { id: 'meat', label: 'Meat & seafood', emoji: '🍗' },
+  { id: 'produce', label: 'Fruit & veg', emoji: '🍎' },
+] as const;
+export type Aisle = (typeof AISLES)[number]['id'];
+
 export type FrontExtracted = {
   brand: string | null;
   product_name: string | null;
@@ -285,6 +300,16 @@ export const api = {
   /** Current data for products the user is watching for ingredient changes (max 50 ids). */
   lookup: (ids: number[]) =>
     post<{ products: ApiProduct[] }>('/api/products/lookup', { ids: ids.slice(0, 50) }, { validate: isProductList, retries: 1 }),
+  /** Grocery tab: products matching a search and/or in an aisle, a page at a time (unfiltered: the app checks the fit). */
+  browse: (opts: { q?: string; aisle?: Aisle | null; offset?: number }) =>
+    post<{ products: ApiProduct[]; next_offset: number | null }>(
+      '/api/products/browse',
+      { q: opts.q?.slice(0, 100) || null, aisle: opts.aisle ?? null, offset: opts.offset ?? 0 },
+      {
+        validate: (v) => isProductList(v) && isObj(v) && (v.next_offset === null || (typeof v.next_offset === 'number' && Number.isSafeInteger(v.next_offset))),
+        retries: 1,
+      },
+    ),
   /** In-app feedback forms. Stored on the server and forwarded to the support email. */
   feedback: (topic: string, message: string) =>
     post<{ ok: true }>('/api/feedback', { topic: topic.slice(0, 80), message: message.slice(0, 2000) }, { validate: isObj, retries: 1 }),

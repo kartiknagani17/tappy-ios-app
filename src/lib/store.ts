@@ -31,7 +31,8 @@ type State = {
   askedPush: boolean;
   account?: { email: string; provider: 'email' | 'google' | 'apple' | 'facebook' };
   accountPromptDismissed: boolean;
-  saved: string[];
+  /** Bookmarked products (newest first), shown in Lists. Fresh data is fetched when Lists opens. */
+  saved: SavedProduct[];
   deviceId?: string;
   /** User opted in to share scanned product photos to improve the database. */
   contributePhotos: boolean;
@@ -44,6 +45,8 @@ type State = {
 };
 
 export type TriedVote = 'up' | 'down';
+export type SavedProduct = { id: number; gtin14: string; name: string; brand: string | null; image_url: string | null };
+export const MAX_SAVED = 300;
 export type WatchedProduct = { id: number; name: string; snapshot: string };
 
 type Actions = {
@@ -53,7 +56,7 @@ type Actions = {
   resetOverrides: () => void;
   applyAvoidList: () => void;
   resetAll: () => void;
-  toggleSaved: (productId: string) => void;
+  toggleSaved: (product: SavedProduct) => void;
   setTried: (gtin14: string, vote: TriedVote | null) => void;
   setWatched: (gtin14: string, product: WatchedProduct | null) => void;
 };
@@ -133,7 +136,12 @@ export const useStore = create<State & Actions>()(
       },
       // Keep the anonymous device id across resets so daily limits can't be bypassed by resetting.
       resetAll: () => set((st) => ({ ...initial, deviceId: st.deviceId })),
-      toggleSaved: (id) => set((st) => ({ saved: st.saved.includes(id) ? st.saved.filter((x) => x !== id) : [...st.saved, id] })),
+      toggleSaved: (p) =>
+        set((st) =>
+          st.saved.some((x) => x.id === p.id)
+            ? { saved: st.saved.filter((x) => x.id !== p.id) }
+            : { saved: [{ id: p.id, gtin14: p.gtin14, name: p.name, brand: p.brand, image_url: p.image_url }, ...st.saved].slice(0, MAX_SAVED) },
+        ),
       setTried: (gtin14, vote) =>
         set((st) => {
           const next = { ...st.tried };

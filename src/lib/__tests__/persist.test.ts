@@ -26,6 +26,20 @@ describe('sanitizePersisted', () => {
     assert.equal(out.deviceId, 'ios-123e4567-e89b-12d3-a456-426614174000');
     assert.equal(out.set, undefined);
   });
+  it('keeps real product bookmarks and drops old demo ids and bad entries', () => {
+    const good = { id: 7, gtin14: '00051500255162', name: 'Creamy Peanut Butter', brand: 'Jif', image_url: 'https://api.tappy.company/img/7-abc.jpg' };
+    const out = sanitizePersisted({
+      saved: [
+        good,
+        'plantain',
+        { ...good }, // duplicate
+        { id: 8, gtin14: '123', name: 'Bad barcode' },
+        { id: -1, gtin14: '00000000000017', name: 'Bad id' },
+        { id: 9, gtin14: '00000000000024', name: 'No photo', brand: 5, image_url: 'javascript:alert(1)' },
+      ],
+    });
+    assert.deepEqual(out.saved, [good, { id: 9, gtin14: '00000000000024', name: 'No photo', brand: null, image_url: null }]);
+  });
   it('handles null / arrays / strings', () => {
     for (const raw of [null, undefined, [], 'x', 5]) assert.deepEqual(sanitizePersisted(raw), {});
   });

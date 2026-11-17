@@ -209,6 +209,44 @@ export function similarProducts(db: DB, product: Product, limit = 60): Product[]
   return [...out.values()];
 }
 
+/** Store aisles for the Grocery tab (see migration 006_aisles.sql). */
+export const AISLES = ['snacks', 'sweets', 'breakfast', 'bakery', 'drinks', 'pantry', 'dairy', 'frozen', 'meat', 'produce'] as const;
+export type Aisle = (typeof AISLES)[number];
+export const GROCERY_PAGE = 40;
+
+/**
+ * Grocery tab: products matching a search and/or in an aisle, products with an ingredient list
+ * only (the verdict needs it), photos first. The app checks which fit the profile (the profile
+ * never leaves the phone), and asks for the next page when too few do.
+ */
+export function browseProducts(db: DB, opts: { q?: string | null; aisle?: Aisle | null; offset?: number }): { products: Product[]; nextOffset: number | null } {
+  const offset = Math.max(0, Math.min(2000, Math.floor(opts.offset ?? 0)));
+  const tokens = ftsTokens(opts.q);
+  let rows: Product[];
+  if (tokens.length) {
+    // Every word must match ("peanut butter" isn't every peanut product).
+    rows = db
+      .prepare(
+        `SELECT p.* FROM product_search s JOIN products p ON p.id = s.rowid
+         WHERE product_search MATCH ? AND p.ingredients_text IS NOT NULL ${opts.aisle ? 'AND p.aisle = ?' : ''}
+         ORDER BY (p.image_url IS NULL), bm25(product_search, 3.0, 4.0, 1.5, 0.5) LIMIT ? OFFSET ?`,
+      )
+      .all(...([all(tokens), ...(opts.aisle ? [opts.aisle] : []), GROCERY_PAGE + 1, offset] as (string | number)[])) as unknown as Product[];
+  } else if (opts.aisle) {
+    rows = db
+      .prepare(
+        `SELECT * FROM products WHERE aisle = ? AND ingredients_text IS NOT NULL
+         ORDER BY (image_url IS NULL), id LIMIT ? OFFSET ?`,
+      )
+      .all(opts.aisle, GROCERY_PAGE + 1, offset) as unknown as Product[];
+  } else {
+    return { products: [], nextOffset: null };
+  }
+  const more = rows.length > GROCERY_PAGE;
+  const page = rows.slice(0, GROCERY_PAGE).filter((p) => !p.needs_review && (p.ingredients_text?.length ?? 0) >= 10);
+  return { products: page, nextOffset: more ? offset + GROCERY_PAGE : null };
+}
+
 /** Current data for up to 50 product ids (used to tell the app when a watched product changed). */
 export function productsByIds(db: DB, ids: number[]): Product[] {
   const unique = [...new Set(ids)].filter((x) => Number.isSafeInteger(x) && x > 0).slice(0, 50);
