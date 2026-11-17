@@ -3,6 +3,7 @@ import { loadConfig, photoScanningEnabled, validateConfig } from '../config.ts';
 import { openDb } from '../db/index.ts';
 import { logError, registerSecret } from '../lib/log.ts';
 import { resendMailer } from '../services/auth.ts';
+import { ImageCache, setImageBase } from '../services/images.ts';
 import { OffLiveClient } from '../services/off-live.ts';
 import { pruneOldData } from '../services/retention.ts';
 import { ScanService } from '../services/scan.ts';
@@ -35,7 +36,9 @@ const offLive = config.offLiveLookup
 const scan = new ScanService({ db, config, vision, offLive });
 
 const mailer = config.resendApiKey ? resendMailer(config.resendApiKey, config.emailFrom) : null;
-const server = createHttpServer(createApp({ db, config, scan, mailer }), config);
+setImageBase(config.publicUrl);
+const images = config.publicUrl ? new ImageCache(config.imageCacheDir, { userAgent: config.offUserAgent }) : null;
+const server = createHttpServer(createApp({ db, config, scan, mailer, images }), config);
 installShutdown({ server, db, timeoutMs: config.shutdownTimeoutMs });
 
 const prune = () => {

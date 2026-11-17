@@ -100,6 +100,8 @@ TRUST_PROXY=true
 DATABASE_PATH=$DATA_DIR/data/tappy.db
 RAW_DATA_DIR=$DATA_DIR/data/raw
 UPLOADS_DIR=$DATA_DIR/uploads
+# Your HTTPS address (step 5). Product photos are then cached here and served through Cloudflare.
+PUBLIC_URL=
 
 # Required for front-of-package and ingredient-panel photos
 # Photo scanning. Set the key with: sudo bash deploy/oracle/set-key.sh OPENAI_API_KEY

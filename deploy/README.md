@@ -100,6 +100,14 @@ Check it from your computer:
 curl https://api.yourdomain.com/api/health
 ```
 
+Then put that address in `/etc/tappy/tappy.env` as `PUBLIC_URL=https://api.yourdomain.com` and restart the API. Product photos are then downloaded once from Open Food Facts (whose image server is slow), kept in `/var/lib/tappy/data/images`, and served through Cloudflare. To download all of them ahead of time (takes a few days, runs in the background):
+
+```bash
+sudo systemd-run --unit tappy-warm-images --uid tappy --nice 10 --working-directory /opt/tappy/server -E TAPPY_ENV_FILE=/etc/tappy/tappy.env node --disable-warning=ExperimentalWarning src/cli.ts warm-images 8
+```
+
+Progress: `journalctl -fu tappy-warm-images`.
+
 ## 6. Point the app at it
 
 In `eas.json`, set `EXPO_PUBLIC_API_URL` in the `preview` and `production` profiles to your address (it's currently the placeholder `https://api.tappy.company`):

@@ -9,6 +9,7 @@ import { updateOffFromDeltas } from './import/off-delta.ts';
 import { importUsda, openUsdaSource } from './import/usda.ts';
 import { findNewUsdaRelease } from './import/usda-latest.ts';
 import { cleanName, isJunkName } from './lib/names.ts';
+import { ImageCache } from './services/images.ts';
 import { approveContribution, pendingContributions, rebuildProduct, rejectContribution } from './services/products.ts';
 
 const HELP = `Tappy data CLI
@@ -26,6 +27,7 @@ const HELP = `Tappy data CLI
   node src/cli.ts review [n]              Ingredient-label photos waiting for review, next to current data
   node src/cli.ts approve <id>            Use a reviewed label photo as the product's data for everyone
   node src/cli.ts reject <id>             Discard a label photo
+  node src/cli.ts warm-images [n]         Download every product photo into the photo cache, n at a time (default 8)
   node src/cli.ts stats                   Row counts and vision spend
   node src/cli.ts feedback [n]            Latest feedback messages (default: 50)
   node src/cli.ts backup [dir] [keep]     Consistent snapshot of the live database (default: keep 2)
@@ -198,6 +200,41 @@ async function main() {
         if (after && after.name !== before.name) fixed++;
       }
       log(`Junk names: ${junk.length.toLocaleString()}; replaced with a real name from another source: ${fixed.toLocaleString()}`);
+      return;
+    }
+    case 'warm-images': {
+      // Download every product photo into the cache ahead of time (skips ones already cached).
+      const concurrency = Math.min(32, Math.max(1, Number(arg) || 8));
+      const db = openDb(config.dbPath, { migrate: false });
+      const cache = new ImageCache(config.imageCacheDir, { userAgent: config.offUserAgent, concurrency });
+      const total = (db.prepare('SELECT count(*) AS n FROM products WHERE image_url IS NOT NULL').get() as { n: number }).n;
+      let seen = 0;
+      let cached = 0;
+      let downloaded = 0;
+      let failed = 0;
+      const running = new Set<Promise<void>>();
+      const rows = db.prepare('SELECT id, image_url FROM products WHERE image_url IS NOT NULL ORDER BY id').iterate() as Iterable<{
+        id: number;
+        image_url: string;
+      }>;
+      for (const r of rows) {
+        seen++;
+        if (existsSync(cache.fileFor(r.id, r.image_url))) {
+          cached++;
+          continue;
+        }
+        const job = cache.get(r.id, r.image_url).then((buf) => {
+          if (buf) downloaded++;
+          else failed++;
+          const done = downloaded + failed;
+          if (done % 1000 === 0) log(`${seen.toLocaleString()}/${total.toLocaleString()} checked: ${downloaded.toLocaleString()} downloaded, ${failed.toLocaleString()} failed, ${cached.toLocaleString()} already cached`);
+        });
+        const tracked = job.finally(() => running.delete(tracked));
+        running.add(tracked);
+        if (running.size >= concurrency * 2) await Promise.race(running);
+      }
+      await Promise.all(running);
+      log(`Done: ${downloaded.toLocaleString()} downloaded, ${failed.toLocaleString()} failed, ${cached.toLocaleString()} were already cached`);
       return;
     }
     case 'backup': {

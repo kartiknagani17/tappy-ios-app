@@ -55,6 +55,12 @@ export function loadConfig() {
     dbPath: path.resolve(SERVER_ROOT, str('DATABASE_PATH', 'data/tappy.db')),
     rawDataDir: path.resolve(SERVER_ROOT, str('RAW_DATA_DIR', 'data/raw')),
     uploadsDir: path.resolve(SERVER_ROOT, str('UPLOADS_DIR', 'data/uploads')),
+    /** Cached product photos; next to the database unless set. */
+    imageCacheDir: process.env.IMAGE_CACHE_DIR
+      ? path.resolve(SERVER_ROOT, process.env.IMAGE_CACHE_DIR)
+      : path.join(path.dirname(path.resolve(SERVER_ROOT, str('DATABASE_PATH', 'data/tappy.db'))), 'images'),
+    /** The API's public HTTPS address. When set, product photos are served (and cached) from here. */
+    publicUrl: str('PUBLIC_URL', ''),
 
     // Data sources
     usdaApiKey: process.env.USDA_API_KEY || '', // optional; bulk CSV import does not need it
@@ -173,6 +179,8 @@ export function validateConfig(c: Config): string[] {
   else if (c.photoScanningMode === 'on' && !visionApiKey(c)) {
     errors.push(`PHOTO_SCANNING=on but ${c.visionProvider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'} is not set`);
   }
+  if (c.publicUrl && !/^https?:\/\/[^/\s]+\/?$/i.test(c.publicUrl))
+    errors.push(`PUBLIC_URL must be an address like https://api.example.com (got "${c.publicUrl}")`);
   if (errors.length) throw new Error(`Invalid configuration:\n  - ${errors.join('\n  - ')}`);
 
   if (!photoScanningEnabled(c)) {
@@ -188,6 +196,7 @@ export function validateConfig(c: Config): string[] {
   if (c.offUserAgent.includes('example.com')) warnings.push('OFF_USER_AGENT still uses the example contact address.');
   if (!c.revenueCatSecretKey)
     warnings.push('REVENUECAT_SECRET_KEY is not set: subscribers get the free daily scan limits instead of unlimited scans.');
+  if (!c.publicUrl) warnings.push("PUBLIC_URL is not set: product photos load from Open Food Facts' slow image server.");
   if (!c.resendApiKey) warnings.push('RESEND_API_KEY is not set: password reset emails are off ("Forgot password?" is hidden in the app).');
   return warnings;
 }

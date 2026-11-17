@@ -6,6 +6,7 @@ import { ImageError, probeImage } from '../lib/image.ts';
 import { logError } from '../lib/log.ts';
 import { accountPurchaserId, ANONYMOUS_PURCHASER_RE, noEntitlements, RevenueCatEntitlements, type EntitlementChecker } from '../services/entitlements.ts';
 import { FeedbackError, submitFeedback } from '../services/feedback.ts';
+import { IMAGE_PATH_RE, imageKey, type ImageCache } from '../services/images.ts';
 import { consumeDailyQuota, ipKey, LimitError, RateLimiter, type QuotaSubject } from '../services/limits.ts';
 import {
   getProductById,
@@ -84,6 +85,7 @@ const ROUTES: Route[] = [
   { name: 'me', pattern: /^\/api\/account$/, methods: ['GET', 'HEAD'] },
   { name: 'profile', pattern: /^\/api\/account\/profile$/, methods: ['POST'] },
   { name: 'delete_account', pattern: /^\/api\/account\/delete$/, methods: ['POST'] },
+  { name: 'image', pattern: IMAGE_PATH_RE, methods: ['GET', 'HEAD'] },
   { name: 'terms', pattern: /^\/terms\/?$/, methods: ['GET', 'HEAD'] },
   { name: 'privacy', pattern: /^\/privacy\/?$/, methods: ['GET', 'HEAD'] },
 ];
@@ -102,6 +104,10 @@ export type AppDeps = {
   appleKeys?: AppleKeySource;
   /** Checks the RevenueCat subscription; defaults to RevenueCat when REVENUECAT_SECRET_KEY is set. */
   entitlements?: EntitlementChecker;
+  /** Product photo cache behind GET /img/…; null turns the route off. */
+  images?: ImageCache | null;
+  /** Photo requests per minute per IP (screens show a dozen at once; Cloudflare absorbs repeats). */
+  imageLimiter?: RateLimiter;
 };
 
 /** Plain node:http request handler. Routes:
@@ -127,6 +133,8 @@ export function createApp({
   entitlements = config.revenueCatSecretKey
     ? new RevenueCatEntitlements({ secretKey: config.revenueCatSecretKey, entitlementId: config.revenueCatEntitlementId })
     : noEntitlements,
+  images = null,
+  imageLimiter = new RateLimiter(600),
 }: AppDeps) {
   const maxImageBody = Math.ceil(config.visionMaxImageBytes * 1.4) + 4096; // base64 overhead
   const photosEnabled = photoScanningEnabled(config);
@@ -176,6 +184,22 @@ export function createApp({
 
     const ip = clientIp(req, config.trustProxyHops);
     const ipk = ipKey(ip);
+
+    if (r.name === 'image') {
+      // Before the API limiter: a result screen loads many photos at once.
+      imageLimiter.check(`img:${ipk}`);
+      const key = IMAGE_PATH_RE.exec(pathname)![2];
+      const p = images ? getProductById(db, idParam) : null;
+      if (!p?.image_url || imageKey(p.image_url) !== key) throw new HttpError(404, 'not_found', 'Image not found');
+      const buf = await images!.get(p.id, p.image_url);
+      if (!buf) throw new HttpError(404, 'not_found', 'Image not available');
+      // The address changes when the photo does, so it can be cached for good (by Cloudflare and the phone).
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': buf.length });
+      res.end(req.method === 'HEAD' ? undefined : buf);
+      return;
+    }
     // IP first: rotating device ids from one address can't grow the per-user limiter past the IP limit.
     ipLimiter.check(`ip:${ipk}`);
 
@@ -293,7 +317,9 @@ export function createApp({
       case 'similar': {
         const p = getProductById(db, idParam);
         if (!p) throw new HttpError(404, 'not_found', 'Product not found');
-        return send(res, 200, { products: similarProducts(db, p).map(toPublicProduct) });
+        const list = similarProducts(db, p);
+        images?.warm(list); // the app asks for these photos next
+        return send(res, 200, { products: list.map(toPublicProduct) });
       }
       case 'lookup': {
         const ids = body.ids;

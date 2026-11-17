@@ -1,6 +1,7 @@
 import type { DB } from '../db/index.ts';
 import { mergeRecords, type SourceRecord } from '../lib/merge.ts';
 import { displayName } from '../lib/names.ts';
+import { publicImageUrl } from './images.ts';
 
 export type Product = {
   id: number;
@@ -343,7 +344,8 @@ export function toPublicProduct(p: Product) {
     allergens_text: p.allergens_text,
     nutrition: p.nutrition_json ? (JSON.parse(p.nutrition_json) as Record<string, unknown>) : null,
     category: p.category,
-    image_url: p.image_url,
+    // Our cached copy (fast, via Cloudflare) rather than Open Food Facts' slow image server.
+    image_url: publicImageUrl(p.id, p.image_url),
     source: p.source,
     source_updated_at: p.source_updated_at,
     verified: !!p.verified,
