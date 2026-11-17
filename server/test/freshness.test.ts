@@ -57,8 +57,18 @@ describe('display names', () => {
     assert.equal(cleanName('3948764032905', 'Brand', null).fix, 'replaced');
   });
 
+  it('treats placeholders as junk and never shows raw category tags or placeholder brands', () => {
+    assert.equal(cleanName("Unknown - can't determine product name from given image", 'Aldi', null).name, 'Aldi');
+    assert.equal(cleanName('Read from your label photo', 'Kroger', null).name, 'Kroger');
+    assert.equal(cleanName('Test', 'Datofit', 'en:uncategorized').name, 'Datofit');
+    assert.equal(cleanName('No name', 'Sans nom', null).fix, 'junk_kept');
+    assert.equal(cleanName('Tums assorted shelf', null, null).name, 'Tums assorted');
+  });
+
   it('keeps real endings that look like photo words', () => {
     for (const n of [
+      'The Elf on the Shelf',
+      'Mega Image',
       'Apple Juice From Concentrate With Added Ingredients',
       'Black tea - Red Label',
       'Atlantic Salmon Side',
@@ -96,9 +106,9 @@ describe('display names', () => {
   it('is what the app receives, while the stored name is unchanged', async () => {
     const db = await seededDb();
     const p = getProductByGtin(db, '00051500255162')!;
-    db.prepare('UPDATE products SET name = ? WHERE id = ?').run('creamy peanut butter front', p.id);
+    db.prepare('UPDATE products SET name = ? WHERE id = ?').run('creamy peanut butter shelf', p.id);
     const stored = getProductByGtin(db, '00051500255162')!;
-    assert.equal(stored.name, 'creamy peanut butter front');
+    assert.equal(stored.name, 'creamy peanut butter shelf');
     assert.equal(toPublicProduct(stored).name, 'Creamy Peanut Butter');
   });
 });

@@ -14,15 +14,20 @@
  * deliberately short: "ingredients", "nutrition", "label" and "side" end many real names
  * ("…With Added Ingredients", "Red Label", "Salmon Side"), as the full-database report showed.
  */
-const TRAILING_JUNK = /\s+(?:shelf|photo|pic|picture|image|front)$/i;
+/** Only "shelf" (from shelf photos) survived the report, and never in "Elf on the Shelf". */
+const TRAILING_JUNK = /(?<!\b(?:the|on|in|of|a|an|top|off))\s+shelf$/i;
 /** Names that aren't product names at all. */
-const JUNK_NAME = /^(?:test\b|unknown\b|product\b|untitled\b|no name\b|(?:null|none|n\/a|item|food|food item|nutrition facts)$)/i;
+const JUNK_NAME = /^(?:test\b|product\b|untitled\b|no name\b|(?:null|none|n\/a|item|food|food item|nutrition facts)$)/i;
+/** Placeholders written by people or tools instead of a name, at any length. */
+const PLACEHOLDER_NAME = /^(?:unknown\b|read from your label|can'?t determine|no product name)/i;
 /** "My Bff" is junk, but "My Deli Sandwich" and the brand "My" are real: see isJunkName. */
 const MY_NAME = /^my\s+\S+$/i;
 const SMALL_WORDS = new Set(['a', 'an', 'and', 'or', 'of', 'with', 'the', 'in', 'on', 'for', 'to', '&', 'de', 'n']);
 
 /** Brand values that are placeholders, not brands. */
-const PLACEHOLDER_BRAND = /^(?:undefined|null|unknown|none|n\/a|generic|original|-+)$/i;
+const PLACEHOLDER_BRAND = /^(?:undefined|null|unknown|none|n\/a|generic|original|no brand|unbranded|sans nom|sans marque|sin marca|-+)$/i;
+/** Category values that aren't categories ("en:uncategorized"). */
+const PLACEHOLDER_CATEGORY = /^(?:[a-z]{2}:)?(?:uncategorized|undefined|unknown|null|none|other)$/i;
 
 const letters = (s: string) => s.replace(/[^\p{L}]/gu, '');
 
@@ -67,6 +72,7 @@ export function isJunkName(name: string | null | undefined, brand?: string | nul
   // No letters ("3948764032905") or a single Latin letter ("G"). "7 up" and "TB" are real names,
   // and one Chinese or Japanese character can be a whole word ("餅").
   if (!l || (l.length < 2 && /^\p{Script=Latin}+$/u.test(l))) return true;
+  if (PLACEHOLDER_NAME.test(s)) return true;
   if (JUNK_NAME.test(s) && s.split(' ').filter(Boolean).length <= 3) return true;
   if (MY_NAME.test(s)) {
     // "My <word>" with nothing tying it to the product: a nickname, not a product name.
@@ -101,7 +107,8 @@ export function cleanName(name: string, brandField: string | null, category: str
   const brand = brandRaw && !PLACEHOLDER_BRAND.test(brandRaw) ? fixCase(brandRaw) : '';
 
   if (isJunkName(s, brandRaw, category)) {
-    const cat = (category ?? '').trim();
+    const rawCat = (category ?? '').trim();
+    const cat = PLACEHOLDER_CATEGORY.test(rawCat) ? '' : rawCat.replace(/^[a-z]{2}:/i, '');
     if (brand && cat) return { name: `${brand} ${cat.charAt(0).toLowerCase()}${cat.slice(1)}`, fix: 'replaced' };
     if (brand) return { name: brand, fix: 'replaced' };
     return { name, fix: 'junk_kept' }; // nothing better to show
