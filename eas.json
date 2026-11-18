@@ -8,7 +8,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://localhost:8787",
-        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu"
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "698625528840-i59tes7nc33d20buo747g0de3q5eskmg.apps.googleusercontent.com"
       },
       "ios": {
         "simulator": true
@@ -19,7 +20,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.tappy.company",
-        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu"
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "698625528840-i59tes7nc33d20buo747g0de3q5eskmg.apps.googleusercontent.com"
       }
     },
     "simulator": {
@@ -33,7 +35,8 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.tappy.company",
-        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu"
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_TZhKLDElIdjjegjZlMnZpBnpqXu",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "698625528840-i59tes7nc33d20buo747g0de3q5eskmg.apps.googleusercontent.com"
       }
     }
   },

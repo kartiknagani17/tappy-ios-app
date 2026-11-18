@@ -10,7 +10,7 @@ import { identifyPurchaser, resetPurchaser } from './subscription';
 /**
  * Accounts, backed by the Tappy server (/api/auth/*, /api/account*).
  *
- *  - Email + password, and Sign in with Apple (App Store Guideline 4.8 is met: Apple is the only social login).
+ *  - Email + password, Sign in with Apple and Sign in with Google (Guideline 4.8 is met: Apple is always offered too).
  *  - The session token lives in the iOS Keychain (expo-secure-store), never in AsyncStorage.
  *  - While signed in, the dietary profile is synced to the account so it can be restored on a new phone.
  */
@@ -19,8 +19,36 @@ export const AUTH_ENABLED = true;
 export type SocialProvider = 'apple' | 'google' | 'facebook';
 export type AccountProvider = 'email' | SocialProvider;
 
+/** The iOS OAuth client id for Sign in with Google (public, set per build profile in eas.json). */
+const GOOGLE_IOS_CLIENT_ID = (process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '').trim();
+const GOOGLE_ENDPOINTS = {
+  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenEndpoint: 'https://oauth2.googleapis.com/token',
+};
+
+type GoogleLibs = { AuthSession: typeof import('expo-auth-session'); Crypto: typeof Crypto };
+let googleLibs: GoogleLibs | null | undefined;
+/**
+ * expo-auth-session and expo-web-browser contain native code. A build made before they were added
+ * (or an update running on one) must not crash: the Google button just stays hidden there.
+ */
+function loadGoogleLibs(): GoogleLibs | null {
+  if (googleLibs !== undefined) return googleLibs;
+  try {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    require('expo-web-browser');
+    const AuthSession = require('expo-auth-session') as typeof import('expo-auth-session');
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    googleLibs = { AuthSession, Crypto };
+  } catch {
+    googleLibs = null;
+  }
+  return googleLibs;
+}
+const googleAvailable = () => Platform.OS === 'ios' && !!GOOGLE_IOS_CLIENT_ID && loadGoogleLibs() !== null;
+
 /** Only providers that are really wired up. Never add Google/Facebook without keeping Apple (4.8). */
-const ENABLED_PROVIDERS: readonly SocialProvider[] = Platform.OS === 'ios' ? ['apple'] : [];
+const ENABLED_PROVIDERS: readonly SocialProvider[] = Platform.OS === 'ios' ? ['apple', ...(googleAvailable() ? (['google'] as const) : [])] : [];
 
 export function socialProviders(): SocialProvider[] {
   if (!AUTH_ENABLED) return [];
@@ -47,7 +75,7 @@ export class AuthCancelledError extends Error {
 
 export type AuthResult = { email: string; provider: AccountProvider; restoredProfile: boolean };
 
-type ServerAccount = { id: number; email: string | null; provider: 'email' | 'apple' };
+type ServerAccount = { id: number; email: string | null; provider: 'email' | 'apple' | 'google' };
 type SessionResponse = { token: string; account: ServerAccount };
 
 const TOKEN_KEY = 'tappy.session';
@@ -242,7 +270,42 @@ export async function passwordResetAvailable(): Promise<boolean> {
   }
 }
 
+/** Sign in with Google: browser sheet with PKCE, then the ID token goes to our server, which verifies it. */
+async function signInWithGoogle(): Promise<AuthResult> {
+  const libs = loadGoogleLibs();
+  if (!libs || !GOOGLE_IOS_CLIENT_ID) throw new Error('Sign in with Google isn’t available on this device.');
+  const { AuthSession, Crypto: C } = libs;
+  const redirectUri = `com.googleusercontent.apps.${GOOGLE_IOS_CLIENT_ID.replace(/\.apps\.googleusercontent\.com$/, '')}:/oauthredirect`;
+  const nonce = C.randomUUID();
+  const request = new AuthSession.AuthRequest({
+    clientId: GOOGLE_IOS_CLIENT_ID,
+    redirectUri,
+    scopes: ['openid', 'email', 'profile'],
+    responseType: AuthSession.ResponseType.Code,
+    usePKCE: true,
+    extraParams: { nonce },
+  });
+  const fail = () => new Error('Sign in with Google didn’t work. Please try again.');
+  let idToken: string | undefined;
+  try {
+    const result = await request.promptAsync(GOOGLE_ENDPOINTS);
+    if (result.type === 'cancel' || result.type === 'dismiss') throw new AuthCancelledError();
+    if (result.type !== 'success' || !result.params.code || !request.codeVerifier) throw fail();
+    const tokens = await AuthSession.exchangeCodeAsync(
+      { clientId: GOOGLE_IOS_CLIENT_ID, code: result.params.code, redirectUri, extraParams: { code_verifier: request.codeVerifier } },
+      GOOGLE_ENDPOINTS,
+    );
+    idToken = tokens.idToken;
+  } catch (e) {
+    if (e instanceof AuthCancelledError) throw e;
+    throw fail();
+  }
+  if (!idToken) throw fail();
+  return startSession(await call<SessionResponse>('POST', '/api/auth/google', { id_token: idToken, nonce }), 'google');
+}
+
 export async function signInWithProvider(provider: SocialProvider): Promise<AuthResult> {
+  if (provider === 'google') return signInWithGoogle();
   if (provider !== 'apple' || !(await AppleAuthentication.isAvailableAsync())) {
     throw new Error('This sign-in option isn’t available on this device.');
   }
