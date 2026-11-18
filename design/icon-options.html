@@ -1,0 +1,96 @@
+<title>Tappy Icon Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Sora:wght@600;700&display=swap">
+<style>
+/* Layout: a responsive grid of six cards. Each card shows one icon large, at the small sizes iOS uses,
+   and on a home-screen strip next to neutral placeholder apps. Icon colors come from the Sunset Coral palette. */
+:root {
+  --bg: #F7F4F2;
+  --fg: #1F1513;
+  --muted: #6F6360;
+  --line: #E6DDD9;
+  --card: #FFFFFF;
+  --coral: #FF7A59;
+  --berry: #B4274F;
+  --wall: #D9CFEA;
+  --head: 'Sora', 'Helvetica Neue', Arial, sans-serif;
+  --body: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #151211; --fg: #F3ECE9; --muted: #AFA3A0; --line: #2E2725; --card: #1E1A19; --wall: #3A3350; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #151211; --fg: #F3ECE9; --muted: #AFA3A0; --line: #2E2725; --card: #1E1A19; --wall: #3A3350; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1120px; margin: 0 auto; }
+h1 { font-family: var(--head); font-weight: 700; font-size: clamp(26px, 4vw, 36px); letter-spacing: -0.02em; margin: 0 0 6px; text-wrap: balance; }
+.intro { color: var(--muted); max-width: 64ch; margin: 0 0 26px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.card h2 { font-family: var(--head); font-size: 17px; margin: 0; letter-spacing: -0.01em; }
+.card p { margin: 3px 0 0; color: var(--muted); font-size: 13.5px; }
+.stage { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.ic { border-radius: 22.37%; overflow: hidden; flex: none; box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 6px 16px rgba(60,20,10,.16); display: block; }
+.ic svg { display: block; width: 100%; height: 100%; }
+.s160 { width: 160px; height: 160px; }
+.s60 { width: 60px; height: 60px; }
+.s40 { width: 40px; height: 40px; }
+.sizes { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.lab { font-size: 11px; color: var(--muted); }
+.home { background: var(--wall); border-radius: 16px; padding: 14px 12px 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 6px; justify-items: center; }
+.home .app { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 9.5px; color: #1b1722; min-width: 0; }
+.home .ph { width: 44px; height: 44px; border-radius: 22.37%; display: block; }
+.home .ic { width: 44px; height: 44px; box-shadow: none; }
+</style>
+
+<div class="wrap">
+  <h1>Tappy icon options</h1>
+  <p class="intro">Six app icons in the Sunset Coral palette. Each is shown large, at the small sizes iOS uses, and on a home screen between other apps. The real icon would be a 1024 by 1024 square; iOS rounds the corners itself.</p>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+var C = { coral: '#FF7A59', ink: '#1F1513', berry: '#B4274F', soft: '#FFEBE4', cream: '#FFF6F1', white: '#FFFFFF', deep: '#2A0E06' };
+var F = "font-family=\"Arial, Helvetica, sans-serif\" font-weight=\"800\"";
+function word(fill, size, x, y, extra) {
+  return '<text x="' + (x || 100) + '" y="' + (y || 122) + '" text-anchor="middle" ' + F + ' font-size="' + size + '" letter-spacing="' + (-size * 0.06) + '" fill="' + fill + '" ' + (extra || '') + '>tappy</text>';
+}
+var OPTIONS = [
+  { name: 'Coral Wordmark', note: 'Your current icon with coral instead of lime. Dark lettering, the safest change.',
+    svg: '<rect width="200" height="200" fill="' + C.coral + '"/>' + word(C.ink, 62) },
+  { name: 'White on Coral', note: 'Same wordmark in white. Softer and friendlier, a little lower contrast.',
+    svg: '<rect width="200" height="200" fill="' + C.coral + '"/>' + word(C.white, 62) },
+  { name: 'Single T', note: 'A big t that stays readable at the smallest sizes. The tap dot doubles as a button.',
+    svg: '<rect width="200" height="200" fill="' + C.coral + '"/>' +
+         '<text x="100" y="150" text-anchor="middle" ' + F + ' font-size="150" fill="' + C.ink + '">t</text>' +
+         '<circle cx="146" cy="58" r="13" fill="' + C.white + '"/>' },
+  { name: 'Berry Night', note: 'Deep berry background with a coral wordmark. Stands out among bright apps.',
+    svg: '<rect width="200" height="200" fill="' + C.berry + '"/>' + word(C.coral, 62) },
+  { name: 'Cream and Coral', note: 'Cream background with a coral wordmark and a dark underline. Light and food-label-like.',
+    svg: '<rect width="200" height="200" fill="' + C.cream + '"/>' + word(C.coral, 62, 100, 118) +
+         '<rect x="44" y="140" width="112" height="8" rx="4" fill="' + C.ink + '"/>' },
+  { name: 'Scan Corners', note: 'Wordmark inside scanner corner brackets, hinting at what the app does.',
+    svg: '<rect width="200" height="200" fill="' + C.coral + '"/>' +
+         '<g fill="none" stroke="' + C.ink + '" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M48 76V56a8 8 0 0 1 8-8h20"/><path d="M124 48h20a8 8 0 0 1 8 8v20"/>' +
+           '<path d="M152 124v20a8 8 0 0 1-8 8h-20"/><path d="M76 152H56a8 8 0 0 1-8-8v-20"/></g>' +
+         word(C.ink, 40, 100, 112) }
+];
+var dummy = ['#6C8CFF', '#53C28B', '#F2C94C', '#9B7BEA', '#4FB3D9', '#E58AB0'];
+function icon(o, cls) { return '<span class="ic ' + cls + '"><svg viewBox="0 0 200 200" aria-hidden="true">' + o.svg + '</svg></span>'; }
+document.getElementById('grid').innerHTML = OPTIONS.map(function (o, i) {
+  var home = '';
+  var order = [0, 1, 'T', 2, 3, 4, 5, 6];
+  var names = ['Maps', 'Notes', '', 'Music', 'Clock', 'Photos', 'Mail', 'Camera'];
+  var d = 0;
+  for (var k = 0; k < 8; k++) {
+    if (k === 2) home += '<div class="app">' + icon(o, '') + '<span>Tappy</span></div>';
+    else home += '<div class="app"><span class="ph" style="background:' + dummy[d++ % dummy.length] + '"></span><span>' + names[k] + '</span></div>';
+  }
+  return '<article class="card"><div><h2>' + (i + 1) + '. ' + o.name + '</h2><p>' + o.note + '</p></div>' +
+    '<div class="stage">' + icon(o, 's160') + '<div class="sizes"><div>' + icon(o, 's60') + '</div><div class="lab">60 px</div><div>' + icon(o, 's40') + '</div><div class="lab">40 px</div></div></div>' +
+    '<div class="home">' + home + '</div></article>';
+}).join('');
+</script>

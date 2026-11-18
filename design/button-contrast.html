@@ -1,0 +1,109 @@
+<title>Tappy Button Contrast</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Sora:wght@600;700&display=swap">
+<style>
+/* Layout: a comparison strip (current vs option A) for button, chip, badge, then two phone screens in option A. */
+:root {
+  --bg: #F7F4F2; --fg: #1F1513; --muted: #6F6360; --line: #E6DDD9; --card: #FFFFFF;
+  --head: 'Sora', 'Helvetica Neue', Arial, sans-serif; --body: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #151211; --fg: #F3ECE9; --muted: #AFA3A0; --line: #2E2725; --card: #1E1A19; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #151211; --fg: #F3ECE9; --muted: #AFA3A0; --line: #2E2725; --card: #1E1A19; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1000px; margin: 0 auto; }
+h1 { font-family: var(--head); font-size: clamp(26px, 4vw, 34px); letter-spacing: -0.02em; margin: 0 0 6px; }
+h2 { font-family: var(--head); font-size: 17px; margin: 0 0 4px; }
+.intro { color: var(--muted); max-width: 64ch; margin: 0 0 24px; }
+.cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 30px; }
+.box { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.box p { margin: 0; color: var(--muted); font-size: 13px; }
+.stage { background: #fff; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; align-items: stretch; color: #1F1513; }
+.btn { border-radius: 14px; font-weight: 700; font-size: 17px; text-align: center; padding: 15px 10px; }
+.btn.now { background: #FF7A59; color: #1F1513; }
+.btn.a { background: #D94A27; color: #fff; }
+.btn.a2 { background: #E04D2A; color: #fff; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.chip { font-size: 13px; font-weight: 600; padding: 7px 13px; border-radius: 99px; border: 1px solid #EBDFDB; background: #fff; color: #1F1513; }
+.chip.now { background: #FF7A59; border-color: #FF7A59; }
+.chip.a { background: #D94A27; border-color: #D94A27; color: #fff; }
+.badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
+.badge.now { background: #FF7A59; color: #1F1513; }
+.badge.a { background: #D94A27; color: #fff; }
+.tag { font-size: 11px; color: #6F6360; margin-bottom: -6px; }
+.phones { display: flex; gap: 18px; overflow-x: auto; padding: 4px 2px 18px; }
+.ph { flex: none; width: 226px; height: 456px; border-radius: 30px; background: #fff; border: 6px solid #111; box-shadow: 0 8px 22px rgba(0,0,0,.16); overflow: hidden; display: flex; flex-direction: column; color: #1F1513; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+.status { height: 22px; flex: none; display: flex; justify-content: space-between; padding: 6px 16px 0; font-size: 9px; font-weight: 600; }
+.pb { flex: 1; min-height: 0; padding: 8px 14px; display: flex; flex-direction: column; gap: 9px; }
+.logo { font-family: Arial, Helvetica, sans-serif; font-weight: 800; letter-spacing: -0.06em; line-height: 1.1; }
+.pbtn { border-radius: 12px; background: #D94A27; color: #fff; font-weight: 700; font-size: 12.5px; text-align: center; padding: 11px 8px; }
+.seg { display: flex; background: #F7F2F0; border-radius: 10px; padding: 3px; gap: 2px; }
+.seg span { flex: 1; text-align: center; font-size: 10px; font-weight: 600; padding: 6px 0; border-radius: 8px; color: #7A6A66; }
+.seg span.on { background: #D94A27; color: #fff; }
+.card2 { border: 1px solid #EBDFDB; border-radius: 14px; padding: 10px; }
+.row { display: flex; align-items: center; gap: 9px; }
+.thumb { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-size: 19px; flex: none; }
+.t1 { font-size: 11.5px; font-weight: 600; line-height: 1.25; }
+.t2 { font-size: 9.5px; color: #7A6A66; }
+.pill { display: inline-block; font-size: 9.5px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: #FFCB05; color: #2B2300; }
+.c2 { font-size: 9.5px; font-weight: 600; padding: 4px 9px; border-radius: 99px; border: 1px solid #EBDFDB; }
+.c2.on { background: #D94A27; border-color: #D94A27; color: #fff; }
+.c2.flag { background: #FFE3DA; border-color: #FFB9A3; color: #A02A08; }
+.tabs { flex: none; height: 50px; border-top: 1px solid #EBDFDB; display: flex; justify-content: space-around; align-items: center; font-size: 8.5px; font-weight: 600; color: #9A8C88; }
+.tabs b { position: relative; }
+.tabs b.on { color: #1F1513; }
+.tabs em { position: absolute; top: -8px; right: -18px; background: #D94A27; color: #fff; font-style: normal; font-size: 7.5px; padding: 1px 4px; border-radius: 6px; }
+.cap { text-align: center; font-size: 11px; color: var(--muted); margin-top: 8px; }
+</style>
+
+<div class="wrap">
+  <h1>Button contrast, option A</h1>
+  <p class="intro">Highlight color moves from the current coral to a deeper coral, with white text. Left is how it looks now, right is option A. Nothing has been applied to the app.</p>
+
+  <div class="cmp">
+    <div class="box">
+      <h2>Now: coral, dark text</h2><p>#FF7A59 with #1F1513. Contrast 7.0.</p>
+      <div class="stage"><div class="tag">Button</div><div class="btn now">Get Started</div>
+        <div class="tag">Selected chip</div><div class="chips"><span class="chip now">All</span><span class="chip">Snacks</span><span class="chip">Bakery</span></div>
+        <div class="tag">Tab badge</div><div><span class="badge now">3</span></div></div>
+    </div>
+    <div class="box">
+      <h2>Option A: deeper coral, white text</h2><p>#D94A27 with white. Contrast 4.2.</p>
+      <div class="stage"><div class="tag">Button</div><div class="btn a">Get Started</div>
+        <div class="tag">Selected chip</div><div class="chips"><span class="chip a">All</span><span class="chip">Snacks</span><span class="chip">Bakery</span></div>
+        <div class="tag">Tab badge</div><div><span class="badge a">3</span></div></div>
+    </div>
+    <div class="box">
+      <h2>Option A, a bit lighter</h2><p>#E04D2A with white. Contrast 3.9.</p>
+      <div class="stage"><div class="tag">Button</div><div class="btn a2">Get Started</div>
+        <div class="tag">Selected chip</div><div class="chips"><span class="chip" style="background:#E04D2A;border-color:#E04D2A;color:#fff">All</span><span class="chip">Snacks</span><span class="chip">Bakery</span></div>
+        <div class="tag">Tab badge</div><div><span class="badge" style="background:#E04D2A;color:#fff">3</span></div></div>
+    </div>
+  </div>
+
+  <h2>Option A on real screens</h2>
+  <div class="phones">
+    <div><div class="ph"><div class="status"><span>9:41</span><span>●●● ▮</span></div>
+      <div class="pb" style="align-items:center;padding-top:14px">
+        <div class="logo" style="font-size:26px">tappy</div>
+        <div style="font-weight:700;font-size:17px;line-height:1.25;text-align:center;margin-top:4px">Let&rsquo;s find food<br>you can eat</div>
+        <div style="flex:1;width:100%;border-radius:20px 20px 0 0;background:#FFEBE4;margin-top:10px;display:flex;align-items:flex-end;justify-content:center;gap:8px;padding:14px 12px 0">
+          <div style="width:52px;height:88px;background:#FDE2EC;border-radius:10px 10px 0 0;display:grid;place-items:center;font-size:22px">🍌</div>
+          <div style="width:52px;height:118px;background:#FFD84D;border-radius:10px 10px 0 0;display:grid;place-items:center;font-size:22px">🍫</div>
+          <div style="width:52px;height:98px;background:#E9DDF7;border-radius:10px 10px 0 0;display:grid;place-items:center;font-size:22px">🍞</div></div>
+      </div>
+      <div style="padding:10px 14px 16px"><div class="pbtn">Get Started</div></div></div><div class="cap">Welcome</div></div>
+    <div><div class="ph"><div class="status"><span>9:41</span><span>●●● ▮</span></div>
+      <div class="pb">
+        <div class="logo" style="font-size:17px">tappy</div>
+        <div class="seg"><span class="on">Barcode</span><span>Photo</span></div>
+        <div class="card2"><div class="row"><div class="thumb" style="background:#FFD84D">🍫</div><div><div class="t1">Chocolate Chip Banana Granola Bars</div><div class="t2">Goodgrain &middot; 6 bars</div></div></div><div style="margin-top:9px"><span class="pill">Check ingredients</span></div></div>
+        <div><div class="t1" style="margin-bottom:5px">Flagged for you</div><div style="display:flex;gap:5px"><span class="c2 flag">Honey</span><span class="c2 flag">Tree nuts</span></div></div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap"><span class="c2 on">All</span><span class="c2">Snacks</span><span class="c2">Bakery</span></div>
+        <div class="pbtn" style="margin-top:auto">Scan another</div>
+      </div>
+      <div class="tabs"><b>Grocery</b><b class="on">Scan</b><b>Lists<em>3</em></b></div></div><div class="cap">Scan result</div></div>
+  </div>
+</div>

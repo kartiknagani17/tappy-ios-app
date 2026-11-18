@@ -1,0 +1,203 @@
+<title>Tappy Color Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Sora:wght@600;700&display=swap">
+<style>
+/* Layout: six palette sections, each a header with swatches and a row of four phone screens
+   (welcome, scan result, grocery, lists). Phones are styled only through the --p/--a variables
+   set per section, so every palette uses identical markup. */
+:root {
+  --bg: #F6F6F3;
+  --fg: #1A1B1E;
+  --muted: #62646B;
+  --line: #DEDFDA;
+  --card: #FFFFFF;
+  --head: 'Sora', 'Helvetica Neue', Arial, sans-serif;
+  --body: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #131417; --fg: #EDEDEA; --muted: #A2A4AB; --line: #2A2C31; --card: #1C1D21; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #131417; --fg: #EDEDEA; --muted: #A2A4AB; --line: #2A2C31; --card: #1C1D21; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1120px; margin: 0 auto; }
+h1 { font-family: var(--head); font-weight: 700; font-size: clamp(26px, 4vw, 36px); letter-spacing: -0.02em; margin: 0 0 6px; text-wrap: balance; }
+.intro { color: var(--muted); max-width: 62ch; margin: 0 0 8px; }
+.note { color: var(--muted); font-size: 13px; max-width: 70ch; margin: 0 0 28px; }
+
+.opt { border-top: 1px solid var(--line); padding-block: 30px 14px; }
+.opt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; margin-bottom: 20px; }
+.icon { width: 64px; height: 64px; border-radius: 15px; display: grid; place-items: center; background: var(--p); color: var(--onp); font-family: Arial, Helvetica, sans-serif; font-weight: 800; font-size: 19px; letter-spacing: -1.2px; flex: none; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+.opt-title { min-width: 0; }
+.opt-title h2 { font-family: var(--head); font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+.opt-title p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.sw { display: flex; flex-wrap: wrap; gap: 10px; margin-left: auto; }
+.sw div { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.sw i { width: 26px; height: 26px; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); display: block; }
+.sw b { display: block; color: var(--fg); font-weight: 600; font-size: 12px; line-height: 1.2; }
+
+.phones { display: flex; gap: 18px; overflow-x: auto; padding: 4px 2px 18px; scroll-snap-type: x proximity; }
+
+/* ---------- phone ---------- */
+.ph { flex: none; width: 226px; height: 456px; border-radius: 30px; background: var(--ab); border: 6px solid #111; box-shadow: 0 8px 22px rgba(0,0,0,.16); overflow: hidden; display: flex; flex-direction: column; color: var(--ink); font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; position: relative; scroll-snap-align: start; }
+.ph .status { height: 22px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 6px 16px 0; font-size: 9px; font-weight: 600; }
+.ph .body { flex: 1; min-height: 0; padding: 8px 14px 6px; display: flex; flex-direction: column; gap: 9px; overflow: hidden; }
+.logo { font-family: Arial, Helvetica, sans-serif; font-weight: 800; letter-spacing: -0.06em; line-height: 1.1; color: var(--logo); }
+.btn { border-radius: 12px; background: var(--p); color: var(--onp); font-weight: 700; font-size: 12.5px; text-align: center; padding: 11px 8px; }
+.btn.ghost { background: transparent; border: 1.5px solid var(--line2); color: var(--ink); }
+.muted { color: var(--mut); }
+.h { font-weight: 700; letter-spacing: -0.02em; }
+.card { background: var(--sf); border: 1px solid var(--line2); border-radius: 14px; padding: 10px; }
+.thumb { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-size: 19px; flex: none; }
+.row { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.row > div:not(.thumb) { min-width: 0; }
+.t1 { font-size: 11.5px; font-weight: 600; line-height: 1.25; }
+.t2 { font-size: 9.5px; color: var(--mut); line-height: 1.3; }
+.pill { display: inline-block; font-size: 9.5px; font-weight: 700; padding: 3px 8px; border-radius: 99px; }
+.good { background: #22C55E; color: #06210F; }
+.warn { background: #FFCB05; color: #2B2300; }
+.bad { background: #FF5A2A; color: #fff; }
+.chip { font-size: 9.5px; font-weight: 600; padding: 4px 9px; border-radius: 99px; border: 1px solid var(--line2); background: var(--sf); white-space: nowrap; }
+.chip.on { background: var(--p); border-color: var(--p); color: var(--onp); }
+.chip.flag { background: #FFE3DA; border-color: #FFB9A3; color: #A02A08; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.tog { width: 30px; height: 18px; border-radius: 99px; background: var(--line2); position: relative; flex: none; }
+.tog::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #fff; top: 2px; left: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.tog.on { background: var(--a); }
+.tog.on::after { left: 14px; }
+.seg { display: flex; background: var(--sm); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg span { flex: 1; text-align: center; font-size: 10px; font-weight: 600; padding: 6px 0; border-radius: 8px; color: var(--mut); }
+.seg span.on { background: var(--p); color: var(--onp); }
+.search { background: var(--sm); border-radius: 11px; padding: 9px 11px; font-size: 10.5px; color: var(--mut); }
+.banner { background: var(--soft); border-radius: 13px; padding: 11px; }
+.banner b { color: var(--a); font-size: 12px; display: block; }
+.banner span { font-size: 9.5px; color: var(--mut); }
+.tabs { flex: none; height: 50px; border-top: 1px solid var(--line2); background: var(--sf); display: flex; justify-content: space-around; align-items: center; padding-bottom: 4px; }
+.tabs div { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 8.5px; font-weight: 600; color: var(--tabin); position: relative; }
+.tabs div.on { color: var(--ink); }
+.tabs svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tabs em { position: absolute; top: -5px; right: -16px; background: var(--p); color: var(--onp); font-style: normal; font-size: 7.5px; padding: 1px 4px; border-radius: 6px; font-weight: 700; }
+.cap { text-align: center; font-size: 11px; color: var(--muted); margin-top: 8px; }
+.col { flex: none; }
+.hero-art { flex: 1; min-height: 0; border-radius: 20px 20px 0 0; background: var(--soft); margin: 4px 6px 0; display: flex; align-items: flex-end; justify-content: center; gap: 8px; padding: 14px 12px 0; overflow: hidden; }
+.hero-art .pk { width: 52px; border-radius: 10px 10px 0 0; display: grid; place-items: center; font-size: 22px; }
+.hero-art .scanline { position: absolute; }
+</style>
+
+<div class="wrap">
+  <h1>Tappy color options</h1>
+  <p class="intro">Six palettes on the same four screens: welcome, scan result, grocery and lists. Only colors change. Layout, icons and wording stay as they are in the app today.</p>
+  <p class="note">The green, yellow and orange verdict colors on the scan result stay the same in every option, because they carry meaning. The current app uses lime with purple, so each option replaces both.</p>
+  <div id="out"></div>
+</div>
+
+<script>
+// ink = main text, mut = muted text, ab = screen background, sf = card/tab surface, sm = muted fill, line2 = borders
+var PALETTES = [
+  { name: 'Fresh Mint', tag: 'Clean and healthy. Teal-green highlight with a deep forest accent.',
+    p: '#3DDC97', onp: '#0B2A1D', a: '#0F6B4F', soft: '#E1F6EC', ab: '#FFFFFF', sf: '#FFFFFF', sm: '#F1F5F3', ink: '#14201B', mut: '#66736D', line2: '#DCE5E0', tabin: '#8A948F', logo: '#14201B', ph: '#3DDC97' },
+  { name: 'Sunset Coral', tag: 'Warm and friendly. Coral highlight with a berry accent.',
+    p: '#FF7A59', onp: '#2A0E06', a: '#B4274F', soft: '#FFEBE4', ab: '#FFFFFF', sf: '#FFFFFF', sm: '#F7F2F0', ink: '#1F1513', mut: '#7A6A66', line2: '#EBDFDB', tabin: '#9A8C88', logo: '#1F1513', ph: '#FF7A59' },
+  { name: 'Ocean Blue', tag: 'Trustworthy and calm. Bright blue highlight with navy accent.',
+    p: '#4C9BFF', onp: '#06182F', a: '#173F86', soft: '#E4EEFF', ab: '#FFFFFF', sf: '#FFFFFF', sm: '#F0F3F8', ink: '#101828', mut: '#5F6B7E', line2: '#DAE1EC', tabin: '#8892A3', logo: '#101828', ph: '#4C9BFF' },
+  { name: 'Sunshine', tag: 'Bold and bright. Yellow highlight with charcoal accent.',
+    p: '#FFD23F', onp: '#241C00', a: '#2B2B2E', soft: '#FFF5CC', ab: '#FFFFFF', sf: '#FFFFFF', sm: '#F5F4EE', ink: '#1A1A1C', mut: '#6C6A60', line2: '#E6E3D6', tabin: '#8F8D84', logo: '#1A1A1C', ph: '#FFD23F' },
+  { name: 'Forest and Cream', tag: 'Earthy and natural. Cream background, deep green highlight.',
+    p: '#2F6B45', onp: '#FFFFFF', a: '#C4622D', soft: '#EBE4D0', ab: '#FAF6EA', sf: '#FFFDF6', sm: '#F0EAD8', ink: '#1E2A22', mut: '#6E7468', line2: '#E3DCC6', tabin: '#948F7E', logo: '#1E2A22', ph: '#2F6B45', iconLogo: '#FAF6EA' },
+  { name: 'Midnight', tag: 'Dark mode. Charcoal screens, lime highlight, violet accent.',
+    p: '#C8F560', onp: '#161B05', a: '#A78BFA', soft: '#26233A', ab: '#121318', sf: '#1B1C23', sm: '#242630', ink: '#F1F1F4', mut: '#9A9CAB', line2: '#2E303B', tabin: '#7C7E8E', logo: '#F1F1F4', ph: '#C8F560', dark: true }
+];
+
+var ICON = {
+  cart: '<svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M3 4h2.5l2.2 10.5h10.2L20 7H6.4"/></svg>',
+  scan: '<svg viewBox="0 0 24 24"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M4 12h16"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>'
+};
+function tabs(active) {
+  var items = [['Grocery', 'cart'], ['Scan', 'scan'], ['Lists', 'list']];
+  return '<div class="tabs">' + items.map(function (t) {
+    return '<div class="' + (t[0] === active ? 'on' : '') + '">' + ICON[t[1]] + t[0] + (t[0] === 'Lists' ? '<em>3</em>' : '') + '</div>';
+  }).join('') + '</div>';
+}
+function status() { return '<div class="status"><span>9:41</span><span>●●● ▮</span></div>'; }
+
+function welcome(P) {
+  return '<div class="ph">' + status() +
+    '<div class="body" style="align-items:center;padding-top:14px;gap:6px">' +
+      '<div class="logo" style="font-size:26px">tappy</div>' +
+      '<div class="h" style="font-size:17px;line-height:1.25;text-align:center;margin-top:4px">Let’s find food<br>you can eat</div>' +
+      '<div class="hero-art" style="width:100%;margin:10px 0 0">' +
+        '<div class="pk" style="height:88px;background:#FDE2EC">🍌</div>' +
+        '<div class="pk" style="height:118px;background:#FFD84D">🍫</div>' +
+        '<div class="pk" style="height:98px;background:#E9DDF7">🍞</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="padding:10px 14px 16px;display:flex;flex-direction:column;gap:8px;background:var(--ab)">' +
+      '<div class="btn">Get Started</div>' +
+      '<div style="text-align:center;font-size:10px" class="muted">Have an account? <b style="color:var(--a)">Log in</b></div>' +
+    '</div></div>';
+}
+function scan() {
+  return '<div class="ph">' + status() +
+    '<div class="body">' +
+      '<div class="row" style="justify-content:space-between"><div class="logo" style="font-size:17px">tappy</div>' +
+        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--a)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg></div>' +
+      '<div class="seg"><span class="on">Barcode</span><span>Photo</span></div>' +
+      '<div class="card"><div class="row"><div class="thumb" style="background:#FFD84D">🍫</div><div><div class="t1">Chocolate Chip Banana Granola Bars</div><div class="t2">Goodgrain · 6 bars</div></div></div>' +
+        '<div style="margin-top:9px"><span class="pill warn">Check ingredients</span></div></div>' +
+      '<div><div class="t1" style="margin-bottom:5px">Flagged for you</div><div style="display:flex;gap:5px;flex-wrap:wrap"><span class="chip flag">Honey</span><span class="chip flag">Tree nuts</span></div></div>' +
+      '<div><div class="t1" style="margin-bottom:5px">Also in this product</div><div style="display:flex;gap:5px;flex-wrap:wrap"><span class="chip">Oats</span><span class="chip">Banana</span><span class="chip">Sunflower oil</span><span class="chip">Sea salt</span></div></div>' +
+      '<div class="row" style="justify-content:space-between;margin-top:auto"><span class="t1">Save to my list</span><div class="tog on"></div></div>' +
+      '<div class="btn">Scan another</div>' +
+    '</div>' + tabs('Scan') + '</div>';
+}
+function grocery() {
+  var rows = [
+    ['🥜', '#F3E3C8', 'Creamy Peanut Butter', 'Nutty Farms', '#22C55E'],
+    ['🍞', '#E9DDF7', 'Whole Wheat Thin-Sliced', 'Hearth', '#FFCB05'],
+    ['🥛', '#D8ECFA', 'Oat Drink Original', 'Oatly Co.', '#22C55E'],
+    ['🍪', '#FBE0C8', 'Oat Raisin Cookies', 'Bakehouse', '#FF5A2A']
+  ];
+  return '<div class="ph">' + status() +
+    '<div class="body">' +
+      '<div class="h" style="font-size:19px">Grocery</div>' +
+      '<div class="search">Search products</div>' +
+      '<div style="display:flex;gap:5px;overflow:hidden"><span class="chip on">All</span><span class="chip">Snacks</span><span class="chip">Bakery</span><span class="chip">Dairy</span></div>' +
+      rows.map(function (r) {
+        return '<div class="row"><div class="thumb" style="background:' + r[1] + '">' + r[0] + '</div><div style="flex:1"><div class="t1">' + r[2] + '</div><div class="t2">' + r[3] + '</div></div><div class="dot" style="background:' + r[4] + '"></div></div>';
+      }).join('') +
+    '</div>' + tabs('Grocery') + '</div>';
+}
+function lists() {
+  return '<div class="ph">' + status() +
+    '<div class="body">' +
+      '<div class="h" style="font-size:19px">Lists</div>' +
+      '<div class="banner"><b>3 products need a look</b><span>Your diet changed since you saved them.</span></div>' +
+      '<div class="card" style="padding:0 10px">' +
+        [['Weekly shop', '12 items', true], ['Lunch box', '5 items', true], ['Party snacks', '8 items', false]].map(function (r, i) {
+          return '<div class="row" style="justify-content:space-between;padding:10px 0;' + (i ? 'border-top:1px solid var(--line2)' : '') + '"><div><div class="t1">' + r[0] + '</div><div class="t2">' + r[1] + '</div></div><div class="tog ' + (r[2] ? 'on' : '') + '"></div></div>';
+        }).join('') +
+      '</div>' +
+      '<div class="row"><span class="t1" style="color:var(--a)">Create a new list</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--a)" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>' +
+    '</div>' + tabs('Lists') + '</div>';
+}
+
+var out = document.getElementById('out');
+out.innerHTML = PALETTES.map(function (P, i) {
+  var vars = '--p:' + P.p + ';--onp:' + P.onp + ';--a:' + P.a + ';--soft:' + P.soft + ';--ab:' + P.ab + ';--sf:' + P.sf + ';--sm:' + P.sm + ';--ink:' + P.ink + ';--mut:' + P.mut + ';--line2:' + P.line2 + ';--tabin:' + P.tabin + ';--logo:' + P.logo;
+  var iconLogo = P.iconLogo || P.onp;
+  var sw = [['Highlight', P.p], ['Accent', P.a], ['Tint', P.soft], ['Screen', P.ab], ['Text', P.ink]].map(function (s) {
+    return '<div><i style="background:' + s[1] + '"></i><span><b>' + s[0] + '</b>' + s[1] + '</span></div>';
+  }).join('');
+  return '<section class="opt" style="' + vars + '">' +
+    '<div class="opt-head"><div class="icon" style="color:' + iconLogo + '">tappy</div>' +
+    '<div class="opt-title"><h2>' + (i + 1) + '. ' + P.name + '</h2><p>' + P.tag + '</p></div><div class="sw">' + sw + '</div></div>' +
+    '<div class="phones">' +
+      '<div class="col">' + welcome(P) + '<div class="cap">Welcome</div></div>' +
+      '<div class="col">' + scan(P) + '<div class="cap">Scan result</div></div>' +
+      '<div class="col">' + grocery(P) + '<div class="cap">Grocery</div></div>' +
+      '<div class="col">' + lists(P) + '<div class="cap">Lists</div></div>' +
+    '</div></section>';
+}).join('');
+</script>
