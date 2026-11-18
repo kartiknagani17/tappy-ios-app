@@ -21,7 +21,7 @@ describe('accounts API', () => {
   let server: Server;
   let base: string;
   const db = testDb();
-  const config = testConfig({ authRateLimitPerMinute: 1000, appleBundleId: 'company.tappy.app' });
+  const config = testConfig({ authRateLimitPerMinute: 1000, appleBundleId: 'company.tappy.app', googleClientIds: ['test-client.apps.googleusercontent.com'] });
   const sent: { to: string; text: string }[] = [];
 
   before(async () => {
@@ -33,6 +33,7 @@ describe('accounts API', () => {
         scan,
         mailer: async (to, _subject, text) => void sent.push({ to, text }),
         appleKeys: async () => [jwk as never],
+        googleKeys: async () => [jwk as never],
       }),
     );
     await new Promise<void>((r) => server.listen(0, r));
@@ -115,6 +116,40 @@ describe('accounts API', () => {
     assert.equal(expired.status, 401);
     const tampered = appleToken(claims).replace(/\.[^.]+\./, `.${Buffer.from(JSON.stringify({ ...claims, sub: 'someone-else' })).toString('base64url')}.`);
     assert.equal((await post('/api/auth/apple', { identity_token: tampered, nonce: 'n1' })).status, 401);
+  });
+
+  it('signs in with Google, links a matching verified email and rejects bad tokens', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const aud = 'test-client.apps.googleusercontent.com';
+    const claims = { iss: 'https://accounts.google.com', aud, exp: now + 600, sub: 'google-123', email: 'gina@example.com', email_verified: true, nonce: 'g1' };
+    const first = await post('/api/auth/google', { id_token: appleToken(claims), nonce: 'g1' });
+    assert.equal(first.status, 200);
+    const body = (await first.json()) as { account: { id: number; email: string; provider: string } };
+    assert.equal(body.account.email, 'gina@example.com');
+    assert.equal(body.account.provider, 'google');
+    // Same Google user again: same account.
+    const again = (await (await post('/api/auth/google', { id_token: appleToken(claims), nonce: 'g1' })).json()) as { account: { id: number } };
+    assert.equal(again.account.id, body.account.id);
+
+    // An existing email account with the same verified email is linked, not duplicated.
+    await post('/api/auth/signup', { email: 'link@example.com', password: 'a long password' });
+    const linked = (await (await post('/api/auth/google', { id_token: appleToken({ ...claims, sub: 'google-456', email: 'link@example.com' }), nonce: 'g1' })).json()) as {
+      account: { email: string; provider: string };
+    };
+    assert.equal(linked.account.email, 'link@example.com');
+    assert.equal(linked.account.provider, 'email');
+
+    // An unverified email is never used to link accounts.
+    const unverified = (await (
+      await post('/api/auth/google', { id_token: appleToken({ ...claims, sub: 'google-789', email: 'ana@example.com', email_verified: false }), nonce: 'g1' })
+    ).json()) as { account: { email: string | null } };
+    assert.equal(unverified.account.email, null);
+
+    assert.equal((await post('/api/auth/google', { id_token: appleToken(claims), nonce: 'other' })).status, 401);
+    assert.equal((await post('/api/auth/google', { id_token: appleToken({ ...claims, aud: 'someone-else.apps.googleusercontent.com' }), nonce: 'g1' })).status, 401);
+    assert.equal((await post('/api/auth/google', { id_token: appleToken({ ...claims, iss: 'https://evil.example.com' }), nonce: 'g1' })).status, 401);
+    assert.equal((await post('/api/auth/google', { id_token: appleToken({ ...claims, exp: now - 3600 }), nonce: 'g1' })).status, 401);
+    assert.equal((await post('/api/auth/google', { id_token: 'not.a.token', nonce: 'g1' })).status, 401);
   });
 
   it('deletes the account and everything tied to it', async () => {

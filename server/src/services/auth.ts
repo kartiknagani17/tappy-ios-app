@@ -26,14 +26,15 @@ export type User = {
   email: string | null;
   password_hash: string | null;
   apple_sub: string | null;
+  google_sub: string | null;
   profile_json: string | null;
   profile_updated_at: number | null;
 };
 
-export type PublicAccount = { id: number; email: string | null; provider: 'email' | 'apple' };
+export type PublicAccount = { id: number; email: string | null; provider: 'email' | 'apple' | 'google' };
 
 export function toPublicAccount(u: User): PublicAccount {
-  return { id: u.id, email: u.email, provider: u.password_hash ? 'email' : 'apple' };
+  return { id: u.id, email: u.email, provider: u.password_hash ? 'email' : u.apple_sub || !u.google_sub ? 'apple' : 'google' };
 }
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -103,7 +104,7 @@ export function userForToken(db: DB, token: string): User | null {
   const h = sha256(token);
   const row = db
     .prepare(
-      `SELECT u.id, u.email, u.password_hash, u.apple_sub, u.profile_json, u.profile_updated_at, s.last_used_at
+      `SELECT u.id, u.email, u.password_hash, u.apple_sub, u.google_sub, u.profile_json, u.profile_updated_at, s.last_used_at
        FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?`,
     )
     .get(h, now) as (User & { last_used_at: number }) | undefined;
@@ -125,7 +126,7 @@ export function pruneSessions(db: DB) {
 }
 
 const getUser = (db: DB, where: string, value: unknown) =>
-  db.prepare(`SELECT id, email, password_hash, apple_sub, profile_json, profile_updated_at FROM users WHERE ${where} = ?`).get(value as string) as
+  db.prepare(`SELECT id, email, password_hash, apple_sub, google_sub, profile_json, profile_updated_at FROM users WHERE ${where} = ?`).get(value as string) as
     | User
     | undefined;
 
@@ -293,6 +294,88 @@ export function signInWithApple(db: DB, apple: { sub: string; email: string | nu
         db
           .prepare('INSERT INTO users (email, apple_sub, created_at, updated_at) VALUES (?, ?, ?, ?)')
           .run(apple.email, apple.sub, now, now).lastInsertRowid,
+      );
+      user = getUser(db, 'id', id)!;
+    }
+    return { user, token: createSession(db, user.id) };
+  });
+}
+
+// ---------- Sign in with Google ----------
+
+type GoogleKey = { kid: string; kty: string; n: string; e: string; alg?: string; use?: string };
+export type GoogleKeySource = () => Promise<GoogleKey[]>;
+
+let googleKeyCache: { keys: GoogleKey[]; at: number } | null = null;
+export const fetchGoogleKeys: GoogleKeySource = async () => {
+  if (googleKeyCache && Date.now() - googleKeyCache.at < 3600_000) return googleKeyCache.keys;
+  const res = await fetch('https://www.googleapis.com/oauth2/v3/certs', { signal: AbortSignal.timeout(10_000) });
+  if (!res.ok) throw new Error(`Google keys responded ${res.status}`);
+  const { keys } = (await res.json()) as { keys: GoogleKey[] };
+  googleKeyCache = { keys, at: Date.now() };
+  return keys;
+};
+
+/**
+ * Verifies a Google ID token (RS256 JWT): signature against Google's published keys, issuer, audience
+ * (one of our OAuth client ids), expiry, and the nonce the app sent with the sign-in request.
+ * Only a verified email is used.
+ */
+export async function verifyGoogleToken(
+  token: unknown,
+  rawNonce: unknown,
+  audiences: readonly string[],
+  keys: GoogleKeySource = fetchGoogleKeys,
+): Promise<{ sub: string; email: string | null }> {
+  if (!audiences.length) throw new AuthError(503, 'google_unavailable', 'Sign in with Google isn’t available right now.');
+  const bad = new AuthError(401, 'invalid_google_token', 'Sign in with Google failed. Please try again.');
+  if (typeof token !== 'string' || token.length > 4096) throw bad;
+  const parts = token.split('.');
+  if (parts.length !== 3) throw bad;
+  let header: Record<string, unknown>, claims: Record<string, unknown>;
+  try {
+    header = b64json(parts[0]);
+    claims = b64json(parts[1]);
+  } catch {
+    throw bad;
+  }
+  if (header.alg !== 'RS256') throw bad;
+  let jwk = (await keys()).find((k) => k.kid === header.kid);
+  if (!jwk) {
+    googleKeyCache = null; // Google rotated keys
+    jwk = (await keys()).find((k) => k.kid === header.kid);
+  }
+  if (!jwk) throw bad;
+  const ok = verify('RSA-SHA256', Buffer.from(`${parts[0]}.${parts[1]}`), createPublicKey({ key: { kty: jwk.kty, n: jwk.n, e: jwk.e }, format: 'jwk' }), Buffer.from(parts[2], 'base64url'));
+  if (!ok) throw bad;
+  const now = nowSeconds();
+  if (claims.iss !== 'https://accounts.google.com' && claims.iss !== 'accounts.google.com') throw bad;
+  if (typeof claims.aud !== 'string' || !audiences.includes(claims.aud)) throw bad;
+  if (typeof claims.exp !== 'number' || claims.exp < now - 60) throw bad;
+  if (typeof claims.sub !== 'string' || !claims.sub) throw bad;
+  if (typeof rawNonce !== 'string' || !rawNonce || claims.nonce !== rawNonce) throw bad;
+  const verified = claims.email_verified === true || claims.email_verified === 'true';
+  const email = verified && typeof claims.email === 'string' ? claims.email.toLowerCase() : null;
+  return { sub: claims.sub, email };
+}
+
+export function signInWithGoogle(db: DB, google: { sub: string; email: string | null }): { user: User; token: string } {
+  const now = nowSeconds();
+  return transaction(db, () => {
+    let user = getUser(db, 'google_sub', google.sub);
+    if (!user && google.email) {
+      // Same verified email as an existing account: link Google to it.
+      const byEmail = getUser(db, 'email', google.email);
+      if (byEmail && !byEmail.google_sub) {
+        db.prepare('UPDATE users SET google_sub = ?, updated_at = ? WHERE id = ?').run(google.sub, now, byEmail.id);
+        user = { ...byEmail, google_sub: google.sub };
+      }
+    }
+    if (!user) {
+      const id = Number(
+        db
+          .prepare('INSERT INTO users (email, google_sub, created_at, updated_at) VALUES (?, ?, ?, ?)')
+          .run(google.email, google.sub, now, now).lastInsertRowid,
       );
       user = getUser(db, 'id', id)!;
     }

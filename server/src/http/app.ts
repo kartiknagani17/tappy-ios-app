@@ -27,6 +27,10 @@ import {
   deleteAccount,
   deleteSession,
   fetchAppleKeys,
+  fetchGoogleKeys,
+  signInWithGoogle,
+  verifyGoogleToken,
+  type GoogleKeySource,
   logIn,
   requestPasswordReset,
   saveProfile,
@@ -83,6 +87,7 @@ const ROUTES: Route[] = [
   { name: 'signup', pattern: /^\/api\/auth\/signup$/, methods: ['POST'] },
   { name: 'login', pattern: /^\/api\/auth\/login$/, methods: ['POST'] },
   { name: 'apple', pattern: /^\/api\/auth\/apple$/, methods: ['POST'] },
+  { name: 'google', pattern: /^\/api\/auth\/google$/, methods: ['POST'] },
   { name: 'logout', pattern: /^\/api\/auth\/logout$/, methods: ['POST'] },
   { name: 'reset_request', pattern: /^\/api\/auth\/reset\/request$/, methods: ['POST'] },
   { name: 'reset_confirm', pattern: /^\/api\/auth\/reset\/confirm$/, methods: ['POST'] },
@@ -94,7 +99,7 @@ const ROUTES: Route[] = [
   { name: 'privacy', pattern: /^\/privacy\/?$/, methods: ['GET', 'HEAD'] },
 ];
 
-const AUTH_ROUTES = new Set(['signup', 'login', 'apple', 'logout', 'reset_request', 'reset_confirm', 'me', 'profile', 'delete_account']);
+const AUTH_ROUTES = new Set(['signup', 'login', 'apple', 'google', 'logout', 'reset_request', 'reset_confirm', 'me', 'profile', 'delete_account']);
 
 export type AppDeps = {
   db: DB;
@@ -106,6 +111,7 @@ export type AppDeps = {
   /** Sends password-reset emails; null turns password reset off. */
   mailer?: Mailer | null;
   appleKeys?: AppleKeySource;
+  googleKeys?: GoogleKeySource;
   /** Checks the RevenueCat subscription; defaults to RevenueCat when REVENUECAT_SECRET_KEY is set. */
   entitlements?: EntitlementChecker;
   /** Product photo cache behind GET /img/…; null turns the route off. */
@@ -134,6 +140,7 @@ export function createApp({
   authLimiter = new RateLimiter(config.authRateLimitPerMinute),
   mailer = null,
   appleKeys = fetchAppleKeys,
+  googleKeys = fetchGoogleKeys,
   entitlements = config.revenueCatSecretKey
     ? new RevenueCatEntitlements({ secretKey: config.revenueCatSecretKey, entitlementId: config.revenueCatEntitlementId })
     : noEntitlements,
@@ -391,6 +398,11 @@ export function createApp({
         authLimiter.check(`auth-ip:${ipk}`);
         const apple = await verifyAppleToken(body.identity_token, body.nonce, config.appleBundleId, appleKeys);
         return send(res, 200, session(signInWithApple(db, apple)));
+      }
+      case 'google': {
+        authLimiter.check(`auth-ip:${ipk}`);
+        const google = await verifyGoogleToken(body.id_token, body.nonce, config.googleClientIds, googleKeys);
+        return send(res, 200, session(signInWithGoogle(db, google)));
       }
       case 'reset_request': {
         if (!mailer) throw new HttpError(503, 'reset_unavailable', 'Password reset isn’t available right now. Email support for help.');

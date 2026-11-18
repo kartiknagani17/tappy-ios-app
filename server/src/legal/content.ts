@@ -39,7 +39,7 @@ export const TERMS: LegalDoc = {
     {
       heading: '3. Your account',
       body: [
-        'You can use Tappy without an account. If you create one (with email and password or Sign in with Apple), keep your password secret and tell us if you think someone else has used your account. You are responsible for activity on your account.',
+        'You can use Tappy without an account. If you create one (with email and password, Sign in with Apple or Sign in with Google), keep your password secret and tell us if you think someone else has used your account. You are responsible for activity on your account.',
         'You can delete your account at any time in the app under Settings → Delete account. This permanently deletes your account and the dietary profile stored with it.',
       ],
     },
@@ -129,7 +129,7 @@ export const PRIVACY: LegalDoc = {
         'Scans: the barcode you scan, and the photos you choose to take of a package front or ingredient list. Photos are resized on your phone, processed in memory to read the text, and then discarded, unless you turn on "Share product photos" (off by default), in which case photos the system recognises as food packaging may be kept to improve the product database. We never keep photos that show people.',
         'Ingredient text you contribute: text read from an ingredient-list photo is saved for that product as "user-submitted, unverified" so it can help you and other users.',
         'Network information: your IP address is used briefly for security and rate limiting (for example, to stop abuse of scan limits). We don’t use it to locate you.',
-        'Account information (only if you create an account): your email address, a securely hashed version of your password (we never see or store your actual password), or, with Sign in with Apple, an Apple user identifier and the email Apple shares (which can be a private relay address). When you’re signed in, a copy of your dietary profile is stored with your account so you can restore it on a new device.',
+        'Account information (only if you create an account): your email address, a securely hashed version of your password (we never see or store your actual password), or, with Sign in with Apple, an Apple user identifier and the email Apple shares (which can be a private relay address), or, with Sign in with Google, a Google user identifier and the verified email address of your Google Account. When you’re signed in, a copy of your dietary profile is stored with your account so you can restore it on a new device.',
         'Purchases: if you subscribe, Apple processes the payment. We receive your subscription status (for example, whether you are on a trial or subscribed) through our purchase provider. We never receive your card details.',
         'Product reports and feedback you send us, and the contents of any email you send to support.',
       ],

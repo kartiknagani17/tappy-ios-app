@@ -132,6 +132,11 @@ export function loadConfig() {
     // Accounts
     /** Sign in with Apple tokens must be issued for this audience (the iOS bundle id in app.json). */
     appleBundleId: str('APPLE_BUNDLE_ID', 'company.tappy.app'),
+    /** Sign in with Google ID tokens must be issued for one of these OAuth client ids (comma separated). Empty: Google sign-in is off. */
+    googleClientIds: (process.env.GOOGLE_CLIENT_IDS || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
     /** Password-reset emails go through Resend. Without a key, "Forgot password?" is hidden in the app. */
     resendApiKey: process.env.RESEND_API_KEY || '',
     emailFrom: str('EMAIL_FROM', 'Tappy <no-reply@tappy.company>'),
