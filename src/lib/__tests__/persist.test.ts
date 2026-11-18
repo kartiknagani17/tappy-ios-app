@@ -84,3 +84,29 @@ describe('safeStorage', () => {
     await s.removeItem('k');
   });
 });
+
+describe('sanitizePersisted lists', () => {
+  it('keeps well-formed lists and drops bad ones', () => {
+    const out = sanitizePersisted({
+      lists: [
+        { id: 'want-to-try', name: '  Want   to Try ', icon: 'pin', ids: [3, 3, -1, 'x', 7] },
+        { id: 'dup', name: 'A', icon: 'list', ids: [] },
+        { id: 'dup', name: 'B', icon: 'list', ids: [] },
+        { id: 'no name', name: '', icon: 'list', ids: [] },
+        { id: 'bad id!', name: 'Nope', icon: 'list', ids: [] },
+        { id: 'weird-icon', name: 'Icon', icon: 'skull', ids: 'nope' },
+        'junk',
+      ],
+    }) as { lists: { id: string; name: string; icon: string; ids: number[] }[] };
+    assert.deepEqual(out.lists, [
+      { id: 'want-to-try', name: 'Want to Try', icon: 'pin', ids: [3, 7] },
+      { id: 'dup', name: 'A', icon: 'list', ids: [] },
+      { id: 'weird-icon', name: 'Icon', icon: 'list', ids: [] },
+    ]);
+  });
+
+  it('leaves lists out when the stored value is not an array (defaults apply)', () => {
+    assert.equal('lists' in sanitizePersisted({ lists: 'x' }), false);
+    assert.equal('lists' in sanitizePersisted({}), false);
+  });
+});

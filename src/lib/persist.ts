@@ -90,6 +90,20 @@ export function sanitizePersisted(raw: unknown): Record<string, unknown> {
     }
     out.saved = saved;
   }
+  if (Array.isArray(raw.lists)) {
+    const lists: { id: string; name: string; icon: 'list' | 'pin' | 'cart' | 'heart'; ids: number[] }[] = [];
+    const seenIds = new Set<string>();
+    for (const l of raw.lists.slice(0, 30)) {
+      if (!isObj(l) || typeof l.id !== 'string' || !/^[\w-]{1,40}$/.test(l.id) || seenIds.has(l.id) || typeof l.name !== 'string') continue;
+      const name = l.name.replace(/\s+/g, ' ').trim().slice(0, 40);
+      if (!name) continue;
+      seenIds.add(l.id);
+      const icon = l.icon === 'pin' || l.icon === 'cart' || l.icon === 'heart' ? l.icon : 'list';
+      const ids = Array.isArray(l.ids) ? [...new Set(l.ids.filter((x): x is number => typeof x === 'number' && Number.isSafeInteger(x) && x > 0))].slice(0, 300) : [];
+      lists.push({ id: l.id, name, icon, ids });
+    }
+    out.lists = lists;
+  }
   const restrictions = cleanRestrictions(raw.restrictions);
   if (restrictions) out.restrictions = restrictions;
   const overrides = cleanOverrides(raw.ingredientOverrides);

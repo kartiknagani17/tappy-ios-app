@@ -21,6 +21,7 @@ import {
 import { setWatching } from '../lib/watch';
 import { colors, noOutline, radius } from '../theme';
 import { BottomSheet } from './BottomSheet';
+import { ListPicker } from './ListPicker';
 import { Button, CloseButton, RatingIcon } from './ui';
 
 const ICON: Record<VerdictState, Rating | null> = {
@@ -68,6 +69,7 @@ export function VerdictSheet({
   const [showAll, setShowAll] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [scrolled, setScrolled] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   const verdict = useMemo(() => (product ? computeVerdict(product, restrictions, overrides) : null), [product, restrictions, overrides]);
   const rows = useMemo(() => (product ? restrictionBreakdown(product, restrictions, overrides) : []), [product, restrictions, overrides]);
@@ -119,6 +121,21 @@ export function VerdictSheet({
                 style={styles.iconBtn}
               >
                 <Feather name="bookmark" size={22} color={saved ? colors.accent : colors.ink} />
+              </Pressable>
+            ) : null}
+            {canFollow ? (
+              <Pressable
+                testID="add-to-list"
+                accessibilityRole="button"
+                accessibilityLabel="Add to a list"
+                hitSlop={10}
+                onPress={() => {
+                  haptic.select();
+                  setPicking(true);
+                }}
+                style={styles.iconBtn}
+              >
+                <Feather name="folder-plus" size={22} color={colors.ink} />
               </Pressable>
             ) : null}
             <Pressable
@@ -390,6 +407,14 @@ export function VerdictSheet({
           ) : null}
           <ReportSheet productId={reporting ? product.id : null} onClose={() => setReporting(false)} />
           <ReactionSheet product={reacting ? product : null} onClose={() => setReacting(false)} />
+          <ListPicker
+            product={
+              picking && product.id
+                ? { id: product.id, gtin14: product.gtin14, name: product.name, brand: product.brand, image_url: product.image_url }
+                : null
+            }
+            onClose={() => setPicking(false)}
+          />
         </View>
       ) : null}
     </BottomSheet>

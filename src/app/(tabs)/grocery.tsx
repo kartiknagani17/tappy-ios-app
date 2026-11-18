@@ -1,12 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccountButton } from '../../components/AccountButton';
 import { ProductCard } from '../../components/ProductCard';
+import { SettingsSheet } from '../../components/SettingsSheet';
 import { RatingIcon, Screen } from '../../components/ui';
 import { VerdictSheet } from '../../components/VerdictSheet';
 import { AISLES, api, ApiError, type Aisle, type ApiProduct } from '../../lib/api';
 import { haptic } from '../../lib/haptics';
-import { useStore } from '../../lib/store';
+import { useStore, type Rating } from '../../lib/store';
 import { computeVerdict, fitsProfile, verdictRating } from '../../lib/verdict';
 import { colors, noOutline, radius } from '../../theme';
 
@@ -35,6 +37,7 @@ export default function Grocery() {
   const [aisle, setAisle] = useState<Aisle | null>(null);
   const [likelyOnly, setLikelyOnly] = useState(true);
   const [open, setOpen] = useState<ApiProduct | null>(null);
+  const [settings, setSettings] = useState(false);
   const [results, setResults] = useState<Results>(empty(''));
   /** "Load more" asked for by scrolling or a button: { key, offset }. */
   const [asked, setAsked] = useState<{ key: string; offset: number } | null>(null);
@@ -139,6 +142,7 @@ export default function Grocery() {
             onSubmitEditing={() => setDebounced(query.trim())}
           />
         </View>
+        <AccountButton onPress={() => setSettings(true)} />
       </View>
 
       <View>
@@ -184,30 +188,29 @@ export default function Grocery() {
       </View>
 
       {!key ? (
-        <ScrollView contentContainerStyle={styles.home} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-          <Text style={styles.homeTitle}>Find food that fits you</Text>
-          <Text style={styles.homeBody}>
-            {query.trim().length > 0 && query.trim().length < 3
-              ? 'Type at least 3 letters to search.'
-              : hasProfile
-                ? 'Search for a product, or pick an aisle. We’ll show the ones that fit your profile.'
-                : 'Search for a product, or pick an aisle. Add your diets in Settings to see which ones fit you.'}
-          </Text>
-          <View style={styles.aisleGrid}>
-            {AISLES.map((a) => (
-              <Pressable
-                key={a.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Browse ${a.label}`}
-                style={styles.aisleTile}
-                onPress={() => pickAisle(a.id)}
-              >
-                <Text style={styles.aisleEmoji}>{a.emoji}</Text>
-                <Text style={styles.aisleLabel}>{a.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </ScrollView>
+        <FlatList
+          data={AISLES}
+          keyExtractor={(a) => a.id}
+          contentContainerStyle={styles.home}
+          initialNumToRender={3}
+          windowSize={5}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            query.trim().length > 0 && query.trim().length < 3 ? <Text style={styles.homeBody}>Type at least 3 letters to search.</Text> : undefined
+          }
+          renderItem={({ item }) => (
+            <AisleRow
+              aisle={item}
+              filterOn={filterOn}
+              hasProfile={hasProfile}
+              restrictions={restrictions}
+              overrides={overrides}
+              onViewAll={() => pickAisle(item.id)}
+              onOpen={setOpen}
+            />
+          )}
+        />
       ) : (
         <FlatList
           data={shown}
@@ -269,7 +272,111 @@ export default function Grocery() {
       )}
 
       <VerdictSheet product={open} onClose={() => setOpen(null)} onOpenProduct={(p) => setOpen(p)} />
+      <SettingsSheet visible={settings} onClose={() => setSettings(false)} />
     </Screen>
+  );
+}
+
+
+type Rated = { p: ApiProduct; rating: Rating | null; fits: boolean };
+const AISLE_CACHE = new Map<string, { at: number; products: ApiProduct[] }>();
+const AISLE_TTL_MS = 5 * 60 * 1000;
+const CAROUSEL_MAX = 12;
+
+/** One aisle on the Grocery home: a heading, "View all", and a sideways row of products (the first page of the aisle). */
+function AisleRow({
+  aisle,
+  filterOn,
+  hasProfile,
+  restrictions,
+  overrides,
+  onViewAll,
+  onOpen,
+}: {
+  aisle: (typeof AISLES)[number];
+  filterOn: boolean;
+  hasProfile: boolean;
+  restrictions: ReturnType<typeof useStore.getState>['restrictions'];
+  overrides: ReturnType<typeof useStore.getState>['ingredientOverrides'];
+  onViewAll: () => void;
+  onOpen: (p: ApiProduct) => void;
+}) {
+  const [state, setState] = useState<{ products: ApiProduct[] | null; failed: boolean }>(() => {
+    const hit = AISLE_CACHE.get(aisle.id);
+    return { products: hit && Date.now() - hit.at < AISLE_TTL_MS ? hit.products : null, failed: false };
+  });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (state.products) return;
+    let alive = true;
+    api
+      .browse({ aisle: aisle.id, offset: 0 })
+      .then((res) => {
+        AISLE_CACHE.set(aisle.id, { at: Date.now(), products: res.products });
+        if (alive) setState({ products: res.products, failed: false });
+      })
+      .catch(() => alive && setState({ products: null, failed: true }));
+    return () => {
+      alive = false;
+    };
+  }, [aisle.id, attempt, state.products]);
+
+  const rated: Rated[] = useMemo(
+    () =>
+      (state.products ?? []).map((p) => {
+        const v = computeVerdict(p, restrictions, overrides);
+        return { p, rating: hasProfile ? verdictRating(v) : null, fits: fitsProfile(v) };
+      }),
+    [state.products, restrictions, overrides, hasProfile],
+  );
+  const shown = (filterOn ? rated.filter((r) => r.fits) : rated).slice(0, CAROUSEL_MAX);
+  if (state.products && !shown.length) return null; // nothing here fits right now
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">
+          {aisle.label}
+        </Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={`View all ${aisle.label}`} hitSlop={8} style={styles.viewAll} onPress={onViewAll}>
+          <Text style={styles.viewAllText}>View all</Text>
+          <Feather name="chevron-right" size={18} color={colors.ink} />
+        </Pressable>
+      </View>
+      {state.failed ? (
+        <Pressable
+          accessibilityRole="button"
+          style={[styles.retry, { alignSelf: 'flex-start', marginLeft: 16 }]}
+          onPress={() => {
+            setState({ products: null, failed: false });
+            setAttempt((n) => n + 1);
+          }}
+        >
+          <Text style={styles.retryText}>Couldn’t load. Try again</Text>
+        </Pressable>
+      ) : !state.products ? (
+        <View style={styles.carouselLoading}>
+          <ActivityIndicator color={colors.textMuted} />
+        </View>
+      ) : (
+        <FlatList
+          horizontal
+          data={shown}
+          keyExtractor={(i) => i.p.gtin14}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
+          renderItem={({ item }) => (
+            <View style={styles.carouselCard}>
+              <ProductCard
+                product={{ id: item.p.id ?? 0, gtin14: item.p.gtin14, name: item.p.name, brand: item.p.brand, image_url: item.p.image_url }}
+                rating={item.rating}
+                onPress={() => onOpen(item.p)}
+              />
+            </View>
+          )}
+        />
+      )}
+    </View>
   );
 }
 
@@ -300,21 +407,15 @@ const styles = StyleSheet.create({
   },
   filterOn: { borderColor: colors.ink, backgroundColor: colors.accentSoft },
   filterText: { fontSize: 14, color: colors.ink },
-  home: { padding: 16, paddingBottom: 32 },
-  homeTitle: { fontSize: 22, fontWeight: '700', color: colors.ink, marginTop: 8 },
-  homeBody: { fontSize: 15, lineHeight: 21, color: colors.textMuted, marginTop: 6 },
-  aisleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 20 },
-  aisleTile: {
-    width: '47%',
-    flexGrow: 1,
-    height: 84,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceMuted,
-    padding: 14,
-    justifyContent: 'space-between',
-  },
-  aisleEmoji: { fontSize: 26 },
-  aisleLabel: { fontSize: 15, fontWeight: '600', color: colors.ink },
+  home: { paddingTop: 8, paddingBottom: 32 },
+  section: { marginTop: 18 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
+  sectionTitle: { fontSize: 26, fontWeight: '700', color: colors.ink, letterSpacing: -0.3 },
+  viewAll: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  viewAllText: { fontSize: 16, fontWeight: '500', color: colors.ink },
+  carouselCard: { width: 150 },
+  carouselLoading: { height: 180, alignItems: 'center', justifyContent: 'center' },
+  homeBody: { fontSize: 15, lineHeight: 21, color: colors.textMuted, paddingHorizontal: 16, marginTop: 6 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
   emptyTitle: { fontSize: 17, fontWeight: '600', color: colors.ink },
   emptyBody: { fontSize: 15, color: colors.textMuted, textAlign: 'center', lineHeight: 21 },

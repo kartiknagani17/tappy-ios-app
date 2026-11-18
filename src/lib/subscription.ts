@@ -175,3 +175,9 @@ export async function scheduleTrialReminder() {
     // ignore
   }
 }
+
+/** Opens Apple's "Redeem code" sheet (offer codes, gift codes). iOS only; throws PurchasesUnavailableError elsewhere. */
+export async function redeemCode(): Promise<void> {
+  if (!purchasesAvailable() || !configured) throw new PurchasesUnavailableError();
+  await Purchases.presentCodeRedemptionSheet();
+}

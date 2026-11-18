@@ -33,6 +33,8 @@ type State = {
   accountPromptDismissed: boolean;
   /** Bookmarked products (newest first), shown in Lists. Fresh data is fetched when Lists opens. */
   saved: SavedProduct[];
+  /** Named lists of saved products. Every product in a list is also in `saved` ("All Saved"). */
+  lists: UserList[];
   deviceId?: string;
   /** User opted in to share scanned product photos to improve the database. */
   contributePhotos: boolean;
@@ -47,6 +49,15 @@ type State = {
 export type TriedVote = 'up' | 'down';
 export type SavedProduct = { id: number; gtin14: string; name: string; brand: string | null; image_url: string | null };
 export const MAX_SAVED = 300;
+export type ListIcon = 'list' | 'pin' | 'cart' | 'heart';
+export type UserList = { id: string; name: string; icon: ListIcon; ids: number[] };
+export const MAX_LISTS = 30;
+export const MAX_LIST_NAME = 40;
+export const DEFAULT_LISTS: UserList[] = [
+  { id: 'want-to-try', name: 'Want to Try', icon: 'pin', ids: [] },
+  { id: 'weekly-shopping', name: 'Weekly Shopping List', icon: 'cart', ids: [] },
+  { id: 'favorites', name: 'My Favorites', icon: 'heart', ids: [] },
+];
 export type WatchedProduct = { id: number; name: string; snapshot: string };
 
 type Actions = {
@@ -57,6 +68,12 @@ type Actions = {
   applyAvoidList: () => void;
   resetAll: () => void;
   toggleSaved: (product: SavedProduct) => void;
+  /** Create a list; returns its id (or null when the name is empty or there are too many lists). */
+  createList: (name: string) => string | null;
+  renameList: (id: string, name: string) => void;
+  deleteList: (id: string) => void;
+  /** Add or remove a product from a list (adding also saves it to All Saved). */
+  toggleInList: (listId: string, product: SavedProduct) => void;
   setTried: (gtin14: string, vote: TriedVote | null) => void;
   setWatched: (gtin14: string, product: WatchedProduct | null) => void;
 };
@@ -72,6 +89,7 @@ const initial: State = {
   askedPush: false,
   accountPromptDismissed: false,
   saved: [],
+  lists: DEFAULT_LISTS.map((l) => ({ ...l, ids: [] })),
   contributePhotos: false,
   tried: {},
   watched: {},
@@ -139,9 +157,31 @@ export const useStore = create<State & Actions>()(
       toggleSaved: (p) =>
         set((st) =>
           st.saved.some((x) => x.id === p.id)
-            ? { saved: st.saved.filter((x) => x.id !== p.id) }
+            ? { saved: st.saved.filter((x) => x.id !== p.id), lists: st.lists.map((l) => (l.ids.includes(p.id) ? { ...l, ids: l.ids.filter((i) => i !== p.id) } : l)) }
             : { saved: [{ id: p.id, gtin14: p.gtin14, name: p.name, brand: p.brand, image_url: p.image_url }, ...st.saved].slice(0, MAX_SAVED) },
         ),
+      createList: (name) => {
+        const clean = name.replace(/\s+/g, ' ').trim().slice(0, MAX_LIST_NAME);
+        if (!clean || get().lists.length >= MAX_LISTS) return null;
+        const id = `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        set((st) => ({ lists: [...st.lists, { id, name: clean, icon: 'list', ids: [] }] }));
+        return id;
+      },
+      renameList: (id, name) => {
+        const clean = name.replace(/\s+/g, ' ').trim().slice(0, MAX_LIST_NAME);
+        if (!clean) return;
+        set((st) => ({ lists: st.lists.map((l) => (l.id === id ? { ...l, name: clean } : l)) }));
+      },
+      deleteList: (id) => set((st) => ({ lists: st.lists.filter((l) => l.id !== id) })),
+      toggleInList: (listId, p) =>
+        set((st) => {
+          const list = st.lists.find((l) => l.id === listId);
+          if (!list) return {};
+          const inList = list.ids.includes(p.id);
+          const lists = st.lists.map((l) => (l.id === listId ? { ...l, ids: inList ? l.ids.filter((i) => i !== p.id) : [p.id, ...l.ids] } : l));
+          if (inList || st.saved.some((x) => x.id === p.id)) return { lists };
+          return { lists, saved: [{ id: p.id, gtin14: p.gtin14, name: p.name, brand: p.brand, image_url: p.image_url }, ...st.saved].slice(0, MAX_SAVED) };
+        }),
       setTried: (gtin14, vote) =>
         set((st) => {
           const next = { ...st.tried };
@@ -179,6 +219,10 @@ export const useStore = create<State & Actions>()(
           applyAvoidList: _a,
           resetAll: _ra,
           toggleSaved: _t,
+          createList: _cl,
+          renameList: _rl,
+          deleteList: _dl,
+          toggleInList: _tl,
           setTried: _st,
           setWatched: _sw,
           ...data
