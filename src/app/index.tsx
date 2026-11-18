@@ -21,10 +21,10 @@ export default function Splash() {
   }, [hydrated]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}>
-      <StatusBar style="dark" />
+    <View style={{ flex: 1, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+      <StatusBar style="light" />
       <Animated.View entering={FadeIn.duration(500)}>
-        <Logo size={96} />
+        <Logo size={96} color={colors.onPrimary} />
       </Animated.View>
     </View>
   );
