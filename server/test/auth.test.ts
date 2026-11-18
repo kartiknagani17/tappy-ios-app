@@ -120,6 +120,26 @@ describe('accounts API', () => {
     assert.equal((await post('/api/auth/apple', { identity_token: tampered, nonce: 'n1' })).status, 401);
   });
 
+  it('fills in a missing email on a later Apple sign-in, unless another account has it', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const base = { iss: 'https://appleid.apple.com', aud: 'company.tappy.app', exp: now + 600, sub: 'apple-noemail', nonce: nonceHash('n2') };
+    const first = (await (await post('/api/auth/apple', { identity_token: appleToken(base), nonce: 'n2' })).json()) as { account: { id: number; email: string | null } };
+    assert.equal(first.account.email, null);
+    const later = { ...base, email: 'abc123@privaterelay.appleid.com', email_verified: 'true' };
+    const again = (await (await post('/api/auth/apple', { identity_token: appleToken(later), nonce: 'n2' })).json()) as { account: { id: number; email: string | null } };
+    assert.equal(again.account.id, first.account.id);
+    assert.equal(again.account.email, 'abc123@privaterelay.appleid.com');
+
+    // An address that belongs to another account is not copied onto this one.
+    const other = { ...base, sub: 'apple-noemail-2' };
+    const made = (await (await post('/api/auth/apple', { identity_token: appleToken(other), nonce: 'n2' })).json()) as { account: { id: number } };
+    const taken = (await (
+      await post('/api/auth/apple', { identity_token: appleToken({ ...other, email: 'ana@example.com', email_verified: true }), nonce: 'n2' })
+    ).json()) as { account: { id: number; email: string | null } };
+    assert.equal(taken.account.id, made.account.id);
+    assert.equal(taken.account.email, null);
+  });
+
   it('signs in with Google, links a matching verified email and rejects bad tokens', async () => {
     const now = Math.floor(Date.now() / 1000);
     const aud = 'test-client.apps.googleusercontent.com';

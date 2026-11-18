@@ -135,7 +135,8 @@ export function sanitizePersisted(raw: unknown): Record<string, unknown> {
   }
   if (typeof raw.lastChangeCheck === 'number' && Number.isFinite(raw.lastChangeCheck)) out.lastChangeCheck = raw.lastChangeCheck;
   if (isObj(raw.account) && typeof raw.account.email === 'string' && typeof raw.account.provider === 'string' && PROVIDERS.has(raw.account.provider)) {
-    out.account = { email: raw.account.email, provider: raw.account.provider };
+    const name = typeof raw.account.name === 'string' && raw.account.name.length <= 200 ? raw.account.name : undefined;
+    out.account = { email: raw.account.email, provider: raw.account.provider, ...(name ? { name } : {}) };
   }
   // A device id that isn't ours (e.g. tampered with) is regenerated on next use.
   if (typeof out.deviceId === 'string' && !/^ios-[0-9a-f-]{36}$/i.test(out.deviceId)) delete out.deviceId;

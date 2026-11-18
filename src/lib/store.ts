@@ -31,7 +31,8 @@ type State = {
   askedPush: boolean;
   /** Agreed that ingredient photos are sent to OpenAI to be read (App Store 5.1.2(i)). */
   aiPhotoConsent: boolean;
-  account?: { email: string; provider: 'email' | 'google' | 'apple' | 'facebook' };
+  /** `name`: shown when the provider shared no email (Apple gives the name only on the first sign-in). */
+  account?: { email: string; provider: 'email' | 'google' | 'apple' | 'facebook'; name?: string };
   accountPromptDismissed: boolean;
   /** Bookmarked products (newest first), shown in Lists. Fresh data is fetched when Lists opens. */
   saved: SavedProduct[];

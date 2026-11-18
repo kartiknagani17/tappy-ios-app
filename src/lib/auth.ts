@@ -221,11 +221,17 @@ async function endLocalSession() {
  * After any sign-in: keep the session, link purchases, and reconcile the profile.
  * A finished profile on this phone wins and is uploaded; otherwise a profile saved to the account is restored.
  */
-async function startSession(out: SessionResponse, provider: AccountProvider): Promise<AuthResult> {
+/**
+ * `fallback`: what the sign-in sheet itself told us (Apple's email and name), used when the server has
+ * no email on file for the account, so Settings can still show who is signed in.
+ */
+async function startSession(out: SessionResponse, provider: AccountProvider, fallback: { email?: string | null; name?: string | null } = {}): Promise<AuthResult> {
   if (!isSession(out)) throw new ApiError(200, 'bad_response', 'We got an unexpected answer from Tappy. Please try again.');
   await setToken(out.token);
-  const email = out.account.email ?? '';
-  useStore.getState().set({ account: { email, provider }, accountPromptDismissed: true });
+  const prev = useStore.getState().account;
+  const email = out.account.email || fallback.email || (prev?.provider === provider ? prev.email : '') || '';
+  const name = fallback.name || (prev?.provider === provider ? prev.name : undefined) || undefined;
+  useStore.getState().set({ account: { email, provider, ...(name ? { name } : {}) }, accountPromptDismissed: true });
   await identifyPurchaser(`tappy-user-${out.account.id}`);
 
   let restoredProfile = false;
@@ -315,7 +321,7 @@ export async function signInWithProvider(provider: SocialProvider): Promise<Auth
   let credential: AppleAuthentication.AppleAuthenticationCredential;
   try {
     credential = await AppleAuthentication.signInAsync({
-      requestedScopes: [AppleAuthentication.AppleAuthenticationScope.EMAIL],
+      requestedScopes: [AppleAuthentication.AppleAuthenticationScope.EMAIL, AppleAuthentication.AppleAuthenticationScope.FULL_NAME],
       nonce: hashed,
     });
   } catch (e) {
@@ -331,7 +337,24 @@ export async function signInWithProvider(provider: SocialProvider): Promise<Auth
       authorization_code: credential.authorizationCode ?? undefined,
     }),
     'apple',
+    { email: credential.email ?? tokenEmail(credential.identityToken), name: fullName(credential.fullName) },
   );
+}
+
+/** The email in an identity token (display only; the server verifies the token itself). */
+function tokenEmail(token: string): string | null {
+  try {
+    const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const claims = JSON.parse(globalThis.atob(part + '='.repeat((4 - (part.length % 4)) % 4))) as { email?: unknown };
+    return typeof claims.email === 'string' && claims.email.includes('@') ? claims.email.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+function fullName(n: AppleAuthentication.AppleAuthenticationFullName | null): string | null {
+  const s = [n?.givenName, n?.familyName].filter(Boolean).join(' ').trim();
+  return s || null;
 }
 
 export async function signOut(): Promise<void> {
@@ -368,7 +391,11 @@ export async function checkSession(): Promise<void> {
   }
   if (!token) return endLocalSession();
   try {
-    await call('GET', '/api/account', undefined, token);
+    const me = await call<{ account?: { email?: unknown } }>('GET', '/api/account', undefined, token);
+    // Pick up an email the server filled in later (older Apple accounts had none on file).
+    const serverEmail = typeof me?.account?.email === 'string' ? me.account.email : '';
+    const cur = useStore.getState().account;
+    if (cur && serverEmail && serverEmail !== cur.email) useStore.getState().set({ account: { ...cur, email: serverEmail } });
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) await endLocalSession();
   }

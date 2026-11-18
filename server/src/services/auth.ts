@@ -234,6 +234,19 @@ function linkVerifiedEmail(db: DB, user: User, column: 'apple_sub' | 'google_sub
   return { ...user, [column]: sub, password_hash: null };
 }
 
+/**
+ * Accounts made before the provider shared an email (or by an older server) have none on file, so the
+ * app had nothing to show for "who is signed in". Fill it in from a later verified token, unless
+ * another account already uses that address.
+ */
+function fillMissingEmail(db: DB, user: User, email: string | null, now: number): User {
+  if (user.email || !email) return user;
+  const owner = getUser(db, 'email', email);
+  if (owner && owner.id !== user.id) return user;
+  db.prepare('UPDATE users SET email = ?, updated_at = ? WHERE id = ?').run(email, now, user.id);
+  return { ...user, email };
+}
+
 // ---------- Sign in with Apple ----------
 
 type AppleKey = { kid: string; kty: string; n: string; e: string; alg?: string; use?: string };
@@ -295,6 +308,7 @@ export function signInWithApple(db: DB, apple: { sub: string; email: string | nu
   const now = nowSeconds();
   return transaction(db, () => {
     let user = getUser(db, 'apple_sub', apple.sub);
+    if (user) user = fillMissingEmail(db, user, apple.email, now);
     if (!user && apple.email) {
       // Same verified email as an existing account: link Apple to it.
       const byEmail = getUser(db, 'email', apple.email);
@@ -374,6 +388,7 @@ export function signInWithGoogle(db: DB, google: { sub: string; email: string | 
   const now = nowSeconds();
   return transaction(db, () => {
     let user = getUser(db, 'google_sub', google.sub);
+    if (user) user = fillMissingEmail(db, user, google.email, now);
     if (!user && google.email) {
       // Same verified email as an existing account: link Google to it.
       const byEmail = getUser(db, 'email', google.email);
