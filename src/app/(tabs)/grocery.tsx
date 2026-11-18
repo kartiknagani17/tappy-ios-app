@@ -8,8 +8,8 @@ import { RatingIcon, Screen } from '../../components/ui';
 import { VerdictSheet } from '../../components/VerdictSheet';
 import { AISLES, api, ApiError, type Aisle, type ApiProduct } from '../../lib/api';
 import { haptic } from '../../lib/haptics';
-import { useStore, type Rating } from '../../lib/store';
-import { computeVerdict, fitsProfile, verdictRating } from '../../lib/verdict';
+import { useStore } from '../../lib/store';
+import { rateProducts, type Rated } from '../../lib/rate';
 import { colors, noOutline, radius } from '../../theme';
 
 /** With "Likely works" on, keep loading pages until at least this many fit (or MAX_AUTO_PAGES). */
@@ -52,12 +52,9 @@ export default function Grocery() {
   const key = searching || aisle ? `${aisle ?? ''}|${searching ? debounced.toLowerCase() : ''}` : '';
   const current = results.key === key ? results : empty(key);
 
+  // Cached per profile, so each page of results is only rated once.
   const rated = useMemo(
-    () =>
-      current.products.map((p) => {
-        const v = computeVerdict(p, restrictions, overrides);
-        return { p, rating: hasProfile ? verdictRating(v) : null, fits: fitsProfile(v) };
-      }),
+    () => rateProducts(current.products, restrictions, overrides, { hasProfile }),
     [current.products, restrictions, overrides, hasProfile],
   );
   const filterOn = likelyOnly && hasProfile;
@@ -278,7 +275,6 @@ export default function Grocery() {
 }
 
 
-type Rated = { p: ApiProduct; rating: Rating | null; fits: boolean };
 const AISLE_CACHE = new Map<string, { at: number; products: ApiProduct[] }>();
 const AISLE_TTL_MS = 5 * 60 * 1000;
 const CAROUSEL_MAX = 12;
@@ -321,15 +317,11 @@ function AisleRow({
     };
   }, [aisle.id, attempt, state.products]);
 
-  const rated: Rated[] = useMemo(
-    () =>
-      (state.products ?? []).map((p) => {
-        const v = computeVerdict(p, restrictions, overrides);
-        return { p, rating: hasProfile ? verdictRating(v) : null, fits: fitsProfile(v) };
-      }),
-    [state.products, restrictions, overrides, hasProfile],
+  // Only rate until the carousel is full (12), not the whole page of ~40.
+  const shown: Rated[] = useMemo(
+    () => rateProducts(state.products ?? [], restrictions, overrides, { hasProfile, onlyFits: filterOn, limit: CAROUSEL_MAX }),
+    [state.products, restrictions, overrides, hasProfile, filterOn],
   );
-  const shown = (filterOn ? rated.filter((r) => r.fits) : rated).slice(0, CAROUSEL_MAX);
   if (state.products && !shown.length) return null; // nothing here fits right now
 
   return (

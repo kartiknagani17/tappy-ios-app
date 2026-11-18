@@ -36,7 +36,8 @@ export type Flag = { term: string; label: string; rating: Rating; restrictions: 
 
 export type Verdict = { state: VerdictState; flags: Flag[]; matchedTerms: number; reason?: VerdictReason };
 
-type Term = { term: string; label: string; tags: string[]; test: RegExp; global: RegExp };
+/** `needle`: plain text every match must contain, checked with includes() before the regex (much cheaper). */
+type Term = { term: string; label: string; tags: string[]; test: RegExp; global: RegExp; needle: string };
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -101,6 +102,20 @@ function termBody(term: string): string {
   return [...words.slice(0, -1).map((w) => escape(w).replace(/'/g, "'?")), wordPattern(words[words.length - 1])].join('[\\s-]+');
 }
 
+/** A substring every match of termBody(term) contains ('' = no shortcut, always run the regex). */
+function needleFor(term: string): string {
+  const eNum = /^e(\d{3}[a-z]?)$/.exec(term);
+  if (eNum) return eNum[1];
+  const color = /^(red|yellow|blue|green) (\d{1,2})$/.exec(term);
+  if (color) return color[1];
+  const words = term.split(' ');
+  const first = words[0];
+  if (first.includes("'")) return '';
+  // A lone word ending in consonant + y also matches "-ies", so only its stem is certain.
+  if (words.length === 1 && /[^aeiou]y$/.test(first)) return first.slice(0, -1);
+  return first;
+}
+
 const TERMS: Term[] = (() => {
   const map = new Map<string, { label: string; tags: Set<string> }>();
   const add = (phrase: string, tags: string[]) => {
@@ -116,12 +131,40 @@ const TERMS: Term[] = (() => {
   return [...map.entries()]
     .map(([term, { label, tags }]) => {
       const source = `(^|[^a-z0-9])${termBody(term)}(?=[^a-z0-9]|$)`;
-      return { term, label, tags: [...tags], test: new RegExp(source), global: new RegExp(source, 'g') };
+      return { term, label, tags: [...tags], test: new RegExp(source), global: new RegExp(source, 'g'), needle: needleFor(term) };
     })
     .sort((a, b) => b.term.length - a.term.length);
 })();
 
 const TERM_BY_KEY = new Map(TERMS.map((t) => [t.term, t]));
+
+/**
+ * Terms grouped by the first 3 letters of their needle. A match always starts at a word boundary with
+ * the needle, so a label can only match terms filed under the first 3 letters of one of its words.
+ * Terms without a usable word prefix (E-numbers, colors, apostrophes, very short words) are always tried.
+ */
+const ALWAYS_TRY: number[] = [];
+const BY_PREFIX = new Map<string, number[]>();
+TERMS.forEach((t, i) => {
+  // E-numbers start with "e" while their needle is the digits, so they can't be filed by prefix.
+  const plainWord = t.needle.length >= 3 && /^[a-z0-9]/.test(t.needle) && !/^e\d/.test(t.term);
+  if (!plainWord) return void ALWAYS_TRY.push(i);
+  const k = t.needle.slice(0, 3);
+  const list = BY_PREFIX.get(k);
+  if (list) list.push(i);
+  else BY_PREFIX.set(k, [i]);
+});
+
+/** The terms that could possibly match `text`, in TERMS order (longest first). */
+function candidateTerms(text: string): Term[] {
+  const picked = new Set<number>(ALWAYS_TRY);
+  for (const word of text.split(/[^a-z0-9]+/)) {
+    if (word.length < 3) continue;
+    const list = BY_PREFIX.get(word.slice(0, 3));
+    if (list) for (const i of list) picked.add(i);
+  }
+  return [...picked].sort((a, b) => a - b).map((i) => TERMS[i]);
+}
 
 /**
  * Precautionary ("may contain") statements, in English plus FR/ES/IT/DE. A statement runs until the
@@ -162,7 +205,8 @@ function findTerms(text: string): Term[] {
   if (!text.trim()) return [];
   const found: Term[] = [];
   let remaining = ` ${text} `;
-  for (const t of TERMS) {
+  for (const t of candidateTerms(text)) {
+    if (t.needle && !remaining.includes(t.needle)) continue;
     if (t.test.test(remaining)) {
       found.push(t);
       // Blank out the matched phrase so "peanut butter" isn't also counted as "butter".
@@ -223,7 +267,8 @@ export function highlightRanges(text: string, flags: Pick<Flag, 'term'>[]): High
   const ranges: HighlightRange[] = [];
   // Pad so the "(^|[^a-z0-9])" prefix works at the edges; index 0 of the padded string is the pad.
   let remaining = ` ${folded} `;
-  for (const t of TERMS) {
+  for (const t of candidateTerms(folded)) {
+    if (t.needle && !remaining.includes(t.needle)) continue;
     if (!t.test.test(remaining)) continue;
     remaining = remaining.replace(t.global, (m: string, pre: string, offset: number) => {
       const from = offset + pre.length - 1; // back to folded-string indexes
