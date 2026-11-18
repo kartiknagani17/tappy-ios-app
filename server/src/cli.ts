@@ -17,7 +17,7 @@ const HELP = `Tappy data CLI
   node src/cli.ts migrate                 Create/upgrade the database schema
   node src/cli.ts download [usda|off|all] Stream the bulk files into RAW_DATA_DIR (default: all)
   node src/cli.ts import-usda [path]      Import USDA Branded Foods (.zip or extracted folder)
-  node src/cli.ts import-off [path]       Import Open Food Facts US products (.csv or .csv.gz)
+  node src/cli.ts import-off [path]       Import Open Food Facts products (US, CA, UK, MX, IE) (.csv or .csv.gz)
   node src/cli.ts update                  Daily refresh: Open Food Facts daily changes + any new USDA release
   node src/cli.ts update-off              Apply Open Food Facts' daily change files not applied yet
   node src/cli.ts update-usda             Download and import the newest USDA release if it's new

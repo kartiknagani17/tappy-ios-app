@@ -70,6 +70,7 @@ export function offJsonToRow(p: Record<string, unknown>, code: string): Record<s
     sugars_100g: num('sugars_100g'),
     fiber_100g: num('fiber_100g'),
     sodium_100g: num('sodium_100g'),
+    salt_100g: num('salt_100g'),
   };
 }
 

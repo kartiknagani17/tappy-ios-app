@@ -68,8 +68,11 @@ const meaningful = (v: string | null | undefined) => {
   return t && !/^(?:[a-z]{2}:)?(?:null|unknown|none|undefined)$/i.test(t) ? t : null;
 };
 
-export function offRowToRecord(row: Record<string, string>, opts: { requireUs: boolean } = { requireUs: true }): IncomingRecord | null {
-  if (opts.requireUs && !(row.countries_tags ?? '').split(',').includes('en:united-states')) return null;
+/** Markets we keep from Open Food Facts (a product sold in any of them counts). */
+export const OFF_COUNTRIES = ['en:united-states', 'en:canada', 'en:united-kingdom', 'en:mexico', 'en:ireland'];
+
+export function offRowToRecord(row: Record<string, string>, opts: { requireCountry: boolean } = { requireCountry: true }): IncomingRecord | null {
+  if (opts.requireCountry && !(row.countries_tags ?? '').split(',').some((c) => OFF_COUNTRIES.includes(c.trim()))) return null;
   const gtin14 = toGtin14Lenient(row.code);
   if (!gtin14) return null;
   // The generic name ("Creamy peanut butter") when the product name is junk ("My Bff") or missing.
@@ -91,6 +94,11 @@ export function offRowToRecord(row: Record<string, string>, opts: { requireUs: b
   for (const [col, key] of Object.entries(NUTRIENTS)) {
     const n = toNumber(row[col]);
     if (n !== null) nutrition[key] = n;
+  }
+  // UK/EU labels list salt, not sodium: sodium = salt / 2.5.
+  if (nutrition.sodium_g === undefined) {
+    const salt = toNumber(row.salt_100g);
+    if (salt !== null) nutrition.sodium_g = Math.round((salt / 2.5) * 10000) / 10000;
   }
   const hasNutrition = Object.keys(nutrition).length > 0;
   if (hasNutrition) nutrition.basis = 'per_100g';
@@ -118,7 +126,7 @@ export function offRowToRecord(row: Record<string, string>, opts: { requireUs: b
   };
 }
 
-/** Stream an OFF export (tab-separated, optionally .gz) and upsert US products. */
+/** Stream an OFF export (tab-separated, optionally .gz) and upsert products from OFF_COUNTRIES. */
 export async function importOff(db: DB, file: string, log: Logger = console.log, input?: Readable) {
   const stream = input ?? (file.endsWith('.gz') ? createReadStream(file).pipe(createGunzip()) : createReadStream(file));
   const progress = new Progress('off', log);

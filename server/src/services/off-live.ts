@@ -69,7 +69,7 @@ export class OffLiveClient {
       if (!body || typeof body !== 'object' || body.status !== 1 || !body.product || typeof body.product !== 'object') return null;
       // Reuse the dump mapper so live and bulk records look identical. Always the code we asked
       // for: a response can't attach its data to a different GTIN.
-      return offRowToRecord(offJsonToRow(body.product, code), { requireUs: false });
+      return offRowToRecord(offJsonToRow(body.product, code), { requireCountry: false });
     } catch {
       return 'skipped';
     }

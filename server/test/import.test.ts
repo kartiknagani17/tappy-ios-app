@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import type { DB } from '../src/db/index.ts';
-import { importOff } from '../src/import/off.ts';
+import { importOff, offRowToRecord } from '../src/import/off.ts';
 import { dirSource, importUsda } from '../src/import/usda.ts';
 import { compareRecords, mergeRecords, pickWinner, type SourceRecord } from '../src/lib/merge.ts';
 import { getProductByGtin, searchProducts } from '../src/services/products.ts';
@@ -58,6 +58,30 @@ describe('USDA import', () => {
     const second = await importUsda(db, dirSource(USDA_DIR), quiet);
     assert.equal(second.upserted, 0);
     assert.deepEqual(snapshot(db), before);
+  });
+});
+
+describe('Open Food Facts countries', () => {
+  const row = (countries: string, extra: Record<string, string> = {}) => ({
+    code: '5000168001982',
+    product_name: 'Digestive Biscuits',
+    countries_tags: countries,
+    ...extra,
+  });
+
+  it('keeps US, Canada, UK, Mexico and Ireland; skips other markets', () => {
+    for (const c of ['en:canada', 'en:united-kingdom', 'en:mexico', 'en:ireland', 'en:france,en:united-kingdom']) {
+      assert.ok(offRowToRecord(row(c)), c);
+    }
+    for (const c of ['en:france', 'en:germany,en:spain', '']) assert.equal(offRowToRecord(row(c)), null, c);
+    assert.ok(offRowToRecord(row('en:france'), { requireCountry: false }));
+  });
+
+  it('derives sodium from salt when the label has no sodium (UK/EU)', () => {
+    const n = JSON.parse(offRowToRecord(row('en:united-kingdom', { salt_100g: '1.25' }))!.nutrition_json!);
+    assert.equal(n.sodium_g, 0.5);
+    const us = JSON.parse(offRowToRecord(row('en:united-states', { salt_100g: '1.25', 'sodium_100g': '0.4' }))!.nutrition_json!);
+    assert.equal(us.sodium_g, 0.4);
   });
 });
 

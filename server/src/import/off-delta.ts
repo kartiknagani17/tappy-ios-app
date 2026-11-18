@@ -10,8 +10,8 @@ import { offJsonToRow } from './off-json.ts';
 /**
  * Daily Open Food Facts updates. OFF publishes one file per day with every product changed that
  * day (gzipped JSON, one product per line, ~30 MB) and lists them in index.txt. Each file is applied
- * once (tracked in import_runs as source 'off_delta'), oldest first, so a later edit wins. Only US
- * products are kept, like the bulk import.
+ * once (tracked in import_runs as source 'off_delta'), oldest first, so a later edit wins. Only
+ * products sold in OFF_COUNTRIES are kept, like the bulk import.
  */
 export const OFF_DELTA_BASE = 'https://static.openfoodfacts.org/data/delta/';
 const FILE_RE = /^openfoodfacts_products_(\d{9,11})_(\d{9,11})\.json\.gz$/;
