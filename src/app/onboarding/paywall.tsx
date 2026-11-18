@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { BottomSheet } from '../../components/BottomSheet';
-import { LegalSheet, type LegalDocId } from '../../components/LegalSheet';
 import { Button, CloseButton, Screen } from '../../components/ui';
 import { haptic } from '../../lib/haptics';
+import { openLegal, type LegalDocId } from '../../lib/legal';
 import { useStore } from '../../lib/store';
 import {
   PLANS,
@@ -47,7 +47,6 @@ const SLIDES = [
 
 export default function Paywall() {
   const [prices, setPrices] = useState<Record<string, PlanPrice> | null>(null);
-  const [legal, setLegal] = useState<LegalDocId | null>(null);
   const [loading, setLoading] = useState(false);
   const [offer, setOffer] = useState(false);
   const [offerLoading, setOfferLoading] = useState(false);
@@ -71,7 +70,15 @@ export default function Paywall() {
   const monthlyText = annual?.perMonthString ?? money(monthly);
   const offerPriceText = offerPrice?.priceString ?? money(PLANS.annualOffer.price);
   // Only promise a free trial Apple will actually give this Apple ID.
-  const trial = annual ? annual.trialEligible : true;
+  const trialAvailable = annual ? annual.trialEligible : true;
+  const [trialOn, setTrialOn] = useState(true);
+  const trial = trialAvailable && trialOn;
+  // Trial off → the no-trial product, so Apple charges today instead of applying the free week.
+  // Until that product is live in App Store Connect, fall back to the trial product.
+  const noTrial = prices?.[PLANS.annualNoTrial.id];
+  const buyId = trial || !noTrial ? plan.id : PLANS.annualNoTrial.id;
+  const buyPriceText = !trial && noTrial ? noTrial.priceString : priceText;
+  const buyMonthlyText = !trial && noTrial ? (noTrial.perMonthString ?? monthlyText) : monthlyText;
   const trialDays = annual?.trialDays ?? TRIAL_DAYS;
   const offerTrial = offerPrice ? offerPrice.trialEligible : true;
   const offerTrialDays = offerPrice?.trialDays ?? TRIAL_DAYS;
@@ -144,13 +151,21 @@ export default function Paywall() {
         <View style={{ flex: 1 }} />
 
         <View style={styles.bottom}>
-          {trial ? (
-            <View style={styles.trialRow} accessible accessibilityLabel={`${trialDays}-day free trial activated`}>
-              <Text style={styles.trialText}>{trialDays} Day Free Trial Activated</Text>
-              <View style={styles.switchTrack}>
-                <View style={styles.switchThumb} />
-              </View>
-            </View>
+          {trialAvailable ? (
+            <Pressable
+              testID="trial-toggle"
+              style={styles.trialRow}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: trialOn }}
+              accessibilityLabel={`${trialDays}-day free trial`}
+              onPress={() => {
+                haptic.light();
+                setTrialOn((v) => !v);
+              }}
+            >
+              <Text style={styles.trialText}>{trialOn ? `${trialDays} Day Free Trial Activated` : 'Not sure? Enable free trial'}</Text>
+              <Switch on={trialOn} />
+            </Pressable>
           ) : null}
 
           <View
@@ -187,19 +202,19 @@ export default function Paywall() {
             testID="start-trial"
             title={trial ? 'Start FREE trial' : 'Continue'}
             loading={loading}
-            onPress={() => purchase(plan.id, trial, setLoading)}
+            onPress={() => purchase(buyId, trial, setLoading)}
             style={{ borderRadius: 18, height: 62, marginTop: 24 }}
             textStyle={{ fontWeight: '800', fontSize: 20 }}
           />
           <Text style={styles.fineMain}>
             {trial
               ? `${trialDays} days free, then ${monthlyText}/month. Billed as ${priceText}/year`
-              : `${monthlyText}/month. Billed as ${priceText}/year`}
+              : `${buyMonthlyText}/month. Billed as ${buyPriceText}/year`}
           </Text>
           <Text style={styles.fine}>
             Renews automatically unless canceled at least 24 hours before {trial ? 'the trial ends' : 'renewal'}. Cancel anytime in Settings.
           </Text>
-          <LegalRow onRestore={restore} restoring={restoring} onOpen={setLegal} />
+          <LegalRow onRestore={restore} restoring={restoring} onOpen={openLegal} />
         </View>
       </ScrollView>
 
@@ -247,10 +262,9 @@ export default function Paywall() {
           <Text style={styles.offerFine}>
             Renews at {offerPriceText}/year unless canceled at least 24 hours before {offerTrial ? 'the trial ends' : 'renewal'}.
           </Text>
-          <LegalRow onOpen={setLegal} />
+          <LegalRow onOpen={openLegal} />
         </Animated.View>
       </BottomSheet>
-      <LegalSheet doc={legal} onClose={() => setLegal(null)} />
     </Screen>
   );
 }
@@ -327,6 +341,16 @@ function Carousel() {
   );
 }
 
+function Switch({ on }: { on: boolean }) {
+  const track = useAnimatedStyle(() => ({ backgroundColor: withTiming(on ? colors.accent : '#D9D9DE', { duration: 180 }) }));
+  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: withTiming(on ? 24 : 0, { duration: 180 }) }] }));
+  return (
+    <Animated.View style={[styles.switchTrack, track]}>
+      <Animated.View style={[styles.switchThumb, thumb]} />
+    </Animated.View>
+  );
+}
+
 function Dot({ active }: { active: boolean }) {
   const s = useAnimatedStyle(() => ({
     width: withTiming(active ? 24 : 8, { duration: 220 }),
@@ -346,7 +370,7 @@ const styles = StyleSheet.create({
   bottom: { paddingHorizontal: 20, paddingBottom: 8 },
   trialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 22 },
   trialText: { fontSize: 18, fontWeight: '700', color: '#1F1513' },
-  switchTrack: { width: 56, height: 32, borderRadius: 16, backgroundColor: colors.accent, padding: 3, alignItems: 'flex-end' },
+  switchTrack: { width: 56, height: 32, borderRadius: 16, padding: 3 },
   switchThumb: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff' },
   planCard: {
     flexDirection: 'row',

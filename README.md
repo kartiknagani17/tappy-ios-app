@@ -83,9 +83,9 @@ Onboarding branches based on answers (see `src/lib/flow.ts`). For example, choos
 
 Subscriptions go through RevenueCat (`react-native-purchases`) in `src/lib/subscription.ts`. Purchases only work in a development, TestFlight or App Store build, not in Expo Go.
 
-1. **App Store Connect → your app → Subscriptions:** create a subscription group with two auto-renewable subscriptions, `tapi_annual` (1 year, $49.99) and `tapi_annual_offer` (1 year, $39.99, the "Before you go" offer). Give each an introductory offer: **Free, 7 days**. Fill in the localization and review screenshot for each.
+1. **App Store Connect → your app → Subscriptions:** create a subscription group with three auto-renewable subscriptions: `tapi_annual` (1 year, $49.99), `tapi_annual_notrial` (1 year, $49.99, **no** introductory offer; bought when the paywall's free-trial toggle is off) and `tapi_annual_offer` (1 year, $39.99, the "Before you go" offer). Give `tapi_annual` and `tapi_annual_offer` an introductory offer: **Free, 7 days**. Fill in the localization and review screenshot for each.
 2. **App Store Connect → Users and Access → Integrations → In-App Purchase:** generate an In-App Purchase key (.p8) for RevenueCat.
-3. **RevenueCat (free up to $2.5k/month in revenue):** create a project and an App Store app with bundle id `company.tappy.app`, upload the .p8 key, import both products, and create an entitlement called **`tappy_pro`** with both products attached.
+3. **RevenueCat (free up to $2.5k/month in revenue):** create a project and an App Store app with bundle id `company.tappy.app`, upload the .p8 key, import all three products, and create an entitlement called **`tappy_pro`** with all three attached.
 4. Copy the RevenueCat **secret API key** (v1, `sk_…`, Project settings → API keys) into `REVENUECAT_SECRET_KEY` on the server (`/etc/tappy/tappy.env`), then restart `tappy-api`. The server uses it to check the `tappy_pro` entitlement and lift the daily scan limits for subscribers (barcode scans unlimited; photo scans keep a fair-use cap, `SUBSCRIBER_DAILY_PHOTO_SCANS`, default 100/day). Never put this key in the app.
 5. Copy the RevenueCat **public iOS SDK key** (`appl_…`) into `EXPO_PUBLIC_REVENUECAT_IOS_KEY` in `eas.json` (the `preview` and `production` profiles). It's a public key, so it's safe to commit.
 

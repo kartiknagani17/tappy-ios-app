@@ -6,11 +6,10 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
-  FadeIn,
 } from 'react-native-reanimated';
 import { OnboardingHeader, Screen } from '../../components/ui';
 import { goNext, progressFor } from '../../lib/flow';
@@ -26,6 +25,8 @@ export default function Commit() {
   const [state, setState] = useState<'idle' | 'holding' | 'done'>('idle');
   const fill = useSharedValue(0);
   const pulse = useSharedValue(0);
+  // 0 → 1 as the filled button turns into the "Goal set!" circle.
+  const done = useSharedValue(0);
   const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
   const advance = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -36,6 +37,7 @@ export default function Commit() {
       if (advance.current) clearTimeout(advance.current);
       cancelAnimation(pulse);
       cancelAnimation(fill);
+      cancelAnimation(done);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -46,8 +48,15 @@ export default function Commit() {
     if (advance.current) return;
     setState('done');
     haptic.success();
-    pulse.set(withRepeat(withSequence(withTiming(1, { duration: 900 }), withTiming(0, { duration: 900 })), -1));
-    advance.current = setTimeout(() => goNext('commit'), 1400);
+    const ease = Easing.inOut(Easing.sin);
+    done.set(withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) }));
+    pulse.set(
+      withDelay(
+        520,
+        withRepeat(withSequence(withTiming(1, { duration: 900, easing: ease }), withTiming(0, { duration: 900, easing: ease })), -1),
+      ),
+    );
+    advance.current = setTimeout(() => goNext('commit'), 1700);
   };
 
   const onPressIn = () => {
@@ -68,20 +77,35 @@ export default function Commit() {
     if (state === 'done' || fill.get() >= 1) return;
     if (ticker.current) clearInterval(ticker.current);
     cancelAnimation(fill);
-    fill.set(withSpring(0, { damping: 18 }));
+    // Drain smoothly from wherever the finger let go; no spring, so nothing overshoots or bounces.
+    fill.set(withTiming(0, { duration: 200 + 350 * fill.get(), easing: Easing.out(Easing.cubic) }));
     setState('idle');
   };
 
   const innerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.12 + fill.value * 0.88 }],
-    opacity: fill.value === 0 ? 0 : 0.55 + fill.value * 0.45,
+    // Fades in over the first few percent instead of popping, so a quick tap or release never flickers.
+    opacity: Math.min(1, fill.value * 8) * (0.55 + fill.value * 0.45),
   }));
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + pulse.value * 0.06 }],
-    opacity: 0.35 + pulse.value * 0.25,
+  const outerRingStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: (0.82 + done.value * 0.18) * (1 + pulse.value * 0.06) }],
+    opacity: done.value * (0.35 + pulse.value * 0.25),
+  }));
+  const innerRingStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 0.88 + done.value * 0.12 }],
+    opacity: done.value * 0.5,
+  }));
+  const doneCircleStyle = useAnimatedStyle(() => ({
+    opacity: done.value,
+    transform: [{ scale: 0.94 + done.value * 0.06 }],
+  }));
+  const doneTextStyle = useAnimatedStyle(() => ({
+    opacity: done.value,
+    transform: [{ scale: 0.85 + done.value * 0.15 }],
   }));
   const labelStyle = useAnimatedStyle(() => ({
     color: fill.value > 0.88 ? '#fff' : colors.text,
+    opacity: 1 - done.value,
   }));
 
   return (
@@ -95,33 +119,29 @@ export default function Commit() {
       </View>
 
       <View style={styles.center}>
-        {state === 'done' ? (
-          <Animated.View entering={FadeIn.duration(250)} style={styles.doneWrap}>
-            <Animated.View style={[styles.ring, { width: SIZE + 110, height: SIZE + 110, borderRadius: (SIZE + 110) / 2 }, ringStyle]} />
-            <Animated.View style={[styles.ring, { width: SIZE + 50, height: SIZE + 50, borderRadius: (SIZE + 50) / 2, opacity: 0.5 }]} />
-            <View style={styles.doneCircle}>
-              <Text style={styles.doneText}>Goal set!</Text>
-            </View>
+        <Animated.View pointerEvents="none" style={[styles.ring, styles.ringOuter, outerRingStyle]} />
+        <Animated.View pointerEvents="none" style={[styles.ring, styles.ringInner, innerRingStyle]} />
+        <Pressable
+          testID="hold"
+          accessibilityRole="button"
+          accessibilityLabel={state === 'done' ? 'Goal set' : `Press and hold to try this diet for ${duration} days`}
+          accessibilityHint="Hold for about two seconds"
+          disabled={state === 'done'}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          onLongPress={() => {}}
+          delayLongPress={HOLD_MS + 1000}
+          style={styles.outer}
+        >
+          <Animated.View style={[styles.inner, innerStyle]} />
+          <View style={styles.labelWrap} pointerEvents="none">
+            <Animated.Text style={[styles.small, labelStyle]}>Press and hold to try this diet for</Animated.Text>
+            <Animated.Text style={[styles.big, labelStyle]}>{duration} days</Animated.Text>
+          </View>
+          <Animated.View pointerEvents="none" style={[styles.doneCircle, doneCircleStyle]}>
+            <Animated.Text style={[styles.doneText, doneTextStyle]}>Goal set!</Animated.Text>
           </Animated.View>
-        ) : (
-          <Pressable
-            testID="hold"
-            accessibilityRole="button"
-            accessibilityLabel={`Press and hold to try this diet for ${duration} days`}
-            accessibilityHint="Hold for about two seconds"
-            onPressIn={onPressIn}
-            onPressOut={onPressOut}
-            onLongPress={() => {}}
-            delayLongPress={HOLD_MS + 1000}
-            style={styles.outer}
-          >
-            <Animated.View style={[styles.inner, innerStyle]} />
-            <View style={styles.labelWrap} pointerEvents="none">
-              <Animated.Text style={[styles.small, labelStyle]}>Press and hold to try this diet for</Animated.Text>
-              <Animated.Text style={[styles.big, labelStyle]}>{duration} days</Animated.Text>
-            </View>
-          </Pressable>
-        )}
+        </Pressable>
       </View>
       <Text style={styles.caption}>{state === 'idle' ? 'Press and hold to continue' : state === 'holding' ? 'Almost there…' : ' '}</Text>
     </Screen>
@@ -158,9 +178,13 @@ const styles = StyleSheet.create({
   labelWrap: { alignItems: 'center' },
   small: { fontSize: 13, fontWeight: '500' },
   big: { fontSize: 38, fontWeight: '600', marginTop: 2 },
-  doneWrap: { alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', backgroundColor: colors.accentTint },
+  ringOuter: { width: SIZE + 110, height: SIZE + 110, borderRadius: (SIZE + 110) / 2 },
+  ringInner: { width: SIZE + 50, height: SIZE + 50, borderRadius: (SIZE + 50) / 2 },
   doneCircle: {
+    position: 'absolute',
+    top: -1,
+    left: -1,
     width: SIZE,
     height: SIZE,
     borderRadius: SIZE / 2,

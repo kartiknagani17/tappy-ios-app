@@ -24,6 +24,8 @@ export const REMINDER_DAYS_BEFORE = 2;
 /** Fallback prices (USD) until the App Store returns localized prices. Keep in sync with App Store Connect. */
 export const PLANS = {
   annual: { id: 'tapi_annual', price: 49.99, label: '1 year' },
+  // Same plan and price with no introductory offer: bought when the paywall's free-trial toggle is off.
+  annualNoTrial: { id: 'tapi_annual_notrial', price: 49.99, label: '1 year' },
   // One-time "Before you go" offer
   annualOffer: { id: 'tapi_annual_offer', price: 39.99, label: '1 year' },
 };
@@ -102,7 +104,7 @@ const trialDaysOf = (p: PurchasesStoreProduct) => {
 export async function loadPrices(): Promise<Record<string, PlanPrice> | null> {
   if (!configured) return null;
   try {
-    const ids = [PLANS.annual.id, PLANS.annualOffer.id];
+    const ids = [PLANS.annual.id, PLANS.annualNoTrial.id, PLANS.annualOffer.id];
     const [products, eligibility] = await Promise.all([
       Purchases.getProducts(ids),
       Purchases.checkTrialOrIntroductoryPriceEligibility(ids).catch(() => ({}) as Record<string, { status: INTRO_ELIGIBILITY_STATUS }>),
@@ -114,8 +116,12 @@ export async function loadPrices(): Promise<Record<string, PlanPrice> | null> {
         priceString: p.priceString,
         perMonthString: p.pricePerMonthString,
         trialDays: trialDaysOf(p),
-        // Unknown counts as not eligible, so we never promise a trial Apple won't give.
-        trialEligible: status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE && trialDaysOf(p) !== null,
+        // Only a definite "ineligible" (or no trial on the product) hides the trial. StoreKit often answers
+        // "unknown" for new Apple IDs and TestFlight testers who are in fact eligible.
+        trialEligible:
+          trialDaysOf(p) !== null &&
+          status !== INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_INELIGIBLE &&
+          status !== INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_NO_INTRO_OFFER_EXISTS,
       };
     }
     return out;
