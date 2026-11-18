@@ -16,5 +16,6 @@ export function pruneOldData(db: DB, now = nowSeconds()) {
   db.prepare('UPDATE vision_calls SET user_id = NULL WHERE user_id IS NOT NULL AND created_at < ?').run(cutoffIso);
   db.prepare('DELETE FROM scan_cache WHERE expires_at <= ?').run(now);
   db.prepare('DELETE FROM feedback WHERE created_at < ?').run(now - FEEDBACK_RETENTION_DAYS * 86400);
+  db.prepare('DELETE FROM missed_scans WHERE last_at < ?').run(now - FEEDBACK_RETENTION_DAYS * 86400);
   pruneSessions(db);
 }

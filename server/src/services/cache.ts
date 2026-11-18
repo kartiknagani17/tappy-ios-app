@@ -23,6 +23,21 @@ export function setScanCache(db: DB, gtin14: string, found: boolean, result: unk
   ).run(gtin14, found ? 1 : 0, JSON.stringify(result), now + ttlSeconds, now);
 }
 
+// ---------- missed scans (barcodes with no product) ----------
+/** Count one scan of a barcode we have no product for. Barcode only, never who scanned it. */
+export function recordMissedScan(db: DB, gtin14: string) {
+  const now = nowSeconds();
+  db.prepare(
+    `INSERT INTO missed_scans (gtin14, scans, first_at, last_at) VALUES (?, 1, ?, ?)
+     ON CONFLICT (gtin14) DO UPDATE SET scans = scans + 1, last_at = excluded.last_at`,
+  ).run(gtin14, now, now);
+}
+
+/** A product now exists for this barcode: it is no longer missing. */
+export function clearMissedScan(db: DB, gtin14: string) {
+  db.prepare('DELETE FROM missed_scans WHERE gtin14 = ?').run(gtin14);
+}
+
 // ---------- vision_cache (perceptual-hash keyed) ----------
 export type VisionCacheRow = {
   id: number;

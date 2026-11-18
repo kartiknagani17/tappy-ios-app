@@ -29,6 +29,7 @@ const HELP = `Tappy data CLI
   node src/cli.ts reject <id>             Discard a label photo
   node src/cli.ts warm-images [n]         Download every product photo into the photo cache, n at a time (default 8)
   node src/cli.ts stats                   Row counts and vision spend
+  node src/cli.ts missed [n]              Barcodes scanned most often with no product (default: 50)
   node src/cli.ts feedback [n]            Latest feedback messages (default: 50)
   node src/cli.ts backup [dir] [keep]     Consistent snapshot of the live database (default: keep 2)
 
@@ -268,6 +269,20 @@ async function main() {
              sum(output_tokens) AS output_tokens, round(sum(est_cost_usd), 4) AS est_cost_usd, round(avg(latency_ms)) AS avg_ms
            FROM vision_calls GROUP BY day, model ORDER BY day DESC LIMIT 30`),
       );
+      return;
+    }
+    case 'missed': {
+      const db = openDb(config.dbPath);
+      const rows = db
+        .prepare(
+          `SELECT gtin14, scans, datetime(first_at, 'unixepoch') AS first_seen, datetime(last_at, 'unixepoch') AS last_seen
+           FROM missed_scans WHERE gtin14 NOT IN (SELECT gtin14 FROM products)
+           ORDER BY scans DESC, last_at DESC LIMIT ?`,
+        )
+        .all(Number(arg) || 50);
+      if (rows.length) console.table(rows);
+      else console.log('No missed scans yet.');
+      console.table(db.prepare('SELECT count(*) AS missing_barcodes, coalesce(sum(scans), 0) AS total_missed_scans FROM missed_scans WHERE gtin14 NOT IN (SELECT gtin14 FROM products)').all());
       return;
     }
     case 'feedback': {

@@ -15,6 +15,8 @@ import {
   insertVisionCache,
   recordVisionOffer,
   setScanCache,
+  recordMissedScan,
+  clearMissedScan,
   wasOffered,
 } from './cache.ts';
 import type { OffLiveClient } from './off-live.ts';
@@ -140,7 +142,10 @@ export class ScanService {
 
     if (own) return { status: 'found', gtin14, product: own, from_cache: false, via: 'contribution' };
 
-    if (cached && !cached.found) return { status: 'needs_label_photo', gtin14, from_cache: true };
+    if (cached && !cached.found) {
+      recordMissedScan(db, gtin14);
+      return { status: 'needs_label_photo', gtin14, from_cache: true };
+    }
 
     if (config.offLiveLookup && this.d.offLive) {
       const rec = await this.d.offLive.lookup(gtin14);
@@ -148,15 +153,20 @@ export class ScanService {
         upsertSourceRecord(db, rec);
         const product = getProductByGtin(db, gtin14);
         if (product) {
+          clearMissedScan(db, gtin14);
           const pub = toPublicProduct(product);
           setScanCache(db, gtin14, true, pub, config.scanCacheTtlSeconds);
           return { status: 'found', gtin14, product: pub, from_cache: false, via: 'off_live' };
         }
       }
-      if (rec === 'skipped') return { status: 'needs_label_photo', gtin14, from_cache: false }; // don't cache a transient miss
+      if (rec === 'skipped') {
+        recordMissedScan(db, gtin14);
+        return { status: 'needs_label_photo', gtin14, from_cache: false }; // don't cache a transient miss
+      }
     }
 
     setScanCache(db, gtin14, false, null, config.scanCacheNegativeTtlSeconds);
+    recordMissedScan(db, gtin14);
     return { status: 'needs_label_photo', gtin14, from_cache: false };
   }
 

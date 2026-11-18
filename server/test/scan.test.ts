@@ -17,6 +17,29 @@ async function seededDb() {
   return db;
 }
 
+describe('missed scans', () => {
+  const missed = (db: ReturnType<typeof testDb>) =>
+    db.prepare('SELECT gtin14, scans FROM missed_scans').all() as { gtin14: string; scans: number }[];
+
+  it('counts every scan of an unknown barcode (including cached misses), and keeps no device id', async () => {
+    const db = await seededDb();
+    const { scan } = makeScan(db, new MockVisionProvider());
+    await scan.resolveBarcode('036000291452', 'user-aaaaaaaa');
+    await scan.resolveBarcode('036000291452', 'user-bbbbbbbb');
+    assert.deepEqual(missed(db).map((r) => ({ ...r })), [{ gtin14: '00036000291452', scans: 2 }]);
+    const cols = (db.prepare('PRAGMA table_info(missed_scans)').all() as { name: string }[]).map((c) => c.name);
+    assert.ok(!cols.some((c) => /user|device|ip/i.test(c)));
+  });
+
+  it('does not log found products or invalid barcodes', async () => {
+    const db = await seededDb();
+    const { scan } = makeScan(db, new MockVisionProvider());
+    await scan.resolveBarcode('013764027503', 'user-aaaaaaaa');
+    await scan.resolveBarcode('123', 'user-aaaaaaaa');
+    assert.deepEqual(missed(db), []);
+  });
+});
+
 describe('barcode lookup + scan_cache', () => {
   it('UPC-A and EAN-13 forms resolve to the same product', async () => {
     const db = await seededDb();
