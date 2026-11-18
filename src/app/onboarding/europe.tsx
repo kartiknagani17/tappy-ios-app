@@ -6,25 +6,19 @@ import { Button } from '../../components/ui';
 import { goNext } from '../../lib/flow';
 import { colors } from '../../theme';
 
+// Only additives that really are banned, restricted or need a warning label in the EU (checked Nov 2026).
+// Keep this list factual: it's a claim about the law, not about health.
 const ADDITIVES = [
-  'Titanium dioxide',
-  'Potassium bromate',
-  'Azodicarbonamide',
-  'Propylparaben',
-  'Red #3',
-  'Red #40',
-  'Yellow #5',
-  'Yellow #6',
-  'BHA',
-  'BHT',
-  'Carrageenan',
-  'Nitrates & nitrites',
-  'High fructose corn syrup',
-  'Sorbitol',
-  'Aspartame',
-  'Seed oils',
-  'Artificial flavors',
-  'Sucralose',
+  'Titanium dioxide', // E171, banned 2022
+  'Potassium bromate', // not authorised
+  'Azodicarbonamide', // not authorised
+  'Brominated vegetable oil', // not authorised
+  'Propylparaben', // E216, removed 2006
+  'Citrus Red 2', // not authorised
+  'Red #3', // E127, cocktail cherries only
+  'Red #40', // E129, warning label
+  'Yellow #5', // E102, warning label
+  'Yellow #6', // E110, warning label
 ];
 
 export default function Europe() {
@@ -32,7 +26,7 @@ export default function Europe() {
     <QuestionLayout
       step="europe"
       title="If it's banned in Europe, why is it in your pantry?"
-      subtitle="Dozens of additives allowed in the U.S. are restricted overseas due to health concerns. Tappy helps you spot them instantly."
+      subtitle="Some additives allowed in the U.S. are banned, restricted or need a warning label in the European Union. Tappy helps you spot them instantly."
       footer={<Button testID="continue" title="Continue" onPress={() => goNext('europe')} />}
     >
       <View style={styles.panel}>

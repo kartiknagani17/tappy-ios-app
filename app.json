@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tappy",
     "slug": "tappy",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -142,9 +142,13 @@
       ],
       "expo-secure-store",
       "expo-apple-authentication",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-status-bar"
     ],
-    "scheme": ["tappy", "com.googleusercontent.apps.698625528840-i59tes7nc33d20buo747g0de3q5eskmg"],
+    "scheme": [
+      "tappy",
+      "com.googleusercontent.apps.698625528840-i59tes7nc33d20buo747g0de3q5eskmg"
+    ],
     "experiments": {
       "typedRoutes": false
     },

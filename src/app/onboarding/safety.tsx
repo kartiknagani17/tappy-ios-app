@@ -19,15 +19,18 @@ export default function Safety() {
         <Feather name="shield" size={56} color={colors.ink} />
         <Text style={styles.title}>Your safety is our priority</Text>
         <Text style={styles.body}>
-          <Text style={{ fontWeight: '700' }}>Always double-check ingredients</Text>, especially if you live with life-threatening
-          allergies.
+          <Text style={{ fontWeight: '700' }}>Always read the ingredients and allergen warnings on the package yourself</Text> before
+          eating, especially if you live with life-threatening allergies.
+        </Text>
+        <Text style={styles.body}>
+          Tappy’s ratings come from product databases and software. They can be wrong or out of date, and they aren’t medical advice.
         </Text>
       </View>
       <Footer>
         <Pressable
           testID="agree"
           accessibilityRole="checkbox"
-          accessibilityLabel="I agree to Tappy's Terms of Service and Privacy Policy, and I'll always double-check ingredient and allergen info."
+          accessibilityLabel="I agree to Tappy's Terms of Use and Privacy Policy. I understand Tappy can be wrong and isn't medical advice, and I'll always check the package myself."
           accessibilityState={{ checked: agreed }}
           onPress={() => {
             haptic.select();
@@ -39,13 +42,13 @@ export default function Safety() {
           <Text style={styles.agreeText}>
             I agree to Tappy's{' '}
             <Text accessibilityRole="link" style={styles.link} onPress={() => setLegal('terms')}>
-              Terms of Service
+              Terms of Use
             </Text>{' '}
             and{' '}
             <Text accessibilityRole="link" style={styles.link} onPress={() => setLegal('privacy')}>
               Privacy Policy
             </Text>
-            , and I'll always double-check ingredient and allergen info.
+            . I understand Tappy can be wrong and isn’t medical advice, and I’ll always check the package myself.
           </Text>
         </Pressable>
         <Button

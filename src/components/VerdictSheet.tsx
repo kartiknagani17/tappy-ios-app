@@ -274,7 +274,7 @@ export function VerdictSheet({
 
             <View style={styles.warning}>
               <Feather name="alert-triangle" size={16} color="#8A5A00" />
-              <Text style={styles.warningText}>Check the package yourself. Recipes change, and our data can be wrong or out of date.</Text>
+              <Text style={styles.warningText}>Always read the label on the package before eating. Our data can be wrong or out of date, and Tappy isn’t medical advice.</Text>
             </View>
 
             <View style={styles.band} />

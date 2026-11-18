@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { LEGAL_CONTACT } from '../../server/src/legal/content';
+import { ApiError } from '../lib/api';
 import { AUTH_ENABLED, deleteAccount as deleteServerAccount, signOut } from '../lib/auth';
 import { haptic } from '../lib/haptics';
 import { useStore } from '../lib/store';
@@ -22,7 +23,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Is Tappy medical advice?',
-    a: 'No. Tappy is a guide based on label data, which can be wrong or out of date. If you have a severe allergy, always read the package yourself.',
+    a: 'No. Tappy is an informational guide based on label data, which can be wrong or out of date. Always read the ingredients and allergen warnings on the package yourself before eating, and follow your doctor’s advice.',
   },
   {
     q: 'Where does the product information come from?',
@@ -30,7 +31,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'A product is missing or looks wrong. What can I do?',
-    a: 'Scan the barcode, then use the photo option to take a picture of the ingredient list. You can also report a problem from the product page, or contact support.',
+    a: 'Scan the barcode. If we don’t have the ingredients, Tappy asks you to photograph the ingredient list and reads it for you. You can also report a problem from the product page, or contact support.',
   },
   {
     q: 'How do I change my diet or allergies?',
@@ -119,8 +120,11 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
       async () => {
         try {
           await deleteServerAccount();
-        } catch {
-          notify('Couldn’t delete your account', 'We couldn’t reach Tappy. Check your connection and try again.');
+        } catch (e) {
+          notify(
+            'Couldn’t delete your account',
+            e instanceof ApiError && e.code === 'no_session' ? e.message : 'We couldn’t reach Tappy. Check your connection and try again.',
+          );
           return;
         }
         haptic.warning();

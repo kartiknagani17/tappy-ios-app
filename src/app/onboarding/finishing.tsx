@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { CircularProgress, Confetti } from '../../components/art';
@@ -13,8 +13,6 @@ const DURATION = 5200;
 
 export default function Finishing() {
   const restrictionCount = useStore((s) => Object.keys(s.restrictions).length);
-  // Placeholder estimate until a real product catalog is connected.
-  const products = useMemo(() => Math.max(18000, 128426 - restrictionCount * 6913), [restrictionCount]);
   const [p, setP] = useState(0);
 
   useEffect(() => {
@@ -35,11 +33,8 @@ export default function Finishing() {
   const done = p >= 1;
   const steps = [
     { at: 0, label: 'Personalizing your barcode scanner' },
-    { at: 0.3, label: 'Generating 2 million+ ingredient insights' },
-    {
-      at: 0.62,
-      label: `Identifying ${Math.round(products * Math.min(1, Math.max(0, (p - 0.62) / 0.38))).toLocaleString()} products you can eat`,
-    },
+    { at: 0.3, label: `Applying your ${restrictionCount === 1 ? '1 restriction' : `${restrictionCount} restrictions`}` },
+    { at: 0.62, label: 'Rating ingredients against your profile' },
   ];
   const doneAt = [0.3, 0.62, 1];
 

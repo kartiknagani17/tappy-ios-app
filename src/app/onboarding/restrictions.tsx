@@ -88,6 +88,11 @@ export default function Restrictions() {
             return (
               <View key={sec} style={styles.section}>
                 <Text style={styles.sectionTitle}>{SECTION_TITLES[sec]}</Text>
+                {sec === 'conditions' ? (
+                  <Text style={styles.sectionNote}>
+                    These use common dietary guidance, not advice for you. Follow your doctor’s or dietitian’s plan.
+                  </Text>
+                ) : null}
                 <Animated.View layout={LinearTransition} style={styles.chips}>
                   {items.map((r) => (
                     <Chip
@@ -161,6 +166,7 @@ const styles = StyleSheet.create({
   selectedRow: { paddingHorizontal: 16, paddingTop: 16, gap: 10 },
   section: { paddingHorizontal: 16, marginTop: 26 },
   sectionTitle: { fontSize: 19, fontWeight: '600', color: colors.ink, marginBottom: 14 },
+  sectionNote: { fontSize: 13, lineHeight: 18, color: colors.textMuted, marginTop: -8, marginBottom: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   empty: { padding: 24, alignItems: 'center' },
   emptyTitle: { fontSize: 17, fontWeight: '600', color: colors.ink, textAlign: 'center' },

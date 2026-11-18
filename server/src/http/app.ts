@@ -22,8 +22,11 @@ import {
 import type { ScanService } from '../services/scan.ts';
 import { LEGAL_DOCS } from '../legal/content.ts';
 import {
+  appleTokenService,
   AuthError,
   confirmPasswordReset,
+  saveAppleRefreshToken,
+  type AppleTokenService,
   deleteAccount,
   deleteSession,
   fetchAppleKeys,
@@ -114,12 +117,16 @@ export type AppDeps = {
   mailer?: Mailer | null;
   appleKeys?: AppleKeySource;
   googleKeys?: GoogleKeySource;
+  /** Revokes Sign in with Apple tokens on account deletion; defaults to the configured Apple key (null = off). */
+  appleTokens?: AppleTokenService | null;
   /** Checks the RevenueCat subscription; defaults to RevenueCat when REVENUECAT_SECRET_KEY is set. */
   entitlements?: EntitlementChecker;
   /** Product photo cache behind GET /img/…; null turns the route off. */
   images?: ImageCache | null;
   /** Photo requests per minute per IP (screens show a dozen at once; Cloudflare absorbs repeats). */
   imageLimiter?: RateLimiter;
+  /** Feedback messages per minute per IP (each one can email support). */
+  feedbackLimiter?: RateLimiter;
 };
 
 /** Plain node:http request handler. Routes:
@@ -143,11 +150,18 @@ export function createApp({
   mailer = null,
   appleKeys = fetchAppleKeys,
   googleKeys = fetchGoogleKeys,
+  appleTokens = appleTokenService({
+    teamId: config.appleTeamId,
+    keyId: config.appleSignInKeyId,
+    privateKey: config.appleSignInPrivateKey,
+    clientId: config.appleBundleId,
+  }),
   entitlements = config.revenueCatSecretKey
     ? new RevenueCatEntitlements({ secretKey: config.revenueCatSecretKey, entitlementId: config.revenueCatEntitlementId })
     : noEntitlements,
   images = null,
   imageLimiter = new RateLimiter(600),
+  feedbackLimiter = new RateLimiter(5),
 }: AppDeps) {
   const maxImageBody = Math.ceil(config.visionMaxImageBytes * 1.4) + 4096; // base64 overhead
   const photosEnabled = photoScanningEnabled(config);
@@ -354,6 +368,8 @@ export function createApp({
         return send(res, 200, { products: out.products.map(toPublicProduct), next_offset: out.nextOffset });
       }
       case 'feedback': {
+        // Each message can email support: cap it per network too, not only per (easily minted) device id.
+        feedbackLimiter.check(`feedback-ip:${ipk}`);
         const out = submitFeedback(db, userId, body, mailer ? { mailer, to: config.supportEmail } : null);
         return send(res, 200, { ok: true, id: out.id });
       }
@@ -400,7 +416,18 @@ export function createApp({
       case 'apple': {
         authLimiter.check(`auth-ip:${ipk}`);
         const apple = await verifyAppleToken(body.identity_token, body.nonce, config.appleBundleId, appleKeys);
-        return send(res, 200, session(signInWithApple(db, apple)));
+        const out = signInWithApple(db, apple);
+        // Keep a refresh token so it can be revoked if the account is deleted (best effort: sign-in never fails on it).
+        const code = body.authorization_code;
+        if (appleTokens && typeof code === 'string' && code.length > 0 && code.length <= 512) {
+          try {
+            const refresh = await appleTokens.exchangeCode(code);
+            if (refresh) saveAppleRefreshToken(db, out.user.id, refresh);
+          } catch (e) {
+            logError('Apple token exchange', e);
+          }
+        }
+        return send(res, 200, session(out));
       }
       case 'google': {
         authLimiter.check(`auth-ip:${ipk}`);
@@ -433,7 +460,14 @@ export function createApp({
       }
       case 'delete_account': {
         const { user } = requireUser(req);
-        deleteAccount(db, user.id);
+        const appleRefresh = deleteAccount(db, user.id);
+        if (appleRefresh && appleTokens) {
+          try {
+            await appleTokens.revoke(appleRefresh);
+          } catch (e) {
+            logError('Apple token revoke', e); // the account is already gone; nothing else to undo
+          }
+        }
         return send(res, 200, { ok: true });
       }
     }

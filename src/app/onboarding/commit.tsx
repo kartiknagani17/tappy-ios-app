@@ -90,7 +90,7 @@ export default function Commit() {
       <View style={styles.content}>
         <Text style={styles.title}>Make it official</Text>
         <Text style={styles.subtitle}>
-          Press and hold below to lock it in! No daily tasks are required—we'll just check in occasionally.
+          Press and hold below to lock it in! No daily tasks are required. Just scan as you shop.
         </Text>
       </View>
 

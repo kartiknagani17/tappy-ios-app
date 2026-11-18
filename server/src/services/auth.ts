@@ -1,4 +1,4 @@
-import { createHash, createPublicKey, randomBytes, randomInt, scrypt, timingSafeEqual, verify } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, randomBytes, randomInt, scrypt, sign, timingSafeEqual, verify } from 'node:crypto';
 import { promisify } from 'node:util';
 import { nowSeconds, transaction, type DB } from '../db/index.ts';
 
@@ -141,9 +141,10 @@ export async function signUp(db: DB, emailIn: unknown, passwordIn: unknown): Pro
     const existing = getUser(db, 'email', email);
     if (existing?.password_hash) throw new AuthError(409, 'email_taken', 'An account with this email already exists. Log in instead.');
     if (existing) {
-      // Apple account that shared this email: add a password to it.
-      db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(hash, now, existing.id);
-      return { user: { ...existing, password_hash: hash }, token: createSession(db, existing.id) };
+      // An Apple or Google account uses this email. Signing up here must not attach a password to it: the email
+      // isn't verified at sign-up, so that would hand the account to whoever typed the address.
+      // (Its owner can add a password with "Forgot password?", which proves they read that inbox.)
+      throw new AuthError(409, 'email_taken', 'This email already has a Tappy account. Continue with Apple or Google instead.');
     }
     const id = Number(
       db.prepare('INSERT INTO users (email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)').run(email, hash, now, now).lastInsertRowid,
@@ -220,6 +221,19 @@ export function resendMailer(apiKey: string, from: string): Mailer {
   };
 }
 
+
+/**
+ * Links a provider identity (verified email) to the existing account with that email.
+ * A password on that account was set without proving the email, so it may belong to someone who signed up
+ * with this address first to wait for the real owner. The verified owner takes over: the password is
+ * removed and every existing session is ended. The owner can set a new password with "Forgot password?".
+ */
+function linkVerifiedEmail(db: DB, user: User, column: 'apple_sub' | 'google_sub', sub: string, now: number): User {
+  db.prepare(`UPDATE users SET ${column} = ?, password_hash = NULL, updated_at = ? WHERE id = ?`).run(sub, now, user.id);
+  if (user.password_hash) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+  return { ...user, [column]: sub, password_hash: null };
+}
+
 // ---------- Sign in with Apple ----------
 
 type AppleKey = { kid: string; kty: string; n: string; e: string; alg?: string; use?: string };
@@ -284,10 +298,7 @@ export function signInWithApple(db: DB, apple: { sub: string; email: string | nu
     if (!user && apple.email) {
       // Same verified email as an existing account: link Apple to it.
       const byEmail = getUser(db, 'email', apple.email);
-      if (byEmail && !byEmail.apple_sub) {
-        db.prepare('UPDATE users SET apple_sub = ?, updated_at = ? WHERE id = ?').run(apple.sub, now, byEmail.id);
-        user = { ...byEmail, apple_sub: apple.sub };
-      }
+      if (byEmail && !byEmail.apple_sub) user = linkVerifiedEmail(db, byEmail, 'apple_sub', apple.sub, now);
     }
     if (!user) {
       const id = Number(
@@ -366,10 +377,7 @@ export function signInWithGoogle(db: DB, google: { sub: string; email: string | 
     if (!user && google.email) {
       // Same verified email as an existing account: link Google to it.
       const byEmail = getUser(db, 'email', google.email);
-      if (byEmail && !byEmail.google_sub) {
-        db.prepare('UPDATE users SET google_sub = ?, updated_at = ? WHERE id = ?').run(google.sub, now, byEmail.id);
-        user = { ...byEmail, google_sub: google.sub };
-      }
+      if (byEmail && !byEmail.google_sub) user = linkVerifiedEmail(db, byEmail, 'google_sub', google.sub, now);
     }
     if (!user) {
       const id = Number(
@@ -394,7 +402,57 @@ export function saveProfile(db: DB, userId: number, profile: unknown): number {
   return now;
 }
 
-/** App Store Guideline 5.1.1(v): deleting the account removes it and everything tied to it. */
-export function deleteAccount(db: DB, userId: number) {
+/** App Store Guideline 5.1.1(v): deleting the account removes it and everything tied to it.
+ *  Returns the Sign in with Apple refresh token, if any, so the caller can revoke it with Apple. */
+export function deleteAccount(db: DB, userId: number): string | null {
+  const row = db.prepare('SELECT apple_refresh_token FROM users WHERE id = ?').get(userId) as { apple_refresh_token: string | null } | undefined;
   db.prepare('DELETE FROM users WHERE id = ?').run(userId); // sessions + resets cascade
+  return row?.apple_refresh_token ?? null;
+}
+
+export function saveAppleRefreshToken(db: DB, userId: number, refreshToken: string) {
+  db.prepare('UPDATE users SET apple_refresh_token = ? WHERE id = ?').run(refreshToken, userId);
+}
+
+// ---------- Sign in with Apple token revocation ----------
+
+/**
+ * Apple requires apps that offer Sign in with Apple to revoke the user's tokens when they delete their account.
+ * At sign-in the app's one-time authorization code is exchanged for a refresh token (kept with the account);
+ * on deletion that token is revoked. Needs a Sign in with Apple key (APPLE_TEAM_ID, APPLE_SIGN_IN_KEY_ID,
+ * APPLE_SIGN_IN_PRIVATE_KEY); without one this is off and deletion still works.
+ */
+export interface AppleTokenService {
+  exchangeCode(code: string): Promise<string | null>;
+  revoke(refreshToken: string): Promise<void>;
+}
+
+export function appleTokenService(opts: { teamId: string; keyId: string; privateKey: string; clientId: string }): AppleTokenService | null {
+  if (!opts.teamId || !opts.keyId || !opts.privateKey) return null;
+  const key = createPrivateKey(opts.privateKey.replace(/\\n/g, '\n'));
+  const clientSecret = () => {
+    const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const iat = nowSeconds();
+    const head = `${enc({ alg: 'ES256', kid: opts.keyId })}.${enc({ iss: opts.teamId, iat, exp: iat + 300, aud: 'https://appleid.apple.com', sub: opts.clientId })}`;
+    return `${head}.${sign('sha256', Buffer.from(head), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url')}`;
+  };
+  const post = (path: string, fields: Record<string, string>) =>
+    fetch(`https://appleid.apple.com${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: opts.clientId, client_secret: clientSecret(), ...fields }).toString(),
+      signal: AbortSignal.timeout(10_000),
+    });
+  return {
+    async exchangeCode(code) {
+      const res = await post('/auth/token', { code, grant_type: 'authorization_code' });
+      if (!res.ok) throw new Error(`Apple token exchange responded ${res.status}`);
+      const body = (await res.json()) as { refresh_token?: unknown };
+      return typeof body.refresh_token === 'string' && body.refresh_token.length <= 1024 ? body.refresh_token : null;
+    },
+    async revoke(refreshToken) {
+      const res = await post('/auth/revoke', { token: refreshToken, token_type_hint: 'refresh_token' });
+      if (!res.ok) throw new Error(`Apple revoke responded ${res.status}`);
+    },
+  };
 }

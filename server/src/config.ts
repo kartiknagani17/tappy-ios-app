@@ -132,6 +132,11 @@ export function loadConfig() {
     // Accounts
     /** Sign in with Apple tokens must be issued for this audience (the iOS bundle id in app.json). */
     appleBundleId: str('APPLE_BUNDLE_ID', 'company.tappy.app'),
+    /** Sign in with Apple key (Apple Developer > Keys), used to revoke Apple tokens when an account is deleted. Optional. */
+    appleTeamId: str('APPLE_TEAM_ID', ''),
+    appleSignInKeyId: str('APPLE_SIGN_IN_KEY_ID', ''),
+    /** The .p8 file's contents (PEM). Newlines may be written as \n. */
+    appleSignInPrivateKey: str('APPLE_SIGN_IN_PRIVATE_KEY', ''),
     /** Sign in with Google ID tokens must be issued for one of these OAuth client ids (comma separated). Empty: Google sign-in is off. */
     googleClientIds: (process.env.GOOGLE_CLIENT_IDS || '')
       .split(',')

@@ -3,6 +3,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
 import { createApp } from '../src/http/app.ts';
+import { RateLimiter } from '../src/services/limits.ts';
 import { FEEDBACK_PER_DEVICE_PER_DAY } from '../src/services/feedback.ts';
 import { makeScan, MockVisionProvider, testConfig, testDb } from './helpers.ts';
 
@@ -16,7 +17,7 @@ describe('POST /api/feedback', () => {
   before(async () => {
     const { scan } = makeScan(db, new MockVisionProvider(), config);
     const mailer = async (to: string, subject: string, text: string) => void sent.push({ to, subject, text });
-    server = createServer(createApp({ db, config, scan, mailer }));
+    server = createServer(createApp({ db, config, scan, mailer, feedbackLimiter: new RateLimiter(1000) }));
     await new Promise<void>((r) => server.listen(0, r));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
@@ -42,6 +43,20 @@ describe('POST /api/feedback', () => {
   it('rejects empty messages', async () => {
     assert.equal((await post({ message: '   ' })).status, 400);
     assert.equal((await post({ message: 42 })).status, 400);
+  });
+
+  it('caps messages per network per minute', async () => {
+    const { db: db2, config: c2 } = { db: testDb(), config: testConfig() };
+    const { scan: s2 } = makeScan(db2, new MockVisionProvider(), c2);
+    const srv = createServer(createApp({ db: db2, config: c2, scan: s2, feedbackLimiter: new RateLimiter(2) }));
+    await new Promise<void>((r) => srv.listen(0, r));
+    const url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/api/feedback`;
+    const send = (dev: string) =>
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Tappy-User': dev }, body: JSON.stringify({ message: 'hi' }) });
+    assert.equal((await send('device-net-0001')).status, 200);
+    assert.equal((await send('device-net-0002')).status, 200);
+    assert.equal((await send('device-net-0003')).status, 429); // new device id, same network
+    srv.close();
   });
 
   it('caps messages per device per day', async () => {

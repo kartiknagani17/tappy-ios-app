@@ -29,6 +29,8 @@ type State = {
   trialActive: boolean;
   agreedToTerms: boolean;
   askedPush: boolean;
+  /** Agreed that ingredient photos are sent to OpenAI to be read (App Store 5.1.2(i)). */
+  aiPhotoConsent: boolean;
   account?: { email: string; provider: 'email' | 'google' | 'apple' | 'facebook' };
   accountPromptDismissed: boolean;
   /** Bookmarked products (newest first), shown in Lists. Fresh data is fetched when Lists opens. */
@@ -87,6 +89,7 @@ const initial: State = {
   trialActive: false,
   agreedToTerms: false,
   askedPush: false,
+  aiPhotoConsent: false,
   accountPromptDismissed: false,
   saved: [],
   lists: DEFAULT_LISTS.map((l) => ({ ...l, ids: [] })),

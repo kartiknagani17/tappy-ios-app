@@ -39,7 +39,7 @@ const diets: Restriction[] = [
     section: 'diets',
     kind: 'checklist',
     mostCommon: true,
-    hint: 'New to Alpha Gal Allergy? Select all five options below to be safe. Otherwise, pick your triggers.',
+    hint: 'New to Alpha Gal Allergy? Select all five options below to cover them all. Otherwise, pick your triggers.',
     about:
       'Alpha-gal syndrome is an allergy to a sugar found in most mammals. Reactions can be triggered by red meat and mammal-derived products.',
     tags: [],

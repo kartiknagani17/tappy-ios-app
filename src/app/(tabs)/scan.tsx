@@ -3,7 +3,7 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DEMO_PRODUCTS } from '../../components/art';
@@ -170,6 +170,24 @@ export default function Scan() {
   };
 
   const goLabel = (gtin: string | null, frontHash: string | null, recheck = false) => {
+    // App Store 5.1.2(i): say who reads the photo, and ask once, before the first one is sent.
+    if (!useStore.getState().aiPhotoConsent) {
+      Alert.alert(
+        'Read the ingredients with AI?',
+        'Your photo is sent to OpenAI, which reads the ingredient text for us. Only the photo is sent, never your profile or account, and OpenAI doesn’t keep it.',
+        [
+          { text: 'Not now', style: 'cancel', onPress: () => reset() },
+          {
+            text: 'Allow',
+            onPress: () => {
+              useStore.getState().set({ aiPhotoConsent: true });
+              goLabel(gtin, frontHash, recheck);
+            },
+          },
+        ],
+      );
+      return;
+    }
     setVerdict(null);
     setMatch(null);
     setPrompt(null);
@@ -454,8 +472,8 @@ export default function Scan() {
             <Text style={styles.modalTitle} accessibilityRole="header">
               Don't miss out! Enable push notifications.
             </Text>
-            <Text style={styles.modalBody}>We like giving away free stuff and adding new features 😀</Text>
-            <Text style={styles.modalBody}>Do you want to hear about them?</Text>
+            <Text style={styles.modalBody}>We’ll tell you when a product you’re watching changes its ingredients 😀</Text>
+            <Text style={styles.modalBody}>Want us to let you know?</Text>
             <Button
               testID="push-yes"
               title="Yes, I'm in!"

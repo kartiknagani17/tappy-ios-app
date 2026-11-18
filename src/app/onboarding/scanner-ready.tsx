@@ -51,7 +51,7 @@ export default function ScannerReady() {
         </Animated.View>
       </Animated.View>
       <Text style={[styles.headline, compact && { fontSize: 22, lineHeight: 28, marginTop: 16 }]}>
-        Scan from 100,000+ products and know if something's safe. Instantly.
+        Scan from 100,000+ products and instantly see how they fit your profile.
       </Text>
       <View style={{ flex: 1 }} />
       <Footer>

@@ -324,7 +324,12 @@ export async function signInWithProvider(provider: SocialProvider): Promise<Auth
   }
   if (!credential.identityToken) throw new Error('Sign in with Apple didn’t work. Please try again.');
   return startSession(
-    await call<SessionResponse>('POST', '/api/auth/apple', { identity_token: credential.identityToken, nonce: rawNonce }),
+    await call<SessionResponse>('POST', '/api/auth/apple', {
+      identity_token: credential.identityToken,
+      nonce: rawNonce,
+      // One-time code: the server exchanges it so it can revoke Apple's tokens if the account is deleted.
+      authorization_code: credential.authorizationCode ?? undefined,
+    }),
     'apple',
   );
 }
@@ -339,12 +344,16 @@ export async function signOut(): Promise<void> {
 /** Permanently deletes the account on the server (Guideline 5.1.1(v)). Throws if the server can't be reached. */
 export async function deleteAccount(): Promise<void> {
   const token = await getToken();
-  if (token) {
-    try {
-      await call('POST', '/api/account/delete', {}, token);
-    } catch (e) {
-      if (!(e instanceof ApiError && e.status === 401)) throw e; // 401: session already gone, nothing left to delete
+  // Without a session we can't delete anything on the server: never report success in that case.
+  if (!token) throw new ApiError(401, 'no_session', 'Please log in again, then delete your account.');
+  try {
+    await call('POST', '/api/account/delete', {}, token);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      await endLocalSession();
+      throw new ApiError(401, 'no_session', 'Your session has expired. Please log in again, then delete your account.');
     }
+    throw e;
   }
   await endLocalSession();
 }

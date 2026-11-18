@@ -342,7 +342,7 @@ describe('migration 002 on an existing database', () => {
         VALUES ('front', '0123456789abcdef', '0123', '4567', '89ab', 'cdef', 'm', '{}', 1, 0),
                ('label', '0123456789abcdef', '0123', '4567', '89ab', 'cdef', 'm', '{}', NULL, 0);
     `);
-    assert.deepEqual(migrate(db), ['002_hardening.sql', '003_accounts.sql', '004_feedback.sql', '005_category_index.sql', '006_aisles.sql', '007_missed_scans.sql', '008_google_sign_in.sql']);
+    assert.deepEqual(migrate(db), ['002_hardening.sql', '003_accounts.sql', '004_feedback.sql', '005_category_index.sql', '006_aisles.sql', '007_missed_scans.sql', '008_google_sign_in.sql', '009_apple_revoke.sql']);
     assert.equal((db.prepare('SELECT report_count n FROM products WHERE id = 1').get() as { n: number }).n, 2);
     assert.equal((db.prepare(`SELECT count(*) n FROM vision_cache WHERE kind = 'label'`).get() as { n: number }).n, 0);
     assert.equal((db.prepare(`SELECT chosen_product_id c FROM vision_cache`).get() as { c: number | null }).c, null);

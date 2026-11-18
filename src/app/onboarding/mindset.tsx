@@ -3,6 +3,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { BottomSheet } from '../../components/BottomSheet';
 import { QuestionLayout, qStyles } from '../../components/QuestionLayout';
 import { Button, OptionCard, TextLink } from '../../components/ui';
+import { api } from '../../lib/api';
 import { goNext } from '../../lib/flow';
 import { useStore } from '../../lib/store';
 import { colors, radius, noOutline } from '../../theme';
@@ -10,7 +11,7 @@ import { colors, radius, noOutline } from '../../theme';
 const OPTIONS = [
   { id: 'new-diet', emoji: '📝', label: "I'm starting a new, specific diet" },
   { id: 'following', emoji: '🕰️', label: "I've been following my diet for a while" },
-  { id: 'medical', emoji: '🩺', label: 'I have a medical condition; help me choose the right diet' },
+  { id: 'medical', emoji: '🩺', label: 'I follow a diet for a medical condition' },
   { id: 'healthier', emoji: '🌱', label: 'I want to eat healthier' },
 ];
 
@@ -64,7 +65,22 @@ export default function Mindset() {
 function ClinicianSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
-  const valid = /^\S+@\S+\.\S+$/.test(email);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const valid = /^\S+@\S+\.\S+$/.test(email.trim());
+  const submit = async () => {
+    if (!valid || sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      await api.feedback('Clinician access', `Clinician access request from ${email.trim()}`);
+      setSent(true);
+    } catch {
+      setError('Couldn’t send that. Check your connection and try again.');
+    } finally {
+      setSending(false);
+    }
+  };
   return (
     <BottomSheet visible={visible} onClose={onClose} handle>
       <View style={styles.sheet}>
@@ -88,7 +104,8 @@ function ClinicianSheet({ visible, onClose }: { visible: boolean; onClose: () =>
               autoComplete="email"
               style={[styles.input, noOutline]}
             />
-            <Button title="Request access" disabled={!valid} onPress={() => setSent(true)} />
+            {error ? <Text style={[styles.body, { color: colors.danger }]}>{error}</Text> : null}
+            <Button title="Request access" disabled={!valid} loading={sending} onPress={submit} />
           </>
         )}
       </View>

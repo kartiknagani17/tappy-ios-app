@@ -36,7 +36,7 @@ const { width: W } = Dimensions.get('window');
 // Only add them back with real, verifiable data.)
 const SLIDES = [
   { emoji: '🔎', title: 'Unlimited scans', text: 'Scan any barcode and instantly see if it fits your diet, allergies, and avoidances.' },
-  { emoji: '📸', title: 'Photo scanning', text: 'No barcode handy? Snap the package or the ingredient list and Tappy reads it for you.' },
+  { emoji: '📸', title: 'Ingredient photos', text: 'Product not in our database yet? Photograph the ingredient list and Tappy reads it for you.' },
   {
     emoji: '🥗',
     title: 'Personalized ratings',

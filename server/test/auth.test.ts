@@ -23,6 +23,7 @@ describe('accounts API', () => {
   const db = testDb();
   const config = testConfig({ authRateLimitPerMinute: 1000, appleBundleId: 'company.tappy.app', googleClientIds: ['test-client.apps.googleusercontent.com'] });
   const sent: { to: string; text: string }[] = [];
+  const revoked: string[] = [];
 
   before(async () => {
     const { scan } = makeScan(db, new MockVisionProvider(), config);
@@ -34,6 +35,7 @@ describe('accounts API', () => {
         mailer: async (to, _subject, text) => void sent.push({ to, text }),
         appleKeys: async () => [jwk as never],
         googleKeys: async () => [jwk as never],
+        appleTokens: { exchangeCode: async (code) => `refresh-for-${code}`, revoke: async (t) => void revoked.push(t) },
       }),
     );
     await new Promise<void>((r) => server.listen(0, r));
@@ -137,7 +139,9 @@ describe('accounts API', () => {
       account: { email: string; provider: string };
     };
     assert.equal(linked.account.email, 'link@example.com');
-    assert.equal(linked.account.provider, 'email');
+    // The unverified password is dropped when a verified owner links: it can't be used to get back in.
+    assert.equal(linked.account.provider, 'google');
+    assert.equal((await post('/api/auth/login', { email: 'link@example.com', password: 'a long password' })).status, 401);
 
     // An unverified email is never used to link accounts.
     const unverified = (await (
@@ -150,6 +154,35 @@ describe('accounts API', () => {
     assert.equal((await post('/api/auth/google', { id_token: appleToken({ ...claims, iss: 'https://evil.example.com' }), nonce: 'g1' })).status, 401);
     assert.equal((await post('/api/auth/google', { id_token: appleToken({ ...claims, exp: now - 3600 }), nonce: 'g1' })).status, 401);
     assert.equal((await post('/api/auth/google', { id_token: 'not.a.token', nonce: 'g1' })).status, 401);
+  });
+
+  it('blocks pre-registering a password on an email someone else owns', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const aud = 'test-client.apps.googleusercontent.com';
+    // Attacker signs up first with the victim's (unverified) email and keeps a session open.
+    const attacker = (await (await post('/api/auth/signup', { email: 'victim@example.com', password: 'attacker password' })).json()) as { token: string };
+    // The real owner signs in with Google (verified email): the attacker's password and session stop working.
+    const owner = await post('/api/auth/google', {
+      id_token: appleToken({ iss: 'https://accounts.google.com', aud, exp: now + 600, sub: 'g-victim', email: 'victim@example.com', email_verified: true, nonce: 'v' }),
+      nonce: 'v',
+    });
+    assert.equal(owner.status, 200);
+    assert.equal((await me(attacker.token)).status, 401);
+    assert.equal((await post('/api/auth/login', { email: 'victim@example.com', password: 'attacker password' })).status, 401);
+    // Signing up with the email of an Apple/Google account doesn't attach a password to it.
+    const grab = await post('/api/auth/signup', { email: 'victim@example.com', password: 'another attacker pw' });
+    assert.equal(grab.status, 409);
+    assert.equal((await post('/api/auth/login', { email: 'victim@example.com', password: 'another attacker pw' })).status, 401);
+  });
+
+  it('revokes the Sign in with Apple token when the account is deleted', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const claims = { iss: 'https://appleid.apple.com', aud: 'company.tappy.app', exp: now + 600, sub: 'apple-revoke', nonce: nonceHash('r1') };
+    const res = await post('/api/auth/apple', { identity_token: appleToken(claims), nonce: 'r1', authorization_code: 'code-1' });
+    assert.equal(res.status, 200);
+    const { token } = (await res.json()) as { token: string };
+    assert.equal((await post('/api/account/delete', {}, token)).status, 200);
+    assert.deepEqual(revoked, ['refresh-for-code-1']);
   });
 
   it('deletes the account and everything tied to it', async () => {
