@@ -7,11 +7,11 @@ import { LEGAL_CONTACT } from '../../server/src/legal/content';
 import { ApiError } from '../lib/api';
 import { AUTH_ENABLED, deleteAccount as deleteServerAccount, signOut } from '../lib/auth';
 import { haptic } from '../lib/haptics';
+import { openLegal } from '../lib/legal';
 import { useStore } from '../lib/store';
 import { PurchasesUnavailableError, redeemCode, restorePurchases } from '../lib/subscription';
 import { colors, radius } from '../theme';
 import { BottomSheet } from './BottomSheet';
-import { LegalSheet, type LegalDocId } from './LegalSheet';
 
 const SUPPORT_EMAIL = LEGAL_CONTACT;
 const MANAGE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
@@ -69,7 +69,6 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
   const contributePhotos = useStore((s) => s.contributePhotos);
   const trialActive = useStore((s) => s.trialActive);
   const [restoring, setRestoring] = useState(false);
-  const [legal, setLegal] = useState<LegalDocId | null>(null);
   const [faq, setFaq] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -151,7 +150,7 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
             {account ? (
               <>
                 <Text style={styles.accountMain} numberOfLines={1}>
-                  {account.email || 'Apple ID (email hidden)'}
+                  {account.email || account.name || `${PROVIDER_LABEL[account.provider]} account`}
                 </Text>
                 <Text style={styles.accountSub}>Signed in with {PROVIDER_LABEL[account.provider]}</Text>
               </>
@@ -207,8 +206,8 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
         ) : null}
         <Row icon="help-circle" label="FAQs" onPress={() => setFaq(true)} testID="faqs" />
         <Row icon="mail" label="Contact support" onPress={contactSupport} testID="contact" external />
-        <Row icon="shield" label="Privacy Policy" onPress={() => setLegal('privacy')} testID="privacy" />
-        <Row icon="file-text" label="Terms of Use" onPress={() => setLegal('terms')} testID="terms" />
+        <Row icon="shield" label="Privacy Policy" onPress={() => openLegal('privacy')} testID="privacy" />
+        <Row icon="file-text" label="Terms of Use" onPress={() => openLegal('terms')} testID="terms" />
         <Row
           icon="info"
           label="Data sources & credits"
@@ -247,7 +246,6 @@ export function SettingsSheet({ visible, onClose }: { visible: boolean; onClose:
           }
         />
       </ScrollView>
-      <LegalSheet doc={legal} onClose={() => setLegal(null)} />
 
       <BottomSheet visible={faq} onClose={() => setFaq(false)} handle maxHeight={0.85}>
         <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}>

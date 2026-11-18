@@ -1,7 +1,7 @@
 /**
- * Terms of Use and Privacy Policy. Single source: the app shows these in an in-app popup
- * (src/components/LegalSheet.tsx) and the server publishes them at /terms and /privacy for the
- * App Store Connect "Privacy Policy URL" field.
+ * Terms of Use and Privacy Policy. Single source: the server publishes them at /terms and /privacy
+ * (also the App Store Connect "Privacy Policy URL"), and the app opens those pages in an in-app
+ * browser (src/lib/legal.ts).
  *
  * Plain data only (no Node or React Native imports), so both the app and the server can import it.
  * Disputes: laws of India, courts and arbitration seat at Bhopal, Madhya Pradesh.

@@ -1,8 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LegalSheet, type LegalDocId } from '../../components/LegalSheet';
+import { openLegal } from '../../lib/legal';
 import { Button, Checkbox, Footer, Screen } from '../../components/ui';
 import { haptic } from '../../lib/haptics';
 import { useStore } from '../../lib/store';
@@ -11,7 +10,10 @@ import { colors, radius } from '../../theme';
 export default function Safety() {
   const agreed = useStore((s) => s.agreedToTerms);
   const set = useStore((s) => s.set);
-  const [legal, setLegal] = useState<LegalDocId | null>(null);
+  const toggle = () => {
+    haptic.select();
+    set({ agreedToTerms: !agreed });
+  };
 
   return (
     <Screen>
@@ -27,30 +29,31 @@ export default function Safety() {
         </Text>
       </View>
       <Footer>
-        <Pressable
-          testID="agree"
-          accessibilityRole="checkbox"
-          accessibilityLabel="I agree to Tappy's Terms of Use and Privacy Policy. I understand Tappy can be wrong and isn't medical advice, and I'll always check the package myself."
-          accessibilityState={{ checked: agreed }}
-          onPress={() => {
-            haptic.select();
-            set({ agreedToTerms: !agreed });
-          }}
-          style={[styles.agree, agreed && styles.agreeOn]}
-        >
-          <Checkbox checked={agreed} size={24} />
-          <Text style={styles.agreeText}>
+        {/* The checkbox and the sentence toggle the agreement; the two links inside the sentence are their
+            own press targets (nested Text), so tapping them opens the document instead of ticking the box. */}
+        <View style={[styles.agree, agreed && styles.agreeOn]}>
+          <Pressable
+            testID="agree"
+            accessibilityRole="checkbox"
+            accessibilityLabel="I agree to Tappy's Terms of Use and Privacy Policy. I understand Tappy can be wrong and isn't medical advice, and I'll always check the package myself."
+            accessibilityState={{ checked: agreed }}
+            hitSlop={8}
+            onPress={toggle}
+          >
+            <Checkbox checked={agreed} size={24} />
+          </Pressable>
+          <Text style={styles.agreeText} onPress={toggle} suppressHighlighting>
             I agree to Tappy's{' '}
-            <Text accessibilityRole="link" style={styles.link} onPress={() => setLegal('terms')}>
+            <Text testID="terms-link" accessibilityRole="link" style={styles.link} onPress={() => openLegal('terms')}>
               Terms of Use
             </Text>{' '}
             and{' '}
-            <Text accessibilityRole="link" style={styles.link} onPress={() => setLegal('privacy')}>
+            <Text testID="privacy-link" accessibilityRole="link" style={styles.link} onPress={() => openLegal('privacy')}>
               Privacy Policy
             </Text>
             . I understand Tappy can be wrong and isn’t medical advice, and I’ll always check the package myself.
           </Text>
-        </Pressable>
+        </View>
         <Button
           testID="continue"
           title={agreed ? 'Continue' : 'Check the box above to continue'}
@@ -61,7 +64,6 @@ export default function Safety() {
           }}
         />
       </Footer>
-      <LegalSheet doc={legal} onClose={() => setLegal(null)} />
     </Screen>
   );
 }
