@@ -21,10 +21,11 @@ export default function Splash() {
   }, [hydrated]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.lime, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ flex: 1, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' }}>
       <StatusBar style="dark" />
-      <Animated.View entering={FadeIn.duration(500)}>
-        <Logo size={96} />
+      <Animated.View entering={FadeIn.duration(500)} style={{ alignItems: 'stretch' }}>
+        <Logo size={96} color={colors.brand} />
+        <View style={{ height: 8, borderRadius: 4, backgroundColor: colors.ink, marginTop: 14 }} />
       </Animated.View>
     </View>
   );

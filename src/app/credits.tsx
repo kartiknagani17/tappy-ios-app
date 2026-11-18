@@ -70,6 +70,6 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 16, gap: 8 },
   title: { fontSize: 18, fontWeight: '600', color: colors.ink },
   text: { fontSize: 14, lineHeight: 21, color: colors.text },
-  link: { color: '#2346C8', textDecorationLine: 'underline' },
+  link: { color: colors.link, textDecorationLine: 'underline' },
   disclaimer: { fontSize: 13, lineHeight: 19, color: colors.textMuted, marginTop: 6 },
 });

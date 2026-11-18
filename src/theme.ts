@@ -2,28 +2,40 @@ import { Platform, type TextStyle } from 'react-native';
 
 // Single source of truth for Tappy's look. Change brand colors here.
 export const colors = {
-  lime: '#E3FC6D',
-  limePressed: '#D4EE55',
-  purple: '#583AC5',
-  purpleDark: '#4527B0',
-  purpleSoft: '#ECE8FA',
-  purpleTint: '#C0B4E9',
-  ink: '#171717',
-  text: '#1F1F1F',
-  textMuted: '#6B6B6B',
-  textSubtle: '#8E8E93',
-  border: '#D9D9DE',
-  borderLight: '#ECECEF',
+  // Sunset Coral. primary = buttons and badges (white text on top).
+  // accent = secondary actions, toggles, links, saved state (white text on top).
+  primary: '#E04D2A',
+  primaryPressed: '#C73E1C',
+  onPrimary: '#FFFFFF',
+  // The lighter coral of the app icon and splash (logo only, not for buttons).
+  brand: '#FF7A59',
+  accent: '#B4274F',
+  accentDark: '#931F40',
+  accentSoft: '#FFEBE4',
+  accentTint: '#F6B9A8',
+  ink: '#1F1513',
+  text: '#2A1F1C',
+  textMuted: '#7A6A66',
+  textSubtle: '#9A8C88',
+  border: '#EBDFDB',
+  borderLight: '#F3EBE8',
   surface: '#FFFFFF',
-  surfaceMuted: '#F4F4F6',
-  disabledBg: '#EFEFF2',
-  disabledText: '#8A8A90',
+  surfaceMuted: '#F7F2F0',
+  disabledBg: '#F3EEEC',
+  disabledText: '#9A8C88',
   danger: '#D0161E',
   green: '#22C55E',
   greenDark: '#0F9F45',
   yellow: '#FFCB05',
   red: '#FF5A2A',
-  backdrop: 'rgba(0,0,0,0.45)',
+  backdrop: 'rgba(31,21,19,0.45)',
+  // Splash and icon background (cream), also used behind the logo.
+  cream: '#FFF6F1',
+  // Neutral UI greys, warmed to match the palette.
+  inactive: '#9A8C88',
+  hairline: '#F3EBE8',
+  fill: '#F7F2F0',
+  link: '#B4274F',
 };
 
 /** Removes the browser focus ring on TextInputs when previewing on web. */

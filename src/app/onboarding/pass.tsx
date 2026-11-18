@@ -14,7 +14,7 @@ export default function Pass() {
         </Animated.View>
         <Animated.Text entering={FadeInDown.delay(150).duration(450)} style={styles.title}>
           Unlimited Pass{'\n'}
-          {TRIAL_DAYS} days <Text style={{ color: colors.purpleDark }}>free</Text>
+          {TRIAL_DAYS} days <Text style={{ color: colors.accentDark }}>free</Text>
         </Animated.Text>
       </View>
       <Footer border={false}>
@@ -31,7 +31,7 @@ export default function Pass() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  pill: { backgroundColor: '#EAECF0', borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10 },
-  pillText: { fontSize: 17, fontWeight: '600', color: '#4F5370', letterSpacing: 0.3 },
-  title: { fontSize: 38, lineHeight: 48, fontWeight: '800', textAlign: 'center', marginTop: 24, color: '#000', letterSpacing: -0.8 },
+  pill: { backgroundColor: '#F3EEEC', borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10 },
+  pillText: { fontSize: 17, fontWeight: '600', color: '#5A4A46', letterSpacing: 0.3 },
+  title: { fontSize: 38, lineHeight: 48, fontWeight: '800', textAlign: 'center', marginTop: 24, color: '#1F1513', letterSpacing: -0.8 },
 });

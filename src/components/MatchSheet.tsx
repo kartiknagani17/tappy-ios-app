@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: 10,
   },
-  cardOn: { borderColor: colors.purple, borderWidth: 2, padding: 9 },
+  cardOn: { borderColor: colors.accent, borderWidth: 2, padding: 9 },
   thumb: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: '#fff' },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceMuted },
   name: { fontSize: 16, fontWeight: '600', color: colors.ink },

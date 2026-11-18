@@ -44,7 +44,7 @@ export default function Profile() {
         </Text>
       </View>
       <Tabs tab={tab} onChange={switchTab} />
-      <View style={{ flex: 1, backgroundColor: tab === 'lookup' ? '#FAFAFB' : '#fff' }}>
+      <View style={{ flex: 1, backgroundColor: tab === 'lookup' ? '#FBF8F6' : '#fff' }}>
         {tab === 'profile' ? <ProfileTab editing={editing} onReview={() => switchTab('lookup')} /> : <LookupTab />}
       </View>
       <Footer>
@@ -178,7 +178,7 @@ function ProfileTab({ onReview, editing }: { onReview: () => void; editing: bool
           style={styles.banner}
         >
           <Text style={styles.bannerText}>Review individual ingredient ratings</Text>
-          <Feather name="arrow-right" size={22} color={colors.purple} />
+          <Feather name="arrow-right" size={22} color={colors.accent} />
         </Pressable>
 
         {selected.length === 0 ? (
@@ -247,7 +247,7 @@ function ProfileTab({ onReview, editing }: { onReview: () => void; editing: bool
           style={styles.addBtn}
           onPress={() => router.push({ pathname: '/onboarding/restrictions', params: { edit: '1' } })}
         >
-          <Feather name="plus" size={18} color={colors.purple} />
+          <Feather name="plus" size={18} color={colors.accent} />
           <Text style={styles.addText}>{selected.length ? 'Add or edit restrictions' : 'Add restrictions'}</Text>
         </Pressable>
       </ScrollView>
@@ -354,8 +354,8 @@ function LookupTab() {
           style={[styles.filterBtn, filter !== 'all' && styles.filterBtnActive]}
           onPress={() => setFilterOpen(true)}
         >
-          <Text style={[styles.filterText, filter !== 'all' && { color: colors.purple }]}>{FILTER_LABEL[filter]}</Text>
-          <Feather name="chevron-down" size={16} color={filter !== 'all' ? colors.purple : colors.ink} />
+          <Text style={[styles.filterText, filter !== 'all' && { color: colors.accent }]}>{FILTER_LABEL[filter]}</Text>
+          <Feather name="chevron-down" size={16} color={filter !== 'all' ? colors.accent : colors.ink} />
         </Pressable>
       </View>
       <View style={styles.countRow}>
@@ -405,7 +405,7 @@ function LookupTab() {
               <Text style={styles.ingName}>{item.name}</Text>
               {overrides[item.id] ? <Text style={styles.ingChanged}>Changed by you</Text> : null}
             </Pressable>
-            <InfoButton color="#666" size={24} onPress={() => setDetailId(item.id)} />
+            <InfoButton color="#6F625E" size={24} onPress={() => setDetailId(item.id)} />
           </View>
         )}
       />
@@ -434,7 +434,7 @@ function LookupTab() {
               <Text style={styles.filterRowText}>
                 {f === 'all' ? 'All ingredients' : f === 'manual' ? 'Changed by me' : ratingLabel[f]}
               </Text>
-              {filter === f ? <Feather name="check" size={20} color={colors.purple} /> : null}
+              {filter === f ? <Feather name="check" size={20} color={colors.accent} /> : null}
             </Pressable>
           ))}
         </View>
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.ink },
   indicator: { height: 3, backgroundColor: colors.ink, borderRadius: 2 },
   banner: {
-    backgroundColor: colors.purpleSoft,
+    backgroundColor: colors.accentSoft,
     borderRadius: radius.lg,
     paddingHorizontal: 18,
     paddingVertical: 18,
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  bannerText: { color: colors.purple, fontSize: 16, fontWeight: '600', flex: 1 },
+  bannerText: { color: colors.accent, fontSize: 16, fontWeight: '600', flex: 1 },
   groupTitle: { fontSize: 22, fontWeight: '600', color: colors.ink },
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: '#fff' },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingRight: 18 },
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
   subList: { paddingHorizontal: 18, paddingBottom: 14, gap: 6, marginTop: -4 },
   subItem: { fontSize: 14, color: colors.textMuted },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center', marginTop: 24, paddingVertical: 12 },
-  addText: { color: colors.purple, fontSize: 16, fontWeight: '600' },
+  addText: { color: colors.accent, fontSize: 16, fontWeight: '600' },
   emptyProfile: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 16 },
   emptyTitle: { fontSize: 17, fontWeight: '600', color: colors.ink },
   emptyBody: { fontSize: 15, color: colors.textMuted, textAlign: 'center', marginTop: 6, lineHeight: 21 },
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: '#F8F8F9',
+    backgroundColor: '#FBF8F6',
     borderRadius: radius.xl,
     paddingVertical: 24,
   },
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
-  filterBtnActive: { borderColor: colors.purple, backgroundColor: colors.purpleSoft },
+  filterBtnActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   filterText: { fontSize: 15, color: colors.ink, fontWeight: '500' },
   countRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
   count: { fontSize: 15, color: colors.textMuted },
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     minHeight: 62,
   },
   ingName: { fontSize: 16, color: colors.ink },
-  ingChanged: { fontSize: 12, color: colors.purple, marginTop: 2 },
+  ingChanged: { fontSize: 12, color: colors.accent, marginTop: 2 },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 54 },
   filterRowText: { flex: 1, fontSize: 17, color: colors.ink },
   segment: { flexDirection: 'row', gap: 10, marginTop: 12 },
@@ -592,6 +592,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  segBtnActive: { borderColor: colors.purple, borderWidth: 2, backgroundColor: colors.purpleSoft },
+  segBtnActive: { borderColor: colors.accent, borderWidth: 2, backgroundColor: colors.accentSoft },
   segText: { fontSize: 14, fontWeight: '500', color: colors.ink },
 });

@@ -202,7 +202,7 @@ function PickStep({
                 {r.kind === 'radio' ? <Radio checked={items.includes(it.id)} /> : <Checkbox checked={items.includes(it.id)} />}
                 <Text style={styles.itemLabel}>{it.label}</Text>
               </Pressable>
-              <InfoButton size={24} color="#555" onPress={() => setOpenInfo(openInfo === it.id ? null : it.id)} />
+              <InfoButton size={24} color="#5E514D" onPress={() => setOpenInfo(openInfo === it.id ? null : it.id)} />
             </View>
             {openInfo === it.id ? <Text style={[styles.help, { marginLeft: 38, marginBottom: 12, marginTop: -4 }]}>{it.info}</Text> : null}
           </View>
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   help: { fontSize: 14, lineHeight: 20, color: colors.textMuted, marginTop: 8 },
   levelBox: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, overflow: 'hidden' },
   levelRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, backgroundColor: '#fff' },
-  levelRowActive: { backgroundColor: '#FAFAFC' },
+  levelRowActive: { backgroundColor: '#FBF8F6' },
   levelDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   levelTitle: { fontSize: 17, fontWeight: '600', color: colors.ink, marginBottom: 2 },
   levelBody: { fontSize: 15, lineHeight: 22, color: colors.text },

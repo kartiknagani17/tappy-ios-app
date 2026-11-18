@@ -28,7 +28,7 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.ink,
-        tabBarInactiveTintColor: '#8A8A8F',
+        tabBarInactiveTintColor: colors.inactive,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
         tabBarStyle: { borderTopColor: colors.border, backgroundColor: '#fff' },
       }}
@@ -54,10 +54,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -6,
     right: -26,
-    backgroundColor: colors.lime,
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 1,
   },
-  badgeText: { fontSize: 10, fontWeight: '600', color: colors.ink },
+  badgeText: { fontSize: 10, fontWeight: '600', color: colors.onPrimary },
 });

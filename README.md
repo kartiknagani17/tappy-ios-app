@@ -52,7 +52,7 @@ These still need a new build: new native libraries, `app.json` plugins or permis
 
 | # | Screen | File |
 |---|--------|------|
-| 1 | Splash (lime) | `src/app/index.tsx` |
+| 1 | Splash (cream) | `src/app/index.tsx` |
 | 2 | Welcome, notification prompt | `src/app/welcome.tsx` |
 | 3 | How do you think about food? (+ clinician sheet) | `onboarding/mindset.tsx` |
 | 4 | How did you hear about Tappy? | `onboarding/hear.tsx` |

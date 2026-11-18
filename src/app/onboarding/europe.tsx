@@ -62,8 +62,8 @@ export default function Europe() {
 const styles = StyleSheet.create({
   panel: { backgroundColor: colors.surfaceMuted, borderRadius: 18, padding: 20, height: 380, overflow: 'hidden' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  chip: { backgroundColor: '#E9E9EC', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  chipText: { fontSize: 14, color: '#444' },
+  chip: { backgroundColor: '#F3EEEC', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  chipText: { fontSize: 14, color: '#4A3C38' },
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 200 },
   badges: { position: 'absolute', bottom: 18, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center' },
   badge: {
@@ -79,9 +79,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
     borderWidth: 4,
-    borderColor: '#F0F0F2',
+    borderColor: colors.hairline,
   },
   badgeRed: { backgroundColor: '#FDECEC', borderColor: '#F7DADA' },
   flag: { fontSize: 50 },
-  badgeLabel: { fontSize: 18, fontWeight: '600', color: '#666', marginTop: 4 },
+  badgeLabel: { fontSize: 18, fontWeight: '600', color: '#6F625E', marginTop: 4 },
 });

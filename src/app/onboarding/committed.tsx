@@ -5,6 +5,7 @@ import { QuestionLayout } from '../../components/QuestionLayout';
 import { Button } from '../../components/ui';
 import { goNext } from '../../lib/flow';
 import { useStore } from '../../lib/store';
+import { colors } from '../../theme';
 
 export default function Committed() {
   const duration = useStore((s) => s.duration) ?? 7;
@@ -44,7 +45,7 @@ export default function Committed() {
 }
 
 const styles = StyleSheet.create({
-  panel: { backgroundColor: '#ECECEE', borderRadius: 18, height: 330, overflow: 'hidden' },
+  panel: { backgroundColor: '#F3EEEC', borderRadius: 18, height: 330, overflow: 'hidden' },
   card: {
     position: 'absolute',
     width: 190,
@@ -61,5 +62,5 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   plate: { backgroundColor: '#3A91B5' },
-  cardLabel: { fontWeight: '800', color: '#3B2263', marginTop: 4, fontSize: 15 },
+  cardLabel: { fontWeight: '800', color: colors.ink, marginTop: 4, fontSize: 15 },
 });

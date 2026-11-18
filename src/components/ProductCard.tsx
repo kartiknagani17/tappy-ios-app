@@ -68,7 +68,7 @@ export const ProductCard = memo(function ProductCard({
             useStore.getState().toggleSaved(product);
           }}
         >
-          <Feather name="bookmark" size={18} color={saved ? colors.purple : '#555'} />
+          <Feather name="bookmark" size={18} color={saved ? colors.accent : '#5E514D'} />
         </Pressable>
       </View>
     </View>

@@ -155,7 +155,7 @@ export function ProductTile({
           <RatingIcon rating={rating} size={compact ? 18 : 24} />
         </View>
         <View style={pk.tileSave}>
-          <Feather name="bookmark" size={compact ? 11 : 16} color={saved ? colors.purple : '#555'} />
+          <Feather name="bookmark" size={compact ? 11 : 16} color={saved ? colors.accent : '#5E514D'} />
         </View>
       </View>
       <Text style={[pk.tileName, compact && { fontSize: 9, lineHeight: 12 }]} numberOfLines={2}>
@@ -180,7 +180,7 @@ export function PhoneMockup({ style }: { style?: ViewStyle }) {
         </View>
         <View style={pk.phoneSearchRow}>
           <View style={pk.phoneSearch}>
-            <Feather name="search" size={10} color="#666" />
+            <Feather name="search" size={10} color="#6F625E" />
             <Text style={pk.phoneSearchText}>Search for a product</Text>
           </View>
           <Feather name="bell" size={13} />
@@ -236,7 +236,7 @@ export function CircularProgress({ value, size = 130, stroke = 7 }: { value: num
         cx={size / 2}
         cy={size / 2}
         r={r}
-        stroke={colors.purple}
+        stroke={colors.accent}
         strokeWidth={stroke}
         fill="none"
         strokeLinecap="round"
@@ -250,7 +250,7 @@ export function CircularProgress({ value, size = 130, stroke = 7 }: { value: num
 
 // ---------- Confetti ----------
 const { width: W, height: H } = Dimensions.get('window');
-const CONFETTI_COLORS = [colors.lime, colors.purple, '#7B5CF0', colors.green, '#DDB0E6'];
+const CONFETTI_COLORS = [colors.primary, colors.accent, '#FFB199', colors.green, colors.yellow];
 
 // Deterministic pseudo-random spec per piece (keeps render pure and stable).
 function pieceSpec(i: number) {
@@ -327,7 +327,7 @@ const pk = StyleSheet.create({
   tile: {
     height: 150,
     borderRadius: 10,
-    backgroundColor: '#F3F3F5',
+    backgroundColor: colors.fill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -338,7 +338,7 @@ const pk = StyleSheet.create({
     width: 290,
     height: 470,
     borderRadius: 42,
-    backgroundColor: '#111',
+    backgroundColor: '#1F1513',
     padding: 9,
     alignSelf: 'center',
     overflow: 'hidden',
@@ -365,7 +365,7 @@ const pk = StyleSheet.create({
     height: 28,
     paddingHorizontal: 8,
   },
-  phoneSearchText: { fontSize: 9, color: '#666' },
+  phoneSearchText: { fontSize: 9, color: '#6F625E' },
   phoneFilters: { flexDirection: 'row', gap: 5, marginTop: 8, overflow: 'hidden' },
   phoneFilter: {
     flexDirection: 'row',

@@ -118,7 +118,7 @@ export function VerdictSheet({
                 }}
                 style={styles.iconBtn}
               >
-                <Feather name="bookmark" size={22} color={saved ? colors.purple : colors.ink} />
+                <Feather name="bookmark" size={22} color={saved ? colors.accent : colors.ink} />
               </Pressable>
             ) : null}
             <Pressable
@@ -179,7 +179,7 @@ export function VerdictSheet({
                   <Switch
                     value={watched}
                     accessibilityLabel="Get notified of ingredient changes"
-                    trackColor={{ true: colors.purple, false: colors.border }}
+                    trackColor={{ true: colors.accent, false: colors.border }}
                     onValueChange={(on) => {
                       haptic.select();
                       void setWatching(product, on);
@@ -204,7 +204,7 @@ export function VerdictSheet({
                       }}
                       style={[styles.thumb, tried === v && styles.thumbOn]}
                     >
-                      <Feather name={v === 'up' ? 'thumbs-up' : 'thumbs-down'} size={22} color={colors.ink} />
+                      <Feather name={v === 'up' ? 'thumbs-up' : 'thumbs-down'} size={22} color={tried === v ? colors.onPrimary : colors.ink} />
                     </Pressable>
                   ))}
                 </View>
@@ -631,7 +631,7 @@ function ReportSheet({ productId, onClose }: { productId: number | null; onClose
                 }}
               >
                 <Text style={styles.reasonText}>{r}</Text>
-                {reason === r ? <Feather name="check" size={18} color={colors.purple} /> : null}
+                {reason === r ? <Feather name="check" size={18} color={colors.accent} /> : null}
               </Pressable>
             ))}
             <TextInput
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbOn: { backgroundColor: colors.lime },
+  thumbOn: { backgroundColor: colors.primary },
   h2: { fontSize: 24, fontWeight: '600', color: colors.ink, letterSpacing: -0.3 },
   h3: { fontSize: 19, fontWeight: '600', color: colors.ink },
   overviewEmpty: { fontSize: 15, lineHeight: 22, color: colors.textMuted, marginTop: 8 },
@@ -768,7 +768,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: 14,
   },
-  reasonOn: { borderColor: colors.purple, backgroundColor: colors.purpleSoft },
+  reasonOn: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   reasonText: { fontSize: 15, color: colors.ink },
   input: {
     borderWidth: 1,

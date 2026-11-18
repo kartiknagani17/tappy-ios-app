@@ -57,7 +57,7 @@ export default function Finishing() {
           p >= s.at ? (
             <Animated.View key={i} entering={FadeInDown.duration(300)} style={styles.step}>
               <View style={{ width: 28 }}>
-                {p >= doneAt[i] ? <Feather name="check" size={22} color={colors.purple} /> : <ActivityIndicator color={colors.purple} />}
+                {p >= doneAt[i] ? <Feather name="check" size={22} color={colors.accent} /> : <ActivityIndicator color={colors.accent} />}
               </View>
               <Text style={styles.stepText}>{s.label}</Text>
             </Animated.View>

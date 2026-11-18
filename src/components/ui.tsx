@@ -53,7 +53,7 @@ export function Tappable({
 }
 
 // ---------- Buttons ----------
-type ButtonVariant = 'primary' | 'outline' | 'purple' | 'ghost';
+type ButtonVariant = 'primary' | 'outline' | 'accent' | 'ghost';
 export function Button({
   title,
   onPress,
@@ -76,8 +76,8 @@ export function Button({
   testID?: string;
 }) {
   const isDisabled = disabled || loading;
-  const bg = isDisabled ? colors.disabledBg : variant === 'primary' ? colors.lime : variant === 'purple' ? colors.purple : 'transparent';
-  const fg = isDisabled ? colors.disabledText : variant === 'purple' ? '#fff' : colors.ink;
+  const bg = isDisabled ? colors.disabledBg : variant === 'primary' ? colors.primary : variant === 'accent' ? colors.accent : 'transparent';
+  const fg = isDisabled ? colors.disabledText : variant === 'accent' || variant === 'primary' ? colors.onPrimary : colors.ink;
   return (
     <Tappable
       testID={testID}
@@ -96,7 +96,7 @@ export function Button({
       }
     >
       {loading ? (
-        <ActivityIndicator color={colors.ink} />
+        <ActivityIndicator color={variant === 'primary' || variant === 'accent' ? colors.onPrimary : colors.ink} />
       ) : (
         <View style={styles.row}>
           {icon}
@@ -242,7 +242,7 @@ export function OptionCard({
 export function Checkbox({ checked, size = 22 }: { checked: boolean; size?: number }) {
   return (
     <View
-      style={[styles.checkbox, { width: size, height: size }, checked && { backgroundColor: colors.purple, borderColor: colors.purple }]}
+      style={[styles.checkbox, { width: size, height: size }, checked && { backgroundColor: colors.accent, borderColor: colors.accent }]}
     >
       {checked ? <Feather name="check" size={size * 0.72} color="#fff" /> : null}
     </View>
@@ -250,7 +250,7 @@ export function Checkbox({ checked, size = 22 }: { checked: boolean; size?: numb
 }
 
 export function Radio({ checked }: { checked: boolean }) {
-  return <View style={[styles.radio, checked && { borderColor: colors.purple }]}>{checked ? <View style={styles.radioDot} /> : null}</View>;
+  return <View style={[styles.radio, checked && { borderColor: colors.accent }]}>{checked ? <View style={styles.radioDot} /> : null}</View>;
 }
 
 export function InfoButton({ onPress, size = 22, color = colors.ink }: { onPress?: () => void; size?: number; color?: string }) {
@@ -289,8 +289,8 @@ export function Chip({
       }}
       style={[styles.chip, selected && styles.chipSelected, dimmed && styles.chipDimmed].filter(Boolean) as ViewStyle[]}
     >
-      <Text style={[styles.chipText, dimmed && { color: '#A9A9AE' }]}>{label}</Text>
-      {chevron ? <Feather name="chevron-down" size={16} color={dimmed ? '#A9A9AE' : colors.ink} style={{ marginLeft: 6 }} /> : null}
+      <Text style={[styles.chipText, dimmed && { color: '#B3A6A2' }]}>{label}</Text>
+      {chevron ? <Feather name="chevron-down" size={16} color={dimmed ? '#B3A6A2' : colors.ink} style={{ marginLeft: 6 }} /> : null}
     </Tappable>
   );
 }
@@ -360,7 +360,7 @@ export const styles = StyleSheet.create({
   footerBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, height: 52 },
   progressTrack: { flex: 1, height: 9, borderRadius: 9, backgroundColor: colors.surfaceMuted, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 9, backgroundColor: colors.purple },
+  progressFill: { height: '100%', borderRadius: 9, backgroundColor: colors.accent },
   option: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -369,14 +369,14 @@ export const styles = StyleSheet.create({
     paddingVertical: 16,
     backgroundColor: '#fff',
   },
-  optionSelected: { borderColor: colors.purple, borderWidth: 2, paddingHorizontal: 17, paddingVertical: 15 },
+  optionSelected: { borderColor: colors.accent, borderWidth: 2, paddingHorizontal: 17, paddingVertical: 15 },
   optionEmoji: { fontSize: 17, marginRight: 10, lineHeight: 23 },
   optionLabel: { fontSize: 16, lineHeight: 23, color: colors.text },
   optionSub: { fontSize: 14, color: colors.textMuted, marginTop: 2 },
   checkbox: {
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: '#C7C7CC',
+    borderColor: '#D8CCC7',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
@@ -386,12 +386,12 @@ export const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 1.5,
-    borderColor: '#C7C7CC',
+    borderColor: '#D8CCC7',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
   },
-  radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.purple },
+  radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.accent },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

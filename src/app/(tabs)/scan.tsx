@@ -377,7 +377,7 @@ export default function Scan() {
                   style={[styles.segBtn, mode === m && styles.segBtnOn]}
                 >
                   <Feather name={m === 'barcode' ? 'maximize' : 'camera'} size={15} color={mode === m ? colors.ink : '#fff'} />
-                  <Text style={[styles.segText, mode === m && { color: colors.ink }]}>{m === 'barcode' ? 'Barcode' : 'Photo'}</Text>
+                  <Text style={[styles.segText, mode === m && { color: colors.onPrimary }]}>{m === 'barcode' ? 'Barcode' : 'Photo'}</Text>
                 </Pressable>
               ))}
             </View>
@@ -497,8 +497,8 @@ export default function Scan() {
             <Button
               testID="push-yes"
               title="Yes, I'm in!"
-              variant="purple"
-              style={{ borderRadius: 6, marginTop: 24, backgroundColor: '#7452F5' }}
+              variant="accent"
+              style={{ borderRadius: 6, marginTop: 24 }}
               textStyle={{ fontWeight: '500', fontSize: 22 }}
               onPress={async () => {
                 if (Platform.OS !== 'web') {
@@ -522,22 +522,22 @@ export default function Scan() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
-  noCam: { backgroundColor: '#2A2622' },
+  noCam: { backgroundColor: '#2A1F1C' },
   logo: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   tip: {
     position: 'absolute',
     left: 12,
     right: 12,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: colors.ink,
     borderRadius: 14,
     padding: 18,
   },
   tipHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   tipTitle: { color: '#fff', fontSize: 20, fontWeight: '600' },
-  tipClose: { color: '#999', fontSize: 16 },
+  tipClose: { color: '#B3A6A2', fontSize: 16 },
   tipBody: { color: '#fff', fontSize: 16, lineHeight: 24, marginTop: 10 },
   tipFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
-  tipDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#666' },
+  tipDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#6F625E' },
   tipCta: { color: '#fff', fontWeight: '600', fontSize: 16, letterSpacing: 0.3 },
   tipArrow: {
     position: 'absolute',
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 10,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#1C1C1E',
+    borderTopColor: colors.ink,
   },
   frameWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   frame: {
@@ -566,11 +566,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   framePhoto: { width: 290, height: 360, borderRadius: 24, borderTopLeftRadius: 24, borderBottomRightRadius: 24 },
-  hint: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: 16, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 },
+  hint: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: 16, textShadowColor: 'rgba(31,21,19,0.6)', textShadowRadius: 6 },
   controls: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 16 },
-  segment: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: radius.pill, padding: 4 },
+  segment: { flexDirection: 'row', backgroundColor: 'rgba(31,21,19,0.55)', borderRadius: radius.pill, padding: 4 },
   segBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, height: 38, borderRadius: radius.pill },
-  segBtnOn: { backgroundColor: colors.lime },
+  segBtnOn: { backgroundColor: colors.primary },
   segText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   shutter: { width: 76, height: 76, borderRadius: 38, borderWidth: 5, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   shutterInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff' },
@@ -578,28 +578,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(31,21,19,0.6)',
     borderRadius: radius.pill,
     paddingHorizontal: 16,
     height: 38,
   },
   labelBannerText: { color: '#fff', fontWeight: '600' },
-  busy: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 14 },
+  busy: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(31,21,19,0.55)', alignItems: 'center', justifyContent: 'center', gap: 14 },
   busyText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   promptTitle: { fontSize: 22, fontWeight: '600', color: colors.ink, marginTop: 6 },
   promptBody: { fontSize: 15, lineHeight: 22, color: colors.text, marginBottom: 8 },
   permission: { position: 'absolute', left: 16, right: 16, alignItems: 'center', gap: 12 },
   permText: { color: '#fff', fontSize: 15, textAlign: 'center' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 24 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(31,21,19,0.6)', justifyContent: 'center', paddingHorizontal: 24 },
   modal: { backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 24, paddingTop: 40, paddingBottom: 36 },
   modalClose: { position: 'absolute', right: 14, top: 14 },
-  modalTitle: { fontSize: 25, lineHeight: 33, textAlign: 'center', color: '#111' },
-  modalBody: { fontSize: 18, lineHeight: 27, textAlign: 'center', color: '#111', marginTop: 16 },
+  modalTitle: { fontSize: 25, lineHeight: 33, textAlign: 'center', color: '#1F1513' },
+  modalBody: { fontSize: 18, lineHeight: 27, textAlign: 'center', color: '#1F1513', marginTop: 16 },
   manualBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(31,21,19,0.55)',
     borderRadius: radius.pill,
     paddingHorizontal: 16,
     height: 38,

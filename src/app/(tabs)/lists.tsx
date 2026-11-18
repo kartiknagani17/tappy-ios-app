@@ -135,7 +135,7 @@ export default function Lists() {
             <Text style={styles.bannerTitle}>Save your lists</Text>
             <Text style={styles.bannerBody}>Create a free account so your profile and lists sync across devices.</Text>
           </View>
-          <Feather name="arrow-right" size={22} color={colors.purple} />
+          <Feather name="arrow-right" size={22} color={colors.accent} />
         </Pressable>
       ) : null}
 
@@ -197,7 +197,7 @@ export default function Lists() {
               accessibilityLabel="Share product photos"
               value={contributePhotos}
               onValueChange={(v) => useStore.getState().set({ contributePhotos: v })}
-              trackColor={{ true: colors.purple, false: '#D1D1D6' }}
+              trackColor={{ true: colors.accent, false: '#E0D3CE' }}
             />
           </View>
           <Row icon="rotate-ccw" label={restoring ? 'Restoring…' : 'Restore purchases'} onPress={restore} testID="restore" />
@@ -325,14 +325,14 @@ const styles = StyleSheet.create({
   banner: {
     marginHorizontal: 16,
     marginTop: 8,
-    backgroundColor: colors.purpleSoft,
+    backgroundColor: colors.accentSoft,
     borderRadius: radius.lg,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  bannerTitle: { fontSize: 16, fontWeight: '700', color: colors.purple },
+  bannerTitle: { fontSize: 16, fontWeight: '700', color: colors.accent },
   bannerBody: { fontSize: 14, color: colors.text, marginTop: 2, lineHeight: 20 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: colors.ink, marginTop: 14 },

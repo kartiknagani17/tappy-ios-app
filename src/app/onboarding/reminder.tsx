@@ -65,10 +65,10 @@ export default function Reminder() {
     <Screen>
       <View style={styles.center}>
         <Animated.View style={bell}>
-          <Ionicons name="notifications-outline" size={84} color="#000" />
+          <Ionicons name="notifications-outline" size={84} color="#1F1513" />
         </Animated.View>
         <Animated.Text entering={FadeInDown.duration(400)} style={styles.title}>
-          We'll remind you <Text style={{ color: colors.purpleDark }}>{`${REMINDER_DAYS_BEFORE}\u00A0days`}</Text>
+          We'll remind you <Text style={{ color: colors.accentDark }}>{`${REMINDER_DAYS_BEFORE}\u00A0days`}</Text>
           {'\n'}before your trial ends
         </Animated.Text>
         <Text style={styles.sub}>You'll get a push notification on {formatReminderDate()}</Text>
@@ -82,6 +82,6 @@ export default function Reminder() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  title: { fontSize: 31, lineHeight: 40, fontWeight: '800', textAlign: 'center', marginTop: 36, color: '#000', letterSpacing: -0.6 },
-  sub: { fontSize: 15, fontWeight: '500', color: '#111', marginTop: 16, textAlign: 'center' },
+  title: { fontSize: 31, lineHeight: 40, fontWeight: '800', textAlign: 'center', marginTop: 36, color: '#1F1513', letterSpacing: -0.6 },
+  sub: { fontSize: 15, fontWeight: '500', color: '#1F1513', marginTop: 16, textAlign: 'center' },
 });

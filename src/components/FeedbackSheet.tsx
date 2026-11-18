@@ -70,7 +70,7 @@ function FeedbackBody({ onClose, header, title, body, placeholder = 'Let us know
           onPress={send}
         >
           {sending ? (
-            <ActivityIndicator color={colors.purple} />
+            <ActivityIndicator color={colors.accent} />
           ) : (
             <Text style={[styles.barBtn, (!canSend || sent) && { opacity: 0.35 }]}>Send</Text>
           )}
@@ -109,7 +109,7 @@ function FeedbackBody({ onClose, header, title, body, placeholder = 'Let us know
 
 const styles = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 64, gap: 12 },
-  barBtn: { color: colors.purple, fontSize: 17, fontWeight: '500' },
+  barBtn: { color: colors.accent, fontSize: 17, fontWeight: '500' },
   barTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600', color: colors.ink },
   body: { paddingHorizontal: 16, paddingTop: 20 },
   title: { fontSize: 24, fontWeight: '600', color: colors.ink },

@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     padding: 18,
     alignItems: 'flex-start',
   },
-  agreeOn: { backgroundColor: colors.purpleSoft, borderColor: '#D3CBF2' },
+  agreeOn: { backgroundColor: colors.accentSoft, borderColor: colors.accentTint },
   agreeText: { flex: 1, fontSize: 16, lineHeight: 24, color: colors.text },
-  link: { color: '#2346C8', textDecorationLine: 'underline' },
+  link: { color: colors.link, textDecorationLine: 'underline' },
 });

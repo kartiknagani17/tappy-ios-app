@@ -131,7 +131,7 @@ export default function Paywall() {
   return (
     <Screen>
       <View style={styles.top}>
-        <CloseButton testID="paywall-close" onPress={() => setOffer(true)} size={30} color="#4A4A5A" />
+        <CloseButton testID="paywall-close" onPress={() => setOffer(true)} size={30} color="#4A3C38" />
       </View>
       {/* Scrolls only when the screen is too short (iPhone SE) so the legal links stay reachable. */}
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
@@ -146,7 +146,7 @@ export default function Paywall() {
         <View style={styles.bottom}>
           {trial ? (
             <View style={styles.trialRow}>
-              <Feather name="check-circle" size={20} color={colors.purpleDark} />
+              <Feather name="check-circle" size={20} color={colors.accentDark} />
               <Text style={styles.trialText}>{trialDays}-day free trial included</Text>
             </View>
           ) : null}
@@ -159,7 +159,7 @@ export default function Paywall() {
             accessibilityLabel={`1 year plan, ${priceText} per year`}
           >
             <View style={styles.planCheck}>
-              <Feather name="check" size={16} color={colors.ink} />
+              <Feather name="check" size={16} color={colors.onPrimary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.planName}>{plan.label}</Text>
@@ -318,37 +318,37 @@ function Carousel() {
 function Dot({ active }: { active: boolean }) {
   const s = useAnimatedStyle(() => ({
     width: withTiming(active ? 24 : 8, { duration: 220 }),
-    backgroundColor: active ? colors.purpleDark : '#D9D9DE',
+    backgroundColor: active ? colors.accentDark : '#D9D9DE',
   }));
   return <Animated.View style={[styles.dot, s]} />;
 }
 
 const styles = StyleSheet.create({
   top: { paddingHorizontal: 20, paddingTop: 12, height: 52, justifyContent: 'center' },
-  title: { fontSize: 30, fontWeight: '800', textAlign: 'center', color: '#000', marginTop: 12, letterSpacing: -0.6 },
+  title: { fontSize: 30, fontWeight: '800', textAlign: 'center', color: '#1F1513', marginTop: 12, letterSpacing: -0.6 },
   stars: { fontSize: 26, letterSpacing: 4 },
-  review: { fontSize: 16, lineHeight: 23, color: '#6E6E73', textAlign: 'center', marginTop: 10 },
-  authorName: { fontSize: 17, fontWeight: '700', color: '#1B1B2A', marginTop: 16 },
+  review: { fontSize: 16, lineHeight: 23, color: colors.textMuted, textAlign: 'center', marginTop: 10 },
+  authorName: { fontSize: 17, fontWeight: '700', color: colors.ink, marginTop: 16 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 24 },
   dot: { height: 8, borderRadius: 4 },
   bottom: { paddingHorizontal: 20, paddingBottom: 8 },
   trialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 },
-  trialText: { fontSize: 17, fontWeight: '700', color: '#000' },
+  trialText: { fontSize: 17, fontWeight: '700', color: '#1F1513' },
   planCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     borderWidth: 2.5,
-    borderColor: colors.lime,
+    borderColor: colors.primary,
     borderRadius: 40,
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
-  planCheck: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.lime, alignItems: 'center', justifyContent: 'center' },
-  planName: { fontSize: 19, fontWeight: '800', color: '#000' },
-  planSub: { fontSize: 14, color: '#222', marginTop: 2 },
-  planPrice: { fontSize: 22, color: '#000' },
-  fine: { fontSize: 13, color: '#222', textAlign: 'center', marginTop: 12 },
+  planCheck: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  planName: { fontSize: 19, fontWeight: '800', color: '#1F1513' },
+  planSub: { fontSize: 14, color: '#2A1F1C', marginTop: 2 },
+  planPrice: { fontSize: 22, color: '#1F1513' },
+  fine: { fontSize: 13, color: '#2A1F1C', textAlign: 'center', marginTop: 12 },
   message: { fontSize: 13, color: colors.danger, textAlign: 'center', marginBottom: 12 },
   legal: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 8 },
   legalLink: { fontSize: 12, color: colors.textMuted, textDecorationLine: 'underline' },
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 190,
     height: 62,
-    backgroundColor: colors.lime,
+    backgroundColor: colors.primary,
     borderWidth: 3,
     borderColor: '#000',
     transform: [{ rotate: '-4deg' }, { translateY: 20 }, { translateX: 6 }],
@@ -366,17 +366,17 @@ const styles = StyleSheet.create({
   ribbonFront: {
     width: 260,
     height: 74,
-    backgroundColor: colors.lime,
+    backgroundColor: colors.primary,
     borderWidth: 3.5,
     borderColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '-4deg' }],
   },
-  ribbonText: { fontSize: 32, fontWeight: '900', fontStyle: 'italic', color: '#000', letterSpacing: 0.5 },
+  ribbonText: { fontSize: 32, fontWeight: '900', fontStyle: 'italic', color: colors.onPrimary, letterSpacing: 0.5 },
   offer: { paddingHorizontal: 24, paddingTop: 76, alignItems: 'stretch' },
-  offerTitle: { fontSize: 34, fontWeight: '900', textAlign: 'center', color: '#000', letterSpacing: -0.6 },
-  offerSub: { fontSize: 17, color: '#7A7A85', textAlign: 'center', marginTop: 14 },
-  offerNoPay: { fontSize: 16, fontWeight: '800', color: '#7A7A85', textAlign: 'center', marginTop: 6 },
-  decline: { fontSize: 16, color: '#7A7A85', textAlign: 'center' },
+  offerTitle: { fontSize: 34, fontWeight: '900', textAlign: 'center', color: '#1F1513', letterSpacing: -0.6 },
+  offerSub: { fontSize: 17, color: colors.textMuted, textAlign: 'center', marginTop: 14 },
+  offerNoPay: { fontSize: 16, fontWeight: '800', color: colors.textMuted, textAlign: 'center', marginTop: 6 },
+  decline: { fontSize: 16, color: colors.textMuted, textAlign: 'center' },
 });

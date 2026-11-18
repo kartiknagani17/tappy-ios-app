@@ -236,7 +236,7 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
                 onPress={() => setShow((v) => !v)}
                 style={{ paddingHorizontal: 16 }}
               >
-                <Feather name={show ? 'eye-off' : 'eye'} size={24} color="#555" />
+                <Feather name={show ? 'eye-off' : 'eye'} size={24} color="#5E514D" />
               </Pressable>
             </View>
             {(mode === 'signup' || resetFor) && password.length > 0 && !pwOk ? <Text style={styles.hint}>Use at least {MIN_PASSWORD} characters.</Text> : null}
@@ -352,7 +352,7 @@ function AuthForm({ initialMode, fromPrompt }: { initialMode: 'signup' | 'login'
 
 const PROVIDER_LABEL: Record<SocialProvider, string> = { apple: 'Apple', google: 'Google', facebook: 'Facebook' };
 const PROVIDER_ICON: Record<SocialProvider, React.ReactNode> = {
-  apple: <AntDesign name="apple" size={24} color="#000" />,
+  apple: <AntDesign name="apple" size={24} color="#1F1513" />,
   google: <AntDesign name="google" size={22} color="#4285F4" />,
   facebook: <FontAwesome name="facebook-official" size={24} color="#1877F2" />,
 };

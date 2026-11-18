@@ -124,7 +124,7 @@ export default function Grocery() {
     <Screen>
       <View style={styles.searchRow}>
         <View style={styles.search}>
-          <Feather name="search" size={18} color="#666" />
+          <Feather name="search" size={18} color="#6F625E" />
           <TextInput
             testID="grocery-search"
             accessibilityLabel="Search for a product"
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 36,
   },
-  filterOn: { borderColor: colors.ink, backgroundColor: '#F6FFE0' },
+  filterOn: { borderColor: colors.ink, backgroundColor: colors.accentSoft },
   filterText: { fontSize: 14, color: colors.ink },
   home: { padding: 16, paddingBottom: 32 },
   homeTitle: { fontSize: 22, fontWeight: '700', color: colors.ink, marginTop: 8 },
