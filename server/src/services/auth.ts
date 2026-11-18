@@ -446,7 +446,10 @@ export function appleTokenService(opts: { teamId: string; keyId: string; private
   return {
     async exchangeCode(code) {
       const res = await post('/auth/token', { code, grant_type: 'authorization_code' });
-      if (!res.ok) throw new Error(`Apple token exchange responded ${res.status}`);
+      if (!res.ok) {
+        const err = ((await res.json().catch(() => ({}))) as { error?: unknown }).error;
+        throw new Error(`Apple token exchange responded ${res.status}${typeof err === 'string' ? ` (${err.slice(0, 40)})` : ''}`);
+      }
       const body = (await res.json()) as { refresh_token?: unknown };
       return typeof body.refresh_token === 'string' && body.refresh_token.length <= 1024 ? body.refresh_token : null;
     },

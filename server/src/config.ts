@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -135,8 +135,10 @@ export function loadConfig() {
     /** Sign in with Apple key (Apple Developer > Keys), used to revoke Apple tokens when an account is deleted. Optional. */
     appleTeamId: str('APPLE_TEAM_ID', ''),
     appleSignInKeyId: str('APPLE_SIGN_IN_KEY_ID', ''),
-    /** The .p8 file's contents (PEM). Newlines may be written as \n. */
-    appleSignInPrivateKey: str('APPLE_SIGN_IN_PRIVATE_KEY', ''),
+    /** The .p8 key: APPLE_SIGN_IN_PRIVATE_KEY_FILE (path to the file, preferred) or APPLE_SIGN_IN_PRIVATE_KEY (PEM; newlines may be written as \n). */
+    appleSignInPrivateKey: process.env.APPLE_SIGN_IN_PRIVATE_KEY_FILE
+      ? readFileSync(process.env.APPLE_SIGN_IN_PRIVATE_KEY_FILE, 'utf8')
+      : str('APPLE_SIGN_IN_PRIVATE_KEY', ''),
     /** Sign in with Google ID tokens must be issued for one of these OAuth client ids (comma separated). Empty: Google sign-in is off. */
     googleClientIds: (process.env.GOOGLE_CLIENT_IDS || '')
       .split(',')
