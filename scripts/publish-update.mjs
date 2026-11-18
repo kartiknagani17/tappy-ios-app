@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 const args = process.argv.slice(2);
 const channelAt = args.indexOf('--channel');
 const channel = channelAt >= 0 ? args[channelAt + 1] : 'production';
-const message = args.filter((_, i) => i !== channelAt && i !== channelAt + 1).join(' ').trim();
+const message = args.filter((_, i) => channelAt < 0 || (i !== channelAt && i !== channelAt + 1)).join(' ').trim();
 
 if (!message) {
   console.error('Say what changed: npm run update -- "Fix the Grocery search"');
