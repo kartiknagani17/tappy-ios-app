@@ -3,7 +3,7 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DEMO_PRODUCTS } from '../../components/art';
@@ -15,7 +15,7 @@ import { api, ApiError, prepareUpload, type ApiProduct, type FrontResult } from 
 import { haptic } from '../../lib/haptics';
 import { AUTH_ENABLED } from '../../lib/auth';
 import { useStore } from '../../lib/store';
-import { colors, noOutline, radius } from '../../theme';
+import { colors, radius } from '../../theme';
 
 type Mode = 'barcode' | 'front' | 'label';
 type Match = Extract<FrontResult, { status: 'match' }>;
@@ -23,7 +23,6 @@ type Prompt = { title: string; body: string; actions: ('barcode' | 'front' | 'la
 
 const TIPS = [
   { title: 'Barcode scanner', body: 'Scan barcodes to instantly check the ingredients/allergens for your Tappy profile(s).' },
-  { title: 'No barcode handy?', body: 'Switch to Photo and snap the front of the package. You’ll confirm the match before we check it.' },
   { title: 'Color ratings', body: 'Red means it has something you avoid, yellow means something you limit. Always check the package too.' },
   { title: 'Missing product?', body: 'Photograph the ingredient list and Tappy will read it for you right away.' },
 ];
@@ -36,7 +35,6 @@ const MODE_HINT: Record<Mode, string> = {
 
 /** Same barcode seen again within this window is ignored (camera fires many callbacks per second). */
 const SAME_CODE_COOLDOWN_MS = 2500;
-const VALID_LENGTHS = [8, 12, 13, 14];
 const nowMs = () => Date.now();
 
 /** Push pre-prompt is done (or not needed): continue to the one-time account prompt. */
@@ -93,7 +91,6 @@ export default function Scan() {
   const lastFrontHash = useRef<string | null>(null);
   const lastCode = useRef<{ code: string; at: number } | null>(null);
   const shooting = useRef(false);
-  const [manual, setManual] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -215,7 +212,7 @@ export default function Scan() {
         setPrompt({
           title: 'Couldn’t read that barcode',
           body: 'Hold steady and make sure the whole barcode is in the frame.',
-          actions: ['retry', 'front'],
+          actions: ['retry'],
         });
     } catch (e) {
       fail(e);
@@ -360,29 +357,7 @@ export default function Scan() {
               <Feather name="file-text" size={16} color="#fff" />
               <Text style={styles.labelBannerText}>Ingredient photo · tap to cancel</Text>
             </Pressable>
-          ) : (
-            <View style={styles.segment}>
-              {(['barcode', 'front'] as const).map((m) => (
-                <Pressable
-                  key={m}
-                  testID={`mode-${m}`}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: mode === m }}
-                  accessibilityLabel={m === 'barcode' ? 'Barcode' : 'Photo'}
-                  hitSlop={{ top: 4, bottom: 4 }}
-                  onPress={() => {
-                    haptic.select();
-                    setMode(m);
-                  }}
-                  style={[styles.segBtn, mode === m && styles.segBtnOn]}
-                >
-                  <Feather name={m === 'barcode' ? 'maximize' : 'camera'} size={15} color={mode === m ? colors.ink : '#fff'} />
-                  <Text style={[styles.segText, mode === m && { color: colors.onPrimary }]}>{m === 'barcode' ? 'Barcode' : 'Photo'}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-          {mode === 'barcode' ? <ManualEntryButton onPress={() => setManual(true)} /> : null}
+          ) : null}
           {photoMode ? (
             <Pressable
               testID="shutter"
@@ -408,7 +383,6 @@ export default function Scan() {
             onPress={() => (!permission.canAskAgain ? Linking.openSettings() : requestPermission())}
             style={{ alignSelf: 'stretch' }}
           />
-          <ManualEntryButton onPress={() => setManual(true)} />
         </View>
       ) : null}
 
@@ -418,18 +392,6 @@ export default function Scan() {
           <Text style={styles.busyText}>{busy}</Text>
         </View>
       ) : null}
-
-      <ManualBarcodeSheet
-        visible={manual}
-        onClose={() => setManual(false)}
-        onSubmit={(code) => {
-          setManual(false);
-          setMode('barcode');
-          lastCode.current = { code, at: nowMs() };
-          // Let the sheet close before the result sheet opens.
-          setTimeout(() => lookupBarcode(code), 300);
-        }}
-      />
 
       <MatchSheet
         match={match}
@@ -568,10 +530,6 @@ const styles = StyleSheet.create({
   framePhoto: { width: 290, height: 360, borderRadius: 24, borderTopLeftRadius: 24, borderBottomRightRadius: 24 },
   hint: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: 16, textShadowColor: 'rgba(31,21,19,0.6)', textShadowRadius: 6 },
   controls: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 16 },
-  segment: { flexDirection: 'row', backgroundColor: 'rgba(31,21,19,0.55)', borderRadius: radius.pill, padding: 4 },
-  segBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, height: 38, borderRadius: radius.pill },
-  segBtnOn: { backgroundColor: colors.primary },
-  segText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   shutter: { width: 76, height: 76, borderRadius: 38, borderWidth: 5, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   shutterInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff' },
   labelBanner: {
@@ -595,102 +553,4 @@ const styles = StyleSheet.create({
   modalClose: { position: 'absolute', right: 14, top: 14 },
   modalTitle: { fontSize: 25, lineHeight: 33, textAlign: 'center', color: '#1F1513' },
   modalBody: { fontSize: 18, lineHeight: 27, textAlign: 'center', color: '#1F1513', marginTop: 16 },
-  manualBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(31,21,19,0.55)',
-    borderRadius: radius.pill,
-    paddingHorizontal: 16,
-    height: 38,
-  },
-  manualText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  manualSheet: { paddingHorizontal: 16, gap: 12 },
-  manualInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    height: 56,
-    paddingHorizontal: 16,
-    fontSize: 20,
-    letterSpacing: 1.5,
-    color: colors.ink,
-  },
-  manualError: { fontSize: 14, color: colors.danger },
 });
-
-function ManualEntryButton({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      testID="manual-entry"
-      accessibilityRole="button"
-      accessibilityLabel="Type a barcode number"
-      hitSlop={{ top: 4, bottom: 4 }}
-      onPress={() => {
-        haptic.select();
-        onPress();
-      }}
-      style={styles.manualBtn}
-    >
-      <Feather name="hash" size={16} color="#fff" />
-      <Text style={styles.manualText}>Type barcode number</Text>
-    </Pressable>
-  );
-}
-
-/** Fallback when the camera is unavailable, denied, or can't read a damaged barcode. */
-function ManualBarcodeSheet({ visible, onClose, onSubmit }: { visible: boolean; onClose: () => void; onSubmit: (code: string) => void }) {
-  return (
-    <BottomSheet visible={visible} onClose={onClose} handle>
-      {/* Remount on open so the field starts empty. */}
-      {visible ? <ManualBarcodeBody onClose={onClose} onSubmit={onSubmit} /> : null}
-    </BottomSheet>
-  );
-}
-
-function ManualBarcodeBody({ onClose, onSubmit }: { onClose: () => void; onSubmit: (code: string) => void }) {
-  const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const digits = code.replace(/\D/g, '');
-  const submit = () => {
-    if (!VALID_LENGTHS.includes(digits.length)) {
-      setError('Barcodes are 8, 12, 13 or 14 digits. Check the numbers under the bars.');
-      return;
-    }
-    onSubmit(digits);
-  };
-  return (
-    <View style={styles.manualSheet}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={styles.promptTitle} accessibilityRole="header">
-          Type the barcode
-        </Text>
-        <CloseButton onPress={onClose} />
-      </View>
-      <Text style={styles.promptBody}>Enter the numbers printed under the barcode on the package.</Text>
-      <TextInput
-        testID="manual-barcode-input"
-        accessibilityLabel="Barcode number"
-        value={code}
-        onChangeText={(t) => {
-          setCode(t.replace(/[^\d ]/g, ''));
-          setError(null);
-        }}
-        placeholder="e.g. 012345678905"
-        placeholderTextColor={colors.textSubtle}
-        keyboardType="number-pad"
-        returnKeyType="search"
-        maxLength={18}
-        autoFocus
-        onSubmitEditing={submit}
-        style={[styles.manualInput, noOutline]}
-      />
-      {error ? (
-        <Text style={styles.manualError} accessibilityLiveRegion="polite">
-          {error}
-        </Text>
-      ) : null}
-      <Button testID="manual-barcode-submit" title="Look up product" disabled={digits.length < 8} onPress={submit} />
-    </View>
-  );
-}

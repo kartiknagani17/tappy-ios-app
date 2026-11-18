@@ -145,9 +145,11 @@ export default function Paywall() {
 
         <View style={styles.bottom}>
           {trial ? (
-            <View style={styles.trialRow}>
-              <Feather name="check-circle" size={20} color={colors.accentDark} />
-              <Text style={styles.trialText}>{trialDays}-day free trial included</Text>
+            <View style={styles.trialRow} accessible accessibilityLabel={`${trialDays}-day free trial activated`}>
+              <Text style={styles.trialText}>{trialDays} Day Free Trial Activated</Text>
+              <View style={styles.switchTrack}>
+                <View style={styles.switchThumb} />
+              </View>
             </View>
           ) : null}
 
@@ -156,21 +158,25 @@ export default function Paywall() {
             accessible
             accessibilityRole="radio"
             accessibilityState={{ selected: true }}
-            accessibilityLabel={`1 year plan, ${priceText} per year`}
+            accessibilityLabel={`1 year plan, ${priceText} paid yearly, ${monthlyText} per month`}
           >
             <View style={styles.planCheck}>
               <Feather name="check" size={16} color={colors.onPrimary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.planName}>{plan.label}</Text>
-              <Text style={styles.planSub}>{monthlyText}/month, billed yearly</Text>
+              <Text style={styles.planSub}>{priceText} paid yearly</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.planPrice}>{priceText}</Text>
-              <Text style={styles.planSub}>/ year</Text>
+              <Text style={styles.planPrice}>{monthlyText}</Text>
+              <Text style={styles.planSub}>/ month</Text>
             </View>
           </View>
-          <View style={{ height: 18 }} />
+          <View style={styles.pillArrow} />
+          <View style={styles.pill}>
+            <Text style={styles.pillText}>{trial ? 'No payment now · Cancel anytime' : 'Cancel anytime'}</Text>
+          </View>
+
           {message ? (
             <Text style={styles.message} accessibilityLiveRegion="polite">
               {message}
@@ -182,13 +188,16 @@ export default function Paywall() {
             title={trial ? 'Start FREE trial' : 'Continue'}
             loading={loading}
             onPress={() => purchase(plan.id, trial, setLoading)}
-            style={{ borderRadius: 16, height: 60 }}
-            textStyle={{ fontWeight: '800', fontSize: 19 }}
+            style={{ borderRadius: 18, height: 62, marginTop: 24 }}
+            textStyle={{ fontWeight: '800', fontSize: 20 }}
           />
-          <Text style={styles.fine}>
+          <Text style={styles.fineMain}>
             {trial
-              ? `${trialDays} days free, then ${priceText}/year. Renews automatically unless canceled at least 24 hours before the trial ends. Cancel anytime in Settings.`
-              : `${priceText}/year. Renews automatically each year unless canceled at least 24 hours before renewal. Cancel anytime in Settings.`}
+              ? `${trialDays} days free, then ${monthlyText}/month. Billed as ${priceText}/year`
+              : `${monthlyText}/month. Billed as ${priceText}/year`}
+          </Text>
+          <Text style={styles.fine}>
+            Renews automatically unless canceled at least 24 hours before {trial ? 'the trial ends' : 'renewal'}. Cancel anytime in Settings.
           </Text>
           <LegalRow onRestore={restore} restoring={restoring} onOpen={setLegal} />
         </View>
@@ -200,7 +209,8 @@ export default function Paywall() {
         style={{ borderTopLeftRadius: 60, borderTopRightRadius: 60 }}
         topAccessory={
           <View style={styles.ribbon}>
-            <View style={styles.ribbonBack} />
+            <View style={styles.ribbonBackTop} />
+            <View style={styles.ribbonBackBottom} />
             <View style={styles.ribbonFront}>
               <Text style={styles.ribbonText}>FREE TRIAL</Text>
             </View>
@@ -208,27 +218,25 @@ export default function Paywall() {
         }
       >
         <Animated.View entering={FadeIn} style={styles.offer}>
-          <Text style={styles.offerTitle}>Before you go...</Text>
+          <Text style={styles.offerTitle} accessibilityRole="header">
+            Before you go...
+          </Text>
           <Text style={styles.offerSub}>
             {offerTrial ? `${offerTrialDays} days free, then only ${offerPriceText} / year` : `Only ${offerPriceText} / year`}
           </Text>
-          <Text style={styles.offerNoPay}>{offerTrial ? 'No payment now · Cancel anytime' : 'Cancel anytime'}</Text>
+          {offerTrial ? <Text style={styles.offerNoPay}>No payment now</Text> : null}
           <Button
             testID="offer-accept"
             title={offerTrial ? 'Start my free week' : 'Claim this offer'}
             loading={offerLoading}
             onPress={() => purchase(PLANS.annualOffer.id, offerTrial, setOfferLoading)}
-            style={{ marginTop: 40 }}
-            textStyle={{ fontWeight: '800', fontSize: 19 }}
+            style={{ marginTop: 48, height: 62, borderRadius: 31 }}
+            textStyle={{ fontWeight: '800', fontSize: 20 }}
           />
-          <Text style={[styles.fine, { marginTop: 10 }]}>
-            Renews at {offerPriceText}/year unless canceled at least 24 hours before {offerTrial ? 'the trial ends' : 'renewal'}.
-          </Text>
-          <LegalRow onOpen={setLegal} />
           <Pressable
             testID="offer-decline"
             accessibilityRole="button"
-            style={{ paddingVertical: 16 }}
+            style={{ paddingVertical: 18 }}
             onPress={() => {
               setOffer(false);
               leave();
@@ -236,6 +244,10 @@ export default function Paywall() {
           >
             <Text style={styles.decline}>Decline one-time offer →</Text>
           </Pressable>
+          <Text style={styles.offerFine}>
+            Renews at {offerPriceText}/year unless canceled at least 24 hours before {offerTrial ? 'the trial ends' : 'renewal'}.
+          </Text>
+          <LegalRow onOpen={setLegal} />
         </Animated.View>
       </BottomSheet>
       <LegalSheet doc={legal} onClose={() => setLegal(null)} />
@@ -332,8 +344,10 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 24 },
   dot: { height: 8, borderRadius: 4 },
   bottom: { paddingHorizontal: 20, paddingBottom: 8 },
-  trialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 },
-  trialText: { fontSize: 17, fontWeight: '700', color: '#1F1513' },
+  trialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 22 },
+  trialText: { fontSize: 18, fontWeight: '700', color: '#1F1513' },
+  switchTrack: { width: 56, height: 32, borderRadius: 16, backgroundColor: colors.accent, padding: 3, alignItems: 'flex-end' },
+  switchThumb: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff' },
   planCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -344,24 +358,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
-  planCheck: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  planName: { fontSize: 19, fontWeight: '800', color: '#1F1513' },
-  planSub: { fontSize: 14, color: '#2A1F1C', marginTop: 2 },
-  planPrice: { fontSize: 22, color: '#1F1513' },
-  fine: { fontSize: 13, color: '#2A1F1C', textAlign: 'center', marginTop: 12 },
+  planCheck: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  planName: { fontSize: 20, fontWeight: '800', color: '#1F1513' },
+  planSub: { fontSize: 15, color: '#2A1F1C', marginTop: 2 },
+  planPrice: { fontSize: 23, color: '#1F1513' },
+  pillArrow: {
+    alignSelf: 'center',
+    marginTop: 8,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderBottomWidth: 7,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: colors.accentSoft,
+  },
+  pill: { backgroundColor: colors.accentSoft, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  pillText: { fontSize: 15, fontWeight: '700', color: '#1F1513' },
+  fineMain: { fontSize: 14, color: '#2A1F1C', textAlign: 'center', marginTop: 14 },
+  fine: { fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 6 },
   message: { fontSize: 13, color: colors.danger, textAlign: 'center', marginBottom: 12 },
   legal: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 8 },
   legalLink: { fontSize: 12, color: colors.textMuted, textDecorationLine: 'underline' },
   legalDot: { fontSize: 12, color: colors.textMuted },
   ribbon: { width: 300, height: 110, alignItems: 'center', justifyContent: 'center' },
-  ribbonBack: {
+  ribbonBackTop: {
     position: 'absolute',
-    width: 190,
-    height: 62,
+    width: 140,
+    height: 56,
     backgroundColor: colors.primary,
     borderWidth: 3,
     borderColor: '#000',
-    transform: [{ rotate: '-4deg' }, { translateY: 20 }, { translateX: 6 }],
+    transform: [{ rotate: '-4deg' }, { translateX: 70 }, { translateY: -22 }],
+  },
+  ribbonBackBottom: {
+    position: 'absolute',
+    width: 140,
+    height: 56,
+    backgroundColor: colors.primary,
+    borderWidth: 3,
+    borderColor: '#000',
+    transform: [{ rotate: '-4deg' }, { translateX: -50 }, { translateY: 24 }],
   },
   ribbonFront: {
     width: 260,
@@ -375,8 +413,9 @@ const styles = StyleSheet.create({
   },
   ribbonText: { fontSize: 32, fontWeight: '900', fontStyle: 'italic', color: colors.onPrimary, letterSpacing: 0.5 },
   offer: { paddingHorizontal: 24, paddingTop: 76, alignItems: 'stretch' },
-  offerTitle: { fontSize: 34, fontWeight: '900', textAlign: 'center', color: '#1F1513', letterSpacing: -0.6 },
-  offerSub: { fontSize: 17, color: colors.textMuted, textAlign: 'center', marginTop: 14 },
-  offerNoPay: { fontSize: 16, fontWeight: '800', color: colors.textMuted, textAlign: 'center', marginTop: 6 },
-  decline: { fontSize: 16, color: colors.textMuted, textAlign: 'center' },
+  offerTitle: { fontSize: 36, fontWeight: '900', textAlign: 'center', color: '#1F1513', letterSpacing: -0.6 },
+  offerSub: { fontSize: 18, color: colors.textMuted, textAlign: 'center', marginTop: 16 },
+  offerNoPay: { fontSize: 17, fontWeight: '800', color: colors.textMuted, textAlign: 'center', marginTop: 4 },
+  offerFine: { fontSize: 11, color: colors.textMuted, textAlign: 'center' },
+  decline: { fontSize: 17, color: colors.textMuted, textAlign: 'center' },
 });

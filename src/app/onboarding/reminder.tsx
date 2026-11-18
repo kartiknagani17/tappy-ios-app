@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   FadeInDown,
   useAnimatedStyle,
   useSharedValue,
@@ -44,20 +45,16 @@ export default function Reminder() {
     router.push('/onboarding/paywall');
   };
   useEffect(() => {
-    rot.set(
-      withDelay(
-        400,
-        withRepeat(
-          withSequence(
-            withTiming(14, { duration: 90 }),
-            withTiming(-14, { duration: 120 }),
-            withTiming(8, { duration: 100 }),
-            withTiming(0, { duration: 90 }),
-          ),
-          2,
-        ),
-      ),
-    );
+    // Ring twice, rest ~1.2s, repeat forever.
+    const ring = () =>
+      withSequence(
+        withTiming(14, { duration: 90 }),
+        withTiming(-14, { duration: 120 }),
+        withTiming(8, { duration: 100 }),
+        withTiming(0, { duration: 90 }),
+      );
+    rot.set(withDelay(400, withRepeat(withSequence(ring(), ring(), withDelay(1200, withTiming(0, { duration: 1 }))), -1)));
+    return () => cancelAnimation(rot);
   }, [rot]);
   const bell = useAnimatedStyle(() => ({ transform: [{ rotate: `${rot.value}deg` }] }));
 
