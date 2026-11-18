@@ -160,6 +160,16 @@ describe('accounts API', () => {
     assert.equal((db.prepare("SELECT count(*) AS n FROM users WHERE email = 'gone@example.com'").get() as { n: number }).n, 0);
   });
 
+  it('serves the home page with links to the legal pages', async () => {
+    const res = await fetch(base + '/');
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /text\/html/);
+    const html = await res.text();
+    assert.match(html, /Find food you can eat/);
+    assert.match(html, /href="\/privacy"/);
+    assert.match(html, /href="\/terms"/);
+  });
+
   it('serves the legal pages as HTML', async () => {
     for (const p of ['/terms', '/privacy']) {
       const res = await fetch(base + p);

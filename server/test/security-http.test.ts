@@ -77,7 +77,8 @@ describe('HTTP hardening: headers, CORS, routing, bodies', () => {
   });
 
   it('unknown paths are 404, wrong methods are 405 with Allow', async () => {
-    assert.equal((await fetch(`${s.base}/`)).status, 404);
+    assert.equal((await fetch(`${s.base}/nothing-here`)).status, 404);
+    assert.equal((await fetch(`${s.base}/`, { method: 'POST' })).status, 405);
     assert.equal((await fetch(`${s.base}/api/scan/barcodes`, { method: 'POST' })).status, 404);
     const get = await fetch(`${s.base}/api/scan/barcode`);
     assert.equal(get.status, 405);

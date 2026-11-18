@@ -43,6 +43,7 @@ import {
   type Mailer,
   type User,
 } from '../services/auth.ts';
+import { renderHomePage } from './home-page.ts';
 import { renderLegalPage } from './legal-page.ts';
 
 export class HttpError extends Error {
@@ -95,6 +96,7 @@ const ROUTES: Route[] = [
   { name: 'profile', pattern: /^\/api\/account\/profile$/, methods: ['POST'] },
   { name: 'delete_account', pattern: /^\/api\/account\/delete$/, methods: ['POST'] },
   { name: 'image', pattern: IMAGE_PATH_RE, methods: ['GET', 'HEAD'] },
+  { name: 'home', pattern: /^\/$/, methods: ['GET', 'HEAD'] },
   { name: 'terms', pattern: /^\/terms\/?$/, methods: ['GET', 'HEAD'] },
   { name: 'privacy', pattern: /^\/privacy\/?$/, methods: ['GET', 'HEAD'] },
 ];
@@ -189,6 +191,7 @@ export function createApp({
       }
       return send(res, 200, { ok: true, photo_scanning: photosEnabled, password_reset: !!mailer });
     }
+    if (r.name === 'home') return sendHtml(res, renderHomePage());
     if (r.name === 'terms' || r.name === 'privacy') {
       return sendHtml(res, renderLegalPage(LEGAL_DOCS[r.name]));
     }
