@@ -65,7 +65,6 @@ export function VerdictSheet({
   const watched = useStore((s) => (product ? !!s.watched[product.gtin14] : false));
   const saved = useStore((s) => (product?.id ? s.saved.some((x) => x.id === product.id) : false));
   const [reporting, setReporting] = useState(false);
-  const [reacting, setReacting] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [scrolled, setScrolled] = useState(false);
@@ -92,7 +91,7 @@ export function VerdictSheet({
   const shownRows = showAll ? rows : rows.slice(0, ROWS_COLLAPSED);
 
   return (
-    <BottomSheet visible={!!product} onClose={onClose} handle maxHeight={0.92}>
+    <BottomSheet visible={!!product} onClose={onClose} handle maxHeight={0.86}>
       {product && verdict ? (
         <View style={{ flexShrink: 1 }}>
           {/* Top bar: the product name appears once the hero has scrolled away */}
@@ -329,13 +328,6 @@ export function VerdictSheet({
                     />
                   </>
                 ) : null}
-                <View style={styles.divider} />
-                <LinkRow
-                  icon="activity"
-                  title="Report a reaction"
-                  body="Felt unwell after trying this product? Tell us what happened."
-                  onPress={() => setReacting(true)}
-                />
                 {product.id !== null ? (
                   <>
                     <View style={styles.divider} />
@@ -406,7 +398,6 @@ export function VerdictSheet({
             </View>
           ) : null}
           <ReportSheet productId={reporting ? product.id : null} onClose={() => setReporting(false)} />
-          <ReactionSheet product={reacting ? product : null} onClose={() => setReacting(false)} />
           <ListPicker
             product={
               picking && product.id
@@ -542,76 +533,6 @@ function highlight(text: string, flags: Flag[], ratingByTerm: Map<string, Rating
     ) : (
       part.text
     ),
-  );
-}
-
-function ReactionSheet({ product, onClose }: { product: ApiProduct | null; onClose: () => void }) {
-  const [text, setText] = useState('');
-  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const [error, setError] = useState('');
-
-  const close = () => {
-    onClose();
-    setTimeout(() => {
-      setText('');
-      setState('idle');
-      setError('');
-    }, 300);
-  };
-
-  return (
-    <BottomSheet visible={!!product} onClose={close} handle>
-      <View style={{ paddingHorizontal: 16, gap: 12 }}>
-        {state === 'sent' ? (
-          <>
-            <Text style={styles.sheetTitle}>Thanks for telling us</Text>
-            <Text style={styles.sheetBody}>
-              We read every report. If your reaction was serious or is getting worse, contact a doctor or emergency services.
-            </Text>
-            <Button title="Done" onPress={close} />
-          </>
-        ) : (
-          <>
-            <Text style={styles.sheetTitle}>Report a reaction</Text>
-            <Text style={styles.sheetBody}>What happened after you had {product?.name ?? 'this product'}?</Text>
-            <TextInput
-              value={text}
-              onChangeText={(t) => {
-                setText(t);
-                if (error) setError('');
-              }}
-              placeholder="Bloating about an hour after eating it"
-              accessibilityLabel="What happened"
-              placeholderTextColor={colors.textSubtle}
-              style={[styles.input, { minHeight: 96 }, noOutline]}
-              multiline
-              maxLength={1500}
-            />
-            {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
-            <Button
-              title="Send"
-              loading={state === 'sending'}
-              onPress={async () => {
-                if (!product) return;
-                if (text.trim().length < 3) {
-                  setError('Tell us a little about what happened first.');
-                  return;
-                }
-                setState('sending');
-                try {
-                  await api.feedback('Reaction', `${product.name} (barcode ${product.gtin14}): ${text.trim()}`);
-                  haptic.success();
-                  setState('sent');
-                } catch (e) {
-                  setError(e instanceof ApiError ? e.message : 'Could not send this. Please try again.');
-                  setState('error');
-                }
-              }}
-            />
-          </>
-        )}
-      </View>
-    </BottomSheet>
   );
 }
 

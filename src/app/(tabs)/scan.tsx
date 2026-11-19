@@ -306,12 +306,12 @@ export default function Scan() {
         <View style={[StyleSheet.absoluteFill, styles.noCam]} />
       )}
 
-      <View style={[styles.logo, { top: insets.top + 6 }]}>
+      <View style={[styles.logo, { top: insets.top - 2 }]}>
         <Logo size={34} color="#fff" />
       </View>
 
       {!tipHidden && mode === 'barcode' ? (
-        <Animated.View entering={FadeIn} style={[styles.tip, { top: insets.top + 64 }]}>
+        <Animated.View entering={FadeIn} style={[styles.tip, { top: insets.top + 56 }]}>
           <View style={styles.tipHead}>
             <Text style={styles.tipTitle}>{TIPS[tip].title}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Hide tips" hitSlop={14} onPress={() => setTipHidden(true)}>
