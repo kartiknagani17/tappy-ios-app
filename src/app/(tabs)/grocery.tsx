@@ -185,7 +185,10 @@ export default function Grocery() {
       </View>
 
       {!key ? (
+        // Distinct keys: the two lists differ in numColumns, which FlatList can't change in place
+        // (it throws, and the app shows "Something went wrong").
         <FlatList
+          key="aisles"
           data={AISLES}
           keyExtractor={(a) => a.id}
           contentContainerStyle={styles.home}
@@ -210,6 +213,7 @@ export default function Grocery() {
         />
       ) : (
         <FlatList
+          key="results"
           data={shown}
           keyExtractor={(i) => i.p.gtin14}
           numColumns={2}
