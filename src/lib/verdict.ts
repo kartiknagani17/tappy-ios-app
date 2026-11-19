@@ -55,6 +55,9 @@ export function normalizeLabel(input: string): string {
   }
   return s
     .replace(/[̀-ͯ]/g, '')
+    // Labels sometimes run words together ("MilkPowder", "SoyLecithin"): split at lower→upper so
+    // "milk" is still found. Splitting only ever adds matches, so it errs toward over-flagging.
+    .replace(/([a-z])(?=[A-Z])/g, '$1 ')
     .toLowerCase()
     .replace(/œ/g, 'oe')
     .replace(/æ/g, 'ae')
@@ -245,6 +248,12 @@ function foldWithMap(text: string): { folded: string; map: number[] } {
       .replace(/ß/g, 'ss')
       .replace(/[‘’ʼ`´]/g, "'")
       .replace(/[_*]/g, ' ');
+    // Same run-together split as normalizeLabel ("MilkPowder" → "milk powder"); the added space
+    // maps to the capital letter, so highlight ranges still land on the original text.
+    if (i > 0 && /[a-z]/.test(text[i - 1]) && /[A-Z]/.test(text[i])) {
+      folded += ' ';
+      map.push(i);
+    }
     for (const ch of c) {
       folded += ch;
       map.push(i);
