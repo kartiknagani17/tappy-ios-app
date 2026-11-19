@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, T
 import { AccountButton } from '../../components/AccountButton';
 import { ProductCard } from '../../components/ProductCard';
 import { SettingsSheet } from '../../components/SettingsSheet';
-import { RatingIcon, Screen } from '../../components/ui';
+import { BackButton, RatingIcon, Screen } from '../../components/ui';
 import { VerdictSheet } from '../../components/VerdictSheet';
 import { AISLES, api, ApiError, type Aisle, type ApiProduct } from '../../lib/api';
 import { haptic } from '../../lib/haptics';
@@ -123,6 +123,7 @@ export default function Grocery() {
   return (
     <Screen>
       <View style={styles.searchRow}>
+        {aisle ? <BackButton onPress={() => setAisle(null)} /> : null}
         <View style={styles.search}>
           <Feather name="search" size={18} color="#6F625E" />
           <TextInput
