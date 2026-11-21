@@ -1,14 +1,40 @@
 ---
-name: tappy-product-shot
-description: Make a Tappy reel product shot from just a product name - candid POV pick-up of the pack in a US store (Google Flow, Veo 3.1 Lite), quick wrist-led flip, barcode slides into Tappy's fixed scan frame, green lock + beep + soft flash, then the real Tappy verdict. Use when the user gives a product (e.g. "/tappy-product-shot Takis Fuego") or asks for a product shot / product video for a reel.
+name: type-1
+description: Type 1 reel (one of several Tappy reel types). Make a Tappy reel product shot from just a product name - candid POV pick-up of the pack in a US store (Google Flow, Veo 3.1 Lite), quick wrist-led flip, barcode slides into Tappy's fixed scan frame, green lock + beep + soft flash, then the real Tappy verdict, with a character clip hard-cut on at the start and the end. Use when the user gives a product (e.g. "/type-1 Takis Fuego"), gives a list of products and wants the Flow prompts for each, says the Flow files for a batch are ready in a folder, or asks for a product shot / product video for a reel.
 ---
 
-# Tappy product shot
+# Type 1 reel: Tappy product shot
 
 **Input:** a product name (and optionally "good" or "bad" verdict, a reel number, a caption).
-**Output:** `reel analyse/products/<slug>/shot.mp4` (scan ~5 s + real verdict ~7 s) and `scan-only.mp4`.
+**Output:** `reel analyse/products/<slug>/shot.mp4` (scan ~5 s + real verdict ~7 s) and `scan-only.mp4`. When the product folder has character clips: `final.mp4` = character start clip -> `shot.mp4` -> character end clip (step 9).
 **Reference (approved look):** `reel analyse/products/cool-ranch-doritos/` and `reel analyse/tappy-clips/pov-messy-cool-ranch-v5.mp4`.
-**Kit:** `reel analyse/pipeline/product-shot/` (build.sh, labels.cjs, record.cjs, sheet.sh, grid.sh, proxy.mjs, assets/).
+**Kit:** `reel analyse/pipeline/product-shot/` (build.sh, stitch.sh, labels.cjs, record.cjs, sheet.sh, grid.sh, proxy.mjs, assets/).
+
+## Batch workflow (the user's default way of working)
+The user does **all** the Google Flow work. Claude never opens Flow, never generates, never downloads in this mode. Claude's jobs are the prompts (phase 1) and the edit + stitch (phase 2).
+
+### Phase 1: the user sends product names -> Claude sends prompts
+The user sends a list (10, 15 or more). For **each** product:
+1. Do step 0 (slug, angle from `angles.md`, pack details). Alternate left/right and vary rotation, tilt, shelf height and position across the whole batch so no two neighbours look alike. Append every row to `angles.md`.
+2. Fill in the three prompts **exactly as written** in steps 2, 3 and 4. Only replace the [BRACKETS]; never reword, shorten, add to or "improve" a prompt. For the end image, add the pack-type line from step 3 (cans/bottles, boxes) when it applies. For the video, pick GRIP and TURN for the pack type from step 4.
+3. Optional but worth it (free): record the verdict now (step 1) into `<batch>/<slug>/verdict/`. If Tappy can't find the product or shows the wrong one, tell the user **before** they spend Flow credits on it.
+
+Deliver the prompts as one file, `<batch>/PROMPTS.md` (one `## <Product>` section per product with the three prompts in code blocks, plus the angle, pack type and the Flow settings: start image Nano Banana 9:16 x4; end image = edit of the start image; video Veo 3.1 Lite, Frames, 9:16, **x1 = 10 credits**). Also create an empty subfolder per product, `<batch>/<slug>/`, so the user can drop files in. `<batch>` = the folder the user names, else `reel analyse/batches/<yyyy-mm-dd>/`. Give the user the file path and the slug list. Don't paste all the prompts into chat unless asked.
+
+### Phase 2: the user says the files are in the folders -> Claude builds every reel
+Each product subfolder should then hold:
+- the start image and the end image,
+- the product video from Flow (should be the 1080p download),
+- the **character start clip** and the **character end clip** (could be one clip used for both),
+- maybe the character image (reference only, not used in the edit).
+
+For each subfolder:
+1. **Inventory.** List the files. Names from Flow are random, so identify each one by looking at it (a frame from each video, each image). Rename to the kit's names: `start.png`/`.jpg`, `end.png`/`.jpg`, `clip-1080.mp4`, `character-start.mp4`, `character-end.mp4` (or one `character.mp4`, used for both). If a file is ambiguous or missing (no character clip, two candidate product clips), ask the user. Never guess.
+2. Check the product clip with ffprobe. If it's 720p, tell the user and ask for the 1080p download (720p blurs).
+3. Run steps 1 (verdict, if not done in phase 1), 6, 7 and 8 exactly as for a single product. The product folder is the subfolder itself.
+4. Run step 9 (stitch) to get `final.mp4`.
+
+Do the whole batch, then report one table: product, verdict, angle, re-roll needed (yes/no and why), `final.mp4` path. Products whose AI clip fails the step 6 QC are listed for a re-roll, with the reason, and not built. The user re-rolls in Flow and drops the new clip in.
 
 ## Non-negotiable look (the user rejected every version that broke one of these)
 - Candid, off-angle, messy shelf. Never straight-on or staged.
@@ -98,8 +124,20 @@ Read `qa-scan.jpg` and `qa-verdict.jpg`. Check:
 
 To fix: adjust SEGMENTS, BARCODE_X/Y or ZOOM and rebuild (free). Only re-roll the video for problems inside the AI clip.
 
-### 9. Deliver
-Send `shot.mp4` with SendUserFile. Report the credits used and which angle was chosen. Update `angles.md`.
+### 9. Stitch the character clips (when the folder has them)
+The finished reel is: **character start clip -> `shot.mp4` -> character end clip**.
+- Hard cuts only. No transitions, fades or flashes between the pieces.
+- No audio (the user's current rule).
+- Every piece is normalised to 1080×1920, 30 fps, yuv420p. A clip that isn't 9:16 gets scaled to fill and centre-cropped, and the script prints a warning. Tell the user if that happened, since a crop could cut off the character.
+- Character clips play at their full length, untrimmed, unless the user gives other timings.
+
+```
+bash reel analyse/pipeline/product-shot/stitch.sh "<productDir>"
+```
+It reads `character-start.mp4` and `character-end.mp4` (or one `character.mp4` for both; `.mov` works too). Override with `CHAR_START=<file> CHAR_END=<file>`. Output: `final.mp4` and `qa-final.jpg` (1 s around each cut at 6 fps). Read `qa-final.jpg`: the top row must cut from the character to the scan with the hand in view, and the bottom row from the verdict sheet to the character, with no black or duplicate frames at either cut.
+
+### 10. Deliver
+Send `final.mp4` (or `shot.mp4` when there are no character clips) with SendUserFile. Report the credits used and which angle was chosen. Update `angles.md`.
 
 ## Costs
 About 10 credits per product (plus 10 per re-roll). Images and the 1080p upscale are free. The Flow account shows its balance under the avatar (Plus: 190 a month, reset on the 20th). The visible "Veo" watermark is required in the user's region, so leave it.
