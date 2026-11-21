@@ -1,0 +1,57 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--web",
+        "--port",
+        "8081"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--disable-warning=ExperimentalWarning",
+        "server/src/http/server.ts"
+      ],
+      "port": 8787,
+      "env": {
+        "DATABASE_PATH": "C:/Users/HP/AppData/Local/Temp/claude/5a02d09eb8e408c4/cb4fbbd2-2c94-4614-964b-a85c360cc6bb/scratchpad/preview.db",
+        "CORS_ORIGINS": "http://localhost:8081",
+        "PUBLIC_URL": "http://localhost:8787",
+        "PHOTO_SCANNING": "off",
+        "OFF_LIVE_LOOKUP": "false"
+      }
+    },
+    {
+      "name": "shots-proxy",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "D:/tappy ios app/reel analyse/pipeline/product-shot/proxy.mjs"
+      ],
+      "port": 8788
+    },
+    {
+      "name": "shots-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--web",
+        "--port",
+        "8082"
+      ],
+      "port": 8082,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:8788",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "698625528840-i59tes7nc33d20buo747g0de3q5eskmg.apps.googleusercontent.com"
+      }
+    }
+  ]
+}
