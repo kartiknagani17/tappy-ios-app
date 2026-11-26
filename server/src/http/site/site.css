@@ -24,17 +24,6 @@
   --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, system-ui, sans-serif;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #140D0B; --cream: #1D1412; --cream-2: #251916; --card: #231916; --ink: #FBEFEA; --text: #EADCD7; --muted: #B3A29D; --line: #392A26;
-    --shadow: 0 30px 80px -30px rgba(0, 0, 0, .7); color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #140D0B; --cream: #1D1412; --cream-2: #251916; --card: #231916; --ink: #FBEFEA; --text: #EADCD7; --muted: #B3A29D; --line: #392A26;
-  --shadow: 0 30px 80px -30px rgba(0, 0, 0, .7); color-scheme: dark;
-}
-
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 var(--font-text); overflow-x: hidden; -webkit-font-smoothing: antialiased; }

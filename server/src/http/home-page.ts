@@ -5,7 +5,9 @@ import { LEGAL_CONTACT } from '../legal/content.ts';
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 const SITE = new URL('./site/', import.meta.url);
-const read = (name: string) => readFileSync(new URL(name, SITE), 'utf8');
+// Browsers turn CRLF into LF before hashing an inline script for CSP, so normalize here too or a
+// Windows checkout would serve a hash that never matches.
+const read = (name: string) => readFileSync(new URL(name, SITE), 'utf8').replace(/\r\n?/g, '\n');
 
 const SCRIPT = read('site.js');
 
