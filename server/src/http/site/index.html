@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tappy: find food you can eat</title>
+<meta name="description" content="Tappy checks the ingredients of packaged food against your allergies and diets. Scan a barcode, get a clear verdict, browse groceries that fit and keep lists of what works for you.">
+<meta name="theme-color" content="#E04D2A">
+<meta property="og:title" content="Tappy: find food you can eat">
+<meta property="og:description" content="Scan a barcode. Tappy checks every ingredient against your allergies and diets.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23E04D2A'/%3E%3Cpath d='M9 12V9h3M20 9h3v3M23 20v3h-3M12 23H9v-3' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 16.5l2.6 2.6 5.4-5.6' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>/*CSS*/</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<nav class="nav" id="nav" aria-label="Main">
+  <a class="brand" href="#top" aria-label="Tappy home">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#E04D2A"/><path d="M9 12V9h3M20 9h3v3M23 20v3h-3M12 23H9v-3" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16.5l2.6 2.6 5.4-5.6" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    tappy
+  </a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#demo">Try it</a>
+    <a href="#features">Features</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <a class="pill" href="#demo"><span class="dot"></span>Coming soon on iPhone</a>
+</nav>
+
+<header class="hero" id="top">
+  <div class="blobs" aria-hidden="true"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow fade-up"><b>NEW</b> Your personal ingredient detective</span>
+      <h1 aria-label="Find food you can eat.">
+        <span class="w"><span>Find</span></span> <span class="w"><span>food</span></span><br>
+        <span class="w"><span>you</span></span> <span class="w"><span>can</span></span> <span class="w"><span class="accent">eat.</span></span>
+      </h1>
+      <p class="lead fade-up d1">Scan any barcode. Tappy reads every ingredient and checks it against your allergies, diets and the things you avoid, in about a second.</p>
+      <div class="cta-row fade-up d2">
+        <a class="pill coral big" href="#demo">Try the live demo
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="pill ghost big" href="#how">How it works</a>
+      </div>
+      <div class="trust fade-up d3">
+        <div><strong><span data-count="50">0</span>+</strong>diets, allergies<br>and conditions</div>
+        <div><strong><span data-count="300">0</span>+</strong>ingredients<br>recognized</div>
+        <div><strong><span data-count="1">0</span>M+</strong>packaged<br>products</div>
+      </div>
+    </div>
+
+    <div class="stage fade-up d2" id="stage" aria-label="Animated preview of the Tappy scanner">
+      <div class="stage-inner" id="stageInner">
+        <div class="float" style="left:-150px;top:70px;transform:translateZ(90px);animation-delay:-1s" data-depth="1.6">
+          <div class="chip3d"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="#1F1513" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Gluten free<small>No conflicts found</small></span></div>
+        </div>
+        <div class="float" style="right:-140px;top:190px;transform:translateZ(130px);animation-delay:-3s" data-depth="2.2">
+          <div class="chip3d"><span class="m limit"><svg viewBox="0 0 24 24" fill="none" stroke="#1F1513" stroke-width="3.5" stroke-linecap="round"><path d="M12 6v8M12 18.5v.01"/></svg></span><span>Red 40<small>Limit · artificial dye</small></span></div>
+        </div>
+        <div class="float" style="left:-130px;bottom:120px;transform:translateZ(60px);animation-delay:-2s" data-depth="1.2">
+          <div class="chip3d"><span class="m avoid"><svg viewBox="0 0 24 24" fill="none" stroke="#1F1513" stroke-width="3.5" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><span>Contains milk<small>Avoid · your allergy</small></span></div>
+        </div>
+        <div class="float" style="right:-110px;top:-10px;transform:translateZ(-60px);animation-delay:-4s" data-depth=".6">
+          <div class="box3d" aria-hidden="true"><i class="f"></i><i class="bk"></i><i class="l"></i><i class="r"></i><i class="t"></i><i class="bt"></i></div>
+        </div>
+
+        <div class="phone" id="heroPhone" style="transform:rotateY(-16deg) rotateX(6deg) rotateZ(2deg)">
+          <div class="layer" style="transform:translateZ(-14px)"></div><div class="layer" style="transform:translateZ(-11px)"></div><div class="layer" style="transform:translateZ(-8px)"></div><div class="layer" style="transform:translateZ(-5px)"></div><div class="layer" style="transform:translateZ(-2px)"></div>
+          <div class="btn-side"></div>
+          <div class="shell"><div class="screen">
+            <div class="island"></div>
+            <div class="status"><span>9:41</span><i></i></div>
+            <div class="scr" data-scanner="hero"></div>
+            <div class="glare"></div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="marquee" aria-label="Some of the diets and ingredients Tappy covers">
+  <div class="track" id="trackA"></div>
+  <div class="track rev" id="trackB"></div>
+</div>
+
+<section class="sec" id="how" style="padding-bottom:40px">
+  <div class="wrap center">
+    <span class="kicker reveal">How it works</span>
+    <h2 class="h2 scrub-words" id="scrubHead">Reading labels is hard. Tiny print, strange names, forty ingredients. Tappy reads them for you.</h2>
+  </div>
+</section>
+
+<section class="story" id="story">
+  <div class="story-pin">
+    <div class="wrap story-grid">
+      <div>
+        <div class="steps">
+          <div class="step on"><div class="num">01</div><h3>Tell Tappy what you avoid.</h3><p>Pick from 50+ diets, allergies and conditions, from gluten free and low FODMAP to pregnancy. Set how strict each one is.</p></div>
+          <div class="step"><div class="num">02</div><h3>Point. Scan. Done.</h3><p>Aim your camera at any barcode. Tappy locks on in a beat, with a little buzz so you know it got it.</p></div>
+          <div class="step"><div class="num">03</div><h3>Get a verdict you can read.</h3><p>Avoid, limit, or no conflicts found. Every ingredient that matters to you is flagged and explained, including "may contain".</p></div>
+          <div class="step"><div class="num">04</div><h3>Find what works. Keep it.</h3><p>Browse the grocery aisles filtered to your profile and save the winners into lists like Weekly Shopping or Want to Try.</p></div>
+        </div>
+        <div class="dots" id="dots"><i class="on"></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="story-stage">
+        <div class="ring" aria-hidden="true"></div><div class="ring r2" aria-hidden="true"></div>
+        <div class="phone story-phone" id="storyPhone">
+          <div class="layer" style="transform:translateZ(-14px)"></div><div class="layer" style="transform:translateZ(-10px)"></div><div class="layer" style="transform:translateZ(-6px)"></div><div class="layer" style="transform:translateZ(-2px)"></div>
+          <div class="btn-side"></div>
+          <div class="shell"><div class="screen">
+            <div class="island"></div>
+            <!-- 1: profile -->
+            <div class="sc on" data-sc="0">
+              <div class="status dark"><span>9:41</span><i></i></div>
+              <div class="sc-pad">
+                <div class="prog"><span></span></div>
+                <h4>Any dietary restrictions?</h4>
+                <p class="cap">Select everything that applies.</p>
+                <div class="opt" data-pick="0">Gluten free <em>Severe</em><span class="cb"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+                <div class="opt" data-pick="1">Peanut <em>Allergy</em><span class="cb"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+                <div class="opt">Low FODMAP<span class="cb"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+                <div class="opt" data-pick="2">Seed oil free<span class="cb"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+                <div class="opt">Vegan<span class="cb"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>
+                <div class="btn">Continue</div>
+              </div>
+            </div>
+            <!-- 2: scanner -->
+            <div class="sc" data-sc="1" style="background:#0E0A09">
+              <div class="status"><span>9:41</span><i></i></div>
+              <div class="scr" data-scanner="story"></div>
+            </div>
+            <!-- 3: verdict -->
+            <div class="sc" data-sc="2" style="background:#0E0A09">
+              <div class="status"><span>9:41</span><i></i></div>
+              <div class="scr result" data-scanner="storyResult"></div>
+            </div>
+            <!-- 4: grocery -->
+            <div class="sc" data-sc="3">
+              <div class="status dark"><span>9:41</span><i></i></div>
+              <div class="sc-pad">
+                <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Search for a product or brand</div>
+                <div class="chips"><span class="on">✓ Likely works</span><span>Snacks</span><span>Sweets</span><span>Breakfast</span></div>
+                <div class="sec-title">Snacks <small>View all ›</small></div>
+                <div class="gr">
+                  <div><div class="gi"><i style="--c:linear-gradient(160deg,#3A2A2A,#7A3B2A)"></i><b></b></div><div class="gn">Veggie Chips</div><div class="gb">Sea salt</div></div>
+                  <div><div class="gi"><i style="--c:linear-gradient(160deg,#F2D36B,#D9A630)"></i><b></b></div><div class="gn">Corn Tortilla Chips</div><div class="gb">Multigrain</div></div>
+                  <div><div class="gi"><i style="--c:linear-gradient(160deg,#F7B267,#F25C54)"></i><b></b></div><div class="gn">Fruit Pouch</div><div class="gb">Apple carrot</div></div>
+                  <div><div class="gi"><i style="--c:linear-gradient(160deg,#3B5B3B,#1F3A28)"></i><b></b></div><div class="gn">Dark Chocolate</div><div class="gb">72% cocoa</div></div>
+                </div>
+                <div class="tabbar"><span class="on">Grocery</span><span>Scan</span><span>Lists</span></div>
+              </div>
+            </div>
+            <div class="glare"></div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec demo" id="demo">
+  <div class="wrap">
+    <div class="center">
+      <span class="kicker reveal">Live demo</span>
+      <h2 class="h2 reveal">Try it. Right here.</h2>
+      <p class="sub reveal">Choose what you avoid, then tap a product to scan it. The verdict updates as you change your profile, just like in the app.</p>
+    </div>
+    <div class="demo-grid">
+      <div>
+        <div class="panel reveal">
+          <h3><span>1</span>Your profile</h3>
+          <p>Tap to add or remove. Allergies are strict: even "may contain" counts.</p>
+          <div class="toggles" id="toggles"></div>
+        </div>
+        <div class="panel reveal">
+          <h3><span>2</span>Scan a product</h3>
+          <p>Tap any pack to send it to the scanner.</p>
+          <div class="shelf" id="shelf"></div>
+        </div>
+      </div>
+      <div class="demo-phone-col">
+        <div class="phone demo-phone" id="demoPhone">
+          <div class="layer" style="transform:translateZ(-14px)"></div><div class="layer" style="transform:translateZ(-10px)"></div><div class="layer" style="transform:translateZ(-6px)"></div><div class="layer" style="transform:translateZ(-2px)"></div>
+          <div class="btn-side"></div>
+          <div class="shell"><div class="screen">
+            <div class="island"></div>
+            <div class="status"><span>9:41</span><i></i></div>
+            <div class="scr" data-scanner="demo"></div>
+            <div class="glare"></div>
+          </div></div>
+        </div>
+        <p class="demo-hint">Products in this demo are made up. In the app, Tappy looks up real products by barcode.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="features">
+  <div class="wrap">
+    <span class="kicker reveal">Features</span>
+    <h2 class="h2 reveal">Built for people who<br><span class="soft">have to read every label.</span></h2>
+    <div class="bento">
+      <article class="card wide reveal" data-tilt>
+        <h3>Know when a recipe changes</h3>
+        <p>Brands quietly change ingredients. Turn on alerts for the products you rely on and Tappy tells you when something new shows up.</p>
+        <div class="art"><div class="alert"><span class="bell"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></span><div><b>Ingredients changed: Honey Oat Bar</b>Something new now conflicts with your profile.<div class="diff"><span class="add">+ soy lecithin</span>&nbsp;&nbsp;<span class="rem">sunflower lecithin</span></div></div></div></div>
+      </article>
+      <article class="card coral reveal" data-tilt>
+        <div class="big-num"><span data-count="1">0</span>M+</div>
+        <h3 style="margin-top:14px">products</h3>
+        <p>From Open Food Facts and USDA FoodData Central, refreshed every day.</p>
+      </article>
+      <article class="card dark reveal" data-tilt>
+        <h3>We never say "safe"</h3>
+        <p>Honest verdicts only. When we can't be sure, we tell you.</p>
+        <div class="art states">
+          <div><span class="m" style="background:#22C55E"><svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>No conflicts found</div>
+          <div><span class="m" style="background:#FFB800"><svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3.5" stroke-linecap="round"><path d="M12 6v8M12 18.5v.01"/></svg></span>Limit</div>
+          <div><span class="m" style="background:#FF5A2A"><svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3.5" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span>Avoid</div>
+        </div>
+      </article>
+      <article class="card reveal" data-tilt>
+        <h3>"May contain" counts</h3>
+        <p>Cross-contact warnings are checked too, strictly for severe allergies.</p>
+        <div class="art maybe"><span>Contains: milk, soy</span><span class="hit">May contain: peanuts</span></div>
+      </article>
+      <article class="card reveal" data-tilt>
+        <h3>No barcode? Snap the label</h3>
+        <p>Take a photo of the ingredient list and Tappy reads it for you.</p>
+        <div class="art cam-art"><div class="lbl"><b>INGREDIENTS:</b> rolled oats, cane sugar, almonds, <b>whey</b>, sunflower oil, sea salt, natural flavor…</div><div class="sweep"></div></div>
+      </article>
+      <article class="card half coral reveal" data-tilt>
+        <h3>Lists that work for you</h3>
+        <p>Save what you love. Share it with whoever does the shopping.</p>
+        <div class="art list-mini">
+          <div><i style="--c:#3A2A2A"></i>Sea Salt Veggie Chips<small>Weekly</small></div>
+          <div><i style="--c:#F2D36B"></i>Coconut Yogurt<small>Weekly</small></div>
+          <div><i style="--c:#7BC6A4"></i>Rice Crackers<small>Want to try</small></div>
+        </div>
+      </article>
+      <article class="card half reveal" data-tilt>
+        <h3>Grocery, filtered to you</h3>
+        <p>Browse aisles and search by product or brand. Turn on "Likely works" to see only what fits your profile at a glance.</p>
+        <div class="art maybe"><span class="hit" style="background:#FFEBE4;border-color:#1F1513;color:#1F1513">✓ Likely works</span><span>Snacks</span><span>Breakfast</span><span>Sweets &amp; cookies</span></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="statement">
+  <div class="wrap">
+    <p class="reveal">Less squinting at labels in the aisle. <span class="c">More food you can actually eat.</span></p>
+  </div>
+</section>
+
+<section class="sec" id="faq" style="padding-top:40px">
+  <div class="wrap faq">
+    <div>
+      <span class="kicker reveal">FAQ</span>
+      <h2 class="h2 reveal">Good questions.</h2>
+    </div>
+    <div class="reveal">
+      <details class="qa" open><summary>Is Tappy medical advice?<i></i></summary><div class="ans"><p>No. Tappy is a guide based on the information on package labels, which can be incomplete or out of date. If you have a severe allergy, always read the package yourself.</p></div></details>
+      <details class="qa"><summary>Where does the product information come from?<i></i></summary><div class="ans"><p>From <a href="https://world.openfoodfacts.org">Open Food Facts</a> (open database licence ODbL) and the U.S. Department of Agriculture FoodData Central, plus label photos shared by Tappy users.</p></div></details>
+      <details class="qa"><summary>What if a product isn't found?<i></i></summary><div class="ans"><p>Snap a photo of the ingredient list and Tappy reads it for you. If there's no ingredient list at all, Tappy says so instead of guessing.</p></div></details>
+      <details class="qa"><summary>Which diets and allergies does it cover?<i></i></summary><div class="ans"><p>More than 50: the major allergens, plus diets and conditions like gluten free, vegan, low FODMAP, low histamine, seed oil free, pregnancy, GERD, PCOS and many more. You can also add individual ingredients to avoid.</p></div></details>
+      <details class="qa"><summary>When can I get it?<i></i></summary><div class="ans"><p>Tappy is coming soon to the App Store for iPhone. Questions in the meantime? Email <a href="mailto:{{CONTACT}}">{{CONTACT}}</a>.</p></div></details>
+    </div>
+  </div>
+</section>
+
+<section class="final center">
+  <div class="wrap">
+    <h2 class="reveal">Eat with confidence.</h2>
+    <p class="reveal">Tappy is coming soon to the App Store. Your diet, your allergies, every label, in your pocket.</p>
+    <div class="cta-row reveal" style="justify-content:center">
+      <span class="pill big"><span class="dot"></span>Coming soon to the App Store</span>
+      <a class="pill ghost big" href="mailto:{{CONTACT}}">Get in touch</a>
+    </div>
+  </div>
+  <div class="wordmark" id="wordmark" aria-hidden="true">tappy</div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <div class="brand">tappy</div>
+        <p>Tappy is a guide based on the information on package labels, which can be incomplete or out of date. It is not medical advice. If you have a severe allergy, always read the package yourself.</p>
+        <p>Product information comes from <a href="https://world.openfoodfacts.org">Open Food Facts</a> (ODbL) and USDA FoodData Central, plus label photos shared by Tappy users.</p>
+      </div>
+      <div class="foot-links">
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms of Use</a>
+        <a href="mailto:{{CONTACT}}">Contact</a>
+      </div>
+    </div>
+    <div class="copy"><span>© Tappy</span><span>Made for people who read every label.</span></div>
+  </div>
+</footer>
+<script>/*JS*/</script>
+</body>
+</html>

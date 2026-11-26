@@ -46,7 +46,7 @@ import {
   type Mailer,
   type User,
 } from '../services/auth.ts';
-import { renderHomePage } from './home-page.ts';
+import { HOME_PAGE_CSP, renderHomePage } from './home-page.ts';
 import { renderLegalPage } from './legal-page.ts';
 
 export class HttpError extends Error {
@@ -205,7 +205,7 @@ export function createApp({
       }
       return send(res, 200, { ok: true, photo_scanning: photosEnabled, password_reset: !!mailer });
     }
-    if (r.name === 'home') return sendHtml(res, renderHomePage());
+    if (r.name === 'home') return sendHtml(res, renderHomePage(), HOME_PAGE_CSP);
     if (r.name === 'terms' || r.name === 'privacy') {
       return sendHtml(res, renderLegalPage(LEGAL_DOCS[r.name]));
     }
@@ -531,9 +531,9 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(json) }).end(json);
 }
 
-/** Static HTML (the legal pages): inline styles only, no scripts. */
-function sendHtml(res: ServerResponse, html: string) {
-  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'");
+/** Static HTML. The legal pages get inline styles only and no scripts; the home page passes its own policy. */
+function sendHtml(res: ServerResponse, html: string, csp = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'") {
+  res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html) }).end(html);
 }

@@ -221,6 +221,12 @@ describe('accounts API', () => {
     assert.match(html, /Find food you can eat/);
     assert.match(html, /href="\/privacy"/);
     assert.match(html, /href="\/terms"/);
+    // The inline script runs only because the CSP allows its exact hash.
+    const csp = res.headers.get('content-security-policy') ?? '';
+    const script = /<script>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
+    const { createHash } = await import('node:crypto');
+    assert.ok(csp.includes(`'sha256-${createHash('sha256').update(script).digest('base64')}'`));
+    assert.doesNotMatch(csp, /https?:/);
   });
 
   it('serves the legal pages as HTML', async () => {
