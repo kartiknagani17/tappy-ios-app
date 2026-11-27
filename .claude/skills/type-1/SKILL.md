@@ -127,14 +127,15 @@ To fix: adjust SEGMENTS, BARCODE_X/Y or ZOOM and rebuild (free). Only re-roll th
 ### 9. Stitch the character clips (when the folder has them)
 The finished reel is: **character start clip -> `shot.mp4` -> character end clip**.
 - Hard cuts only. No transitions, fades or flashes between the pieces.
-- No audio (the user's current rule).
-- Every piece is normalised to 1080×1920, 30 fps, yuv420p. A clip that isn't 9:16 gets scaled to fill and centre-cropped, and the script prints a warning. Tell the user if that happened, since a crop could cut off the character.
-- Character clips play at their full length, untrimmed, unless the user gives other timings.
+- **Audio (user decision 2026-11-25): the character clips keep their own audio** (spoken lines, ambience). The product shot gets silence. `SHOT_AUDIO=1` keeps shot.mp4's audio if it has any, and `MUTE=1` drops all audio.
+- Every piece is normalised to 1080×1920, 30 fps, yuv420p, with 48 kHz stereo AAC audio. A clip that isn't 9:16 gets scaled to fill and centre-cropped, and the script prints a warning. Tell the user if that happened, since a crop could cut off the character.
+- Trim the character clips with `CS_IN`/`CS_OUT` (start clip) and `CE_IN`/`CE_OUT` (end clip), in seconds. Without them the clips play at full length. Never cut a spoken line mid-word: get word times with faster-whisper (`D:/AIVideoEditor2/Setup/.venv/Scripts/python.exe`, `vad_filter=True`; without VAD it hallucinates speech on silent clips) and cut ~0.25 s after the last word.
 
 ```
-bash reel analyse/pipeline/product-shot/stitch.sh "<productDir>"
+CS_OUT=5.2 CE_IN=3.5 CE_OUT=7 bash reel analyse/pipeline/product-shot/stitch.sh "<productDir>"
 ```
-It reads `character-start.mp4` and `character-end.mp4` (or one `character.mp4` for both; `.mov` works too). Override with `CHAR_START=<file> CHAR_END=<file>`. Output: `final.mp4` and `qa-final.jpg` (1 s around each cut at 6 fps). Read `qa-final.jpg`: the top row must cut from the character to the scan with the hand in view, and the bottom row from the verdict sheet to the character, with no black or duplicate frames at either cut.
+It reads `character-start.mp4` and `character-end.mp4` (or one `character.mp4` for both; `.mov` works too). Override with `CHAR_START=<file> CHAR_END=<file>`.
+How the character clips themselves are made (prompts, rules, what failed): `reel analyse/characters/_tests/2026-11-25/FINDINGS.md`. Output: `final.mp4` and `qa-final.jpg` (1 s around each cut at 6 fps). Read `qa-final.jpg`: the top row must cut from the character to the scan with the hand in view, and the bottom row from the verdict sheet to the character, with no black or duplicate frames at either cut.
 
 ### 10. Deliver
 Send `final.mp4` (or `shot.mp4` when there are no character clips) with SendUserFile. Report the credits used and which angle was chosen. Update `angles.md`.

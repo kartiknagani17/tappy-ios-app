@@ -49,3 +49,13 @@ server/data/
 .env
 .env.*
 !.env.example
+
+# Reel work: source videos, generated clips and frames are large; keep them local.
+/reel analyse/**/*.mp4
+/reel analyse/**/*.mov
+/reel analyse/**/*.wav
+/reel analyse/**/*.jpg
+/reel analyse/**/*.png
+!/reel analyse/pipeline/**
+# ...but never env files (API keys)
+/reel analyse/**/.env

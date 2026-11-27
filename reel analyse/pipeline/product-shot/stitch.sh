@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Final reel: character clip (start) -> product shot (shot.mp4 from build.sh) -> character clip (end).
-# Hard cuts, no transitions, no audio. Every piece is normalised to 1080x1920, 30 fps, yuv420p, SAR 1.
+# Hard cuts, no transitions. Character clips keep their spoken audio; silence under the product shot.
+# Every piece is normalised to 1080x1920, 30 fps, yuv420p, SAR 1, audio 48 kHz stereo AAC.
+# env: CS_IN/CS_OUT, CE_IN/CE_OUT (trim seconds), SHOT_AUDIO=1 (keep shot.mp4 audio), MUTE=1 (no audio at all)
 # usage: stitch.sh <productDir>
 #   needs <productDir>/shot.mp4 (run build.sh first) and the character clips:
 #     character-start.mp4  and  character-end.mp4      (or one character.mp4 used for both)
@@ -35,13 +37,33 @@ for f in "$CS" "$SHOT" "$CE"; do
   awk "BEGIN{a=$w/$h; exit !(a<0.555||a>0.57)}" && echo "  warning: not 9:16, will be centre-cropped to fill 1080x1920"
 done
 
+# Trims (seconds; empty = whole clip): CS_IN/CS_OUT for the start clip, CE_IN/CE_OUT for the end clip.
+# Audio: the character clips keep their own audio (spoken lines). The product shot gets silence,
+# unless SHOT_AUDIO=1 and shot.mp4 has an audio track. MUTE=1 drops all audio (old behaviour).
+hasaudio() { [ -n "$("$FP" -v error -select_streams a -show_entries stream=index -of csv=p=0 "$1")" ]; }
+seg() { # in out file -> duration of the used part
+  local d; d=$(dur "$3"); awk -v i="${1:-0}" -v o="${2:-$d}" 'BEGIN{print o-i}'; }
+D1=$(seg "${CS_IN:-}" "${CS_OUT:-}" "$CS"); D2=$(dur "$SHOT"); D3=$(seg "${CE_IN:-}" "${CE_OUT:-}" "$CE")
+TR() { echo "trim=start=${1:-0}${2:+:end=$2}"; }
+ATR() { echo "atrim=start=${1:-0}${2:+:end=$2}"; }
+
 NORM="fps=30,scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,setsar=1,format=yuv420p,setpts=PTS-STARTPTS"
-$FF -v error -y -i "$CS" -i "$SHOT" -i "$CE" -filter_complex "\
-[0:v]$NORM[a];[1:v]$NORM[b];[2:v]$NORM[c];[a][b][c]concat=n=3:v=1:a=0[v]" \
-  -map "[v]" -an -c:v libx264 -crf 17 -preset medium -pix_fmt yuv420p -r 30 -movflags +faststart "$P/final.mp4"
+ANORM="aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS"
+SIL() { echo "anullsrc=r=48000:cl=stereo,atrim=duration=$1,aformat=sample_fmts=fltp:channel_layouts=stereo"; }
+V="[0:v]$(TR "${CS_IN:-}" "${CS_OUT:-}"),$NORM[v0];[1:v]$NORM[v1];[2:v]$(TR "${CE_IN:-}" "${CE_OUT:-}"),$NORM[v2]"
+if [ "${MUTE:-0}" = 1 ]; then
+  $FF -v error -y -i "$CS" -i "$SHOT" -i "$CE" -filter_complex "$V;[v0][v1][v2]concat=n=3:v=1:a=0[v]" \
+    -map "[v]" -an -c:v libx264 -crf 17 -preset medium -pix_fmt yuv420p -r 30 -movflags +faststart "$P/final.mp4"
+else
+  if hasaudio "$CS"; then A0="[0:a]$(ATR "${CS_IN:-}" "${CS_OUT:-}"),$ANORM,apad,atrim=duration=$D1[a0]"; else A0="$(SIL "$D1")[a0]"; fi
+  if [ "${SHOT_AUDIO:-0}" = 1 ] && hasaudio "$SHOT"; then A1="[1:a]$ANORM,apad,atrim=duration=$D2[a1]"; else A1="$(SIL "$D2")[a1]"; fi
+  if hasaudio "$CE"; then A2="[2:a]$(ATR "${CE_IN:-}" "${CE_OUT:-}"),$ANORM,apad,atrim=duration=$D3[a2]"; else A2="$(SIL "$D3")[a2]"; fi
+  $FF -v error -y -i "$CS" -i "$SHOT" -i "$CE" -filter_complex "$V;$A0;$A1;$A2;[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]" \
+    -map "[v]" -map "[a]" -c:v libx264 -crf 17 -preset medium -pix_fmt yuv420p -r 30 \
+    -c:a aac -b:a 192k -movflags +faststart "$P/final.mp4"
+fi
 
 # QA: 1 s around each cut at 6 fps
-D1=$(dur "$CS"); D2=$(dur "$SHOT")
 C1=$(awk "BEGIN{print $D1}"); C2=$(awk "BEGIN{print $D1+$D2}")
 S1=$(awk "BEGIN{s=$C1-0.5; print (s<0?0:s)}") S2=$(awk "BEGIN{print $C2-0.5}")
 LBL="fps=6,scale=240:-1,drawtext=fontfile='C\:/Windows/Fonts/arialbd.ttf':text='%{pts\:hms}':x=3:y=3:fontsize=16:fontcolor=yellow:box=1:boxcolor=black@0.6"

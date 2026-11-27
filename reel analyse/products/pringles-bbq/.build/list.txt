@@ -1,0 +1,2 @@
+file 'D:/tappy ios app/reel analyse/products/pringles-bbq/.build/a-scan.mp4'
+file 'D:/tappy ios app/reel analyse/products/pringles-bbq/.build/b-verdict.mp4'
