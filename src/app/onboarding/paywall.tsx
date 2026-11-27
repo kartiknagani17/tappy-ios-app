@@ -71,9 +71,9 @@ export default function Paywall() {
   const offerPriceText = offerPrice?.priceString ?? money(PLANS.annualOffer.price);
   // Only promise a free trial Apple will actually give this Apple ID.
   const trialAvailable = annual ? annual.trialEligible : true;
-  const [trialOn, setTrialOn] = useState(true);
-  const trial = trialAvailable && trialOn;
-  // Trial off → the no-trial product, so Apple charges today instead of applying the free week.
+  // App Store 3.1.2(c): no trial on/off toggle. Eligible users always get the trial offer.
+  const trial = trialAvailable;
+  // No trial (already used) → the no-trial product, so Apple charges today.
   // Until that product is live in App Store Connect, fall back to the trial product.
   const noTrial = prices?.[PLANS.annualNoTrial.id];
   const buyId = trial || !noTrial ? plan.id : PLANS.annualNoTrial.id;
@@ -152,20 +152,12 @@ export default function Paywall() {
 
         <View style={styles.bottom}>
           {trialAvailable ? (
-            <Pressable
-              testID="trial-toggle"
-              style={styles.trialRow}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: trialOn }}
-              accessibilityLabel={`${trialDays}-day free trial`}
-              onPress={() => {
-                haptic.light();
-                setTrialOn((v) => !v);
-              }}
-            >
-              <Text style={styles.trialText}>{trialOn ? `${trialDays} Day Free Trial Activated` : 'Not sure? Enable free trial'}</Text>
-              <Switch on={trialOn} />
-            </Pressable>
+            <View testID="trial-included" style={styles.trialRow} accessible accessibilityLabel={`${trialDays}-day free trial included`}>
+              <Text style={styles.trialText}>{trialDays}-Day Free Trial Included</Text>
+              <View style={styles.trialCheck}>
+                <Feather name="check" size={18} color={colors.onPrimary} />
+              </View>
+            </View>
           ) : null}
 
           <View
@@ -341,16 +333,6 @@ function Carousel() {
   );
 }
 
-function Switch({ on }: { on: boolean }) {
-  const track = useAnimatedStyle(() => ({ backgroundColor: withTiming(on ? colors.accent : '#D9D9DE', { duration: 180 }) }));
-  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: withTiming(on ? 24 : 0, { duration: 180 }) }] }));
-  return (
-    <Animated.View style={[styles.switchTrack, track]}>
-      <Animated.View style={[styles.switchThumb, thumb]} />
-    </Animated.View>
-  );
-}
-
 function Dot({ active }: { active: boolean }) {
   const s = useAnimatedStyle(() => ({
     width: withTiming(active ? 24 : 8, { duration: 220 }),
@@ -370,8 +352,7 @@ const styles = StyleSheet.create({
   bottom: { paddingHorizontal: 20, paddingBottom: 8 },
   trialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 22 },
   trialText: { fontSize: 18, fontWeight: '700', color: '#1F1513' },
-  switchTrack: { width: 56, height: 32, borderRadius: 16, padding: 3 },
-  switchThumb: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff' },
+  trialCheck: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   planCard: {
     flexDirection: 'row',
     alignItems: 'center',

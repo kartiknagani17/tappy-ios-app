@@ -29,6 +29,8 @@ type State = {
   trialActive: boolean;
   agreedToTerms: boolean;
   askedPush: boolean;
+  /** The scan screen's tips card ("Barcode scanner · TRY A DEMO") was shown once; it isn't shown again. */
+  seenScanTips: boolean;
   /** Agreed that ingredient photos are sent to OpenAI to be read (App Store 5.1.2(i)). */
   aiPhotoConsent: boolean;
   /** `name`: shown when the provider shared no email (Apple gives the name only on the first sign-in). */
@@ -90,6 +92,7 @@ const initial: State = {
   trialActive: false,
   agreedToTerms: false,
   askedPush: false,
+  seenScanTips: false,
   aiPhotoConsent: false,
   accountPromptDismissed: false,
   saved: [],

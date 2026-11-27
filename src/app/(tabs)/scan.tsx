@@ -72,7 +72,11 @@ export default function Scan() {
   const [permission, requestPermission] = useCameraPermissions();
   const [focused, setFocused] = useState(true);
   const [tip, setTip] = useState(0);
-  const [tipHidden, setTipHidden] = useState(false);
+  // The tips card shows on the first visit only; later launches start without it.
+  const [tipHidden, setTipHidden] = useState(() => useStore.getState().seenScanTips);
+  useEffect(() => {
+    if (!useStore.getState().seenScanTips) useStore.getState().set({ seenScanTips: true });
+  }, []);
   const [pushPrompt, setPushPrompt] = useState(false);
   const askedPush = useStore((s) => s.askedPush);
 

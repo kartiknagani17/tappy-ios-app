@@ -55,6 +55,7 @@ export function sanitizePersisted(raw: unknown): Record<string, unknown> {
     'trialActive',
     'agreedToTerms',
     'askedPush',
+    'seenScanTips',
     'aiPhotoConsent',
     'accountPromptDismissed',
     'contributePhotos',
